@@ -9,6 +9,7 @@ import ChantStage from "./ChantStage";
 import ChapterView from "./ChapterView";
 import { useChurch } from "@/lib/church";
 import UserMenu from "./UserMenu";
+import HelpControl from "./HelpControl";
 import { openScreen } from "@/lib/screen";
 import { createClient } from "@/lib/supabase/client";
 import { uuid } from "@/lib/uuid";
@@ -49,10 +50,10 @@ export default function Control() {
   const [peers, setPeers] = useState([]);                  // les autres opérateurs connectés
   const [lastBy, setLastBy] = useState(null);              // dernière action faite par quelqu'un d'autre { name, device, what }
   const [rPulse, setRPulse] = useState(false);
-  const [helpOn, setHelpOn] = useState(false);            // « aide autorisée » : l'Aide écran peut projeter
+  const [helperId, setHelperId] = useState(null);        // la personne (Aide écran) autorisée à projeter, une seule
   const [helpBusy, setHelpBusy] = useState(false);
-  // l'Aide écran ne peut projeter que si l'administrateur a appuyé sur « Autoriser l'aide »
-  const canProject = church.role !== "assistant" || helpOn;
+  // un profil « Aide écran » ne peut projeter que si l'administrateur l'a choisi
+  const canProject = church.role !== "assistant" || helperId === church.userId;
   const mine = useRef(null);
   const stateRef = useRef({});
   const [pulse, setPulse] = useState(false);
@@ -74,7 +75,7 @@ export default function Control() {
   // donc tout le monde voit la même chose à l'écran et ← → repartent du bon endroit.
   // On ne déplace PAS la lecture de l'autre (sa Bible reste où il la consulte).
   useEffect(() => {
-    const me = { id: uuid(), name: church.firstName || church.email.split("@")[0], device: window.matchMedia("(min-width: 1024px)").matches ? "ordinateur" : "mobile", role: church.role };
+    const me = { id: uuid(), name: church.firstName || church.email.split("@")[0], device: window.matchMedia("(min-width: 1024px)").matches ? "ordinateur" : "mobile", role: church.role, uid: church.userId };
     mine.current = me;
     const applyState = (m) => {
       if (chantsOnly && m.shown && m.shown.kind !== "chant") { setShown(OTHER); setLive(null); setSlideLive(null); if (m.blank !== undefined) setBlank(m.blank); return; }
@@ -89,7 +90,7 @@ export default function Control() {
     const hide = (m) => chantsOnly && m.kind !== "chant";
     const OTHER = { type: "show", kind: "other", ref: "", text: "", version: "" };
     const onRemote = (m) => {
-      if (m.type === "help") { if (m.by?.role === "admin") setHelpOn(!!m.on); return; }
+      if (m.type === "helper") { if (m.by?.role === "admin") setHelperId(m.id || null); return; }
       if (chantsOnly && (m.type === "show" || m.type === "update") && hide(m)) {
         setShown(OTHER); setLive(null); setSlideLive(null);
         if (m.type === "show") setBlank(false);
@@ -121,7 +122,7 @@ export default function Control() {
     ch.current = openScreen(church.token, onRemote, {
       me,
       onPeers: (list) => setPeers(list.filter((p) => p.id !== me.id).filter((p, i, a) => a.findIndex((x) => x.id === p.id) === i)),
-      onReady: () => { ch.current?.postMessage({ type: "sync?" }); createClient().rpc("get_help").then(({ data }) => setHelpOn(data === true)); },
+      onReady: () => { ch.current?.postMessage({ type: "sync?" }); createClient().rpc("get_helper").then(({ data }) => setHelperId(data || null)); },
     });
     return () => ch.current.close();
   }, [church.token]);
@@ -228,14 +229,14 @@ export default function Control() {
     setShown(null);
   };
   // « noir » est explicite (on / off) : si deux personnes appuient, l'écran ne bascule pas dans le mauvais sens
-  const toggleHelp = async () => {
-    const on = !helpOn;
+  // uid = la personne choisie, ou null pour arrêter l'aide (une seule aide à la fois)
+  const pickHelper = async (uid) => {
     setHelpBusy(true);
-    const { error } = await createClient().rpc("set_help", { enabled: on });
+    const { error } = await createClient().rpc("set_helper", { target: uid });
     setHelpBusy(false);
-    if (error) return alert("Impossible de changer le réglage : " + error.message);
-    setHelpOn(on);
-    ch.current?.postMessage({ type: "help", on });
+    if (error) return alert("Impossible de changer l'aide : " + error.message);
+    setHelperId(uid);
+    ch.current?.postMessage({ type: "helper", id: uid });
   };
   const toggleBlank = () => { if (!canProject) return; const on = !blank; ch.current?.postMessage({ type: "blank", on }); setBlank(on); setLastBy(null); };
 
@@ -323,6 +324,7 @@ export default function Control() {
           <span className="text-xl sm:text-2xl font-semibold leading-none">Hosanna <span className="text-amber-400">Cast</span></span>
         </a>
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          {church.role === "admin" && <HelpControl helperId={helperId} peers={peers} busy={helpBusy} onPick={pickHelper} />}
           {peers.length > 0 && (
             <div className="flex items-center gap-1.5 rounded-full bg-neutral-800 border border-neutral-700 pl-2 pr-1 py-1" title={peers.map((p) => `${p.name} (${p.device})`).join(", ") + " : connecté aussi"}>
               <span className="h-2 w-2 rounded-full bg-sky-400" />
@@ -545,14 +547,10 @@ export default function Control() {
             </p>
           )}
 
-          {church.role === "admin" && (
-            <button onClick={toggleHelp} disabled={helpBusy}
-              className={`mt-2 w-full rounded-lg py-2 text-sm transition duration-100 active:scale-95 disabled:opacity-60 ${helpOn ? "bg-sky-500/20 border border-sky-400 text-sky-100" : "bg-neutral-800 hover:bg-neutral-700"}`}>
-              {helpBusy ? "…" : helpOn ? "● Aide autorisée · Arrêter l'aide" : "Autoriser l'aide"}
-            </button>
-          )}
-          {church.role === "assistant" && !helpOn && (
-            <p className="mt-2 text-xs rounded-lg px-2.5 py-2 bg-amber-400/10 text-amber-200">L'aide n'est pas activée. L'administrateur doit appuyer sur « Autoriser l'aide » pour que vous puissiez projeter.</p>
+          {church.role === "assistant" && (
+            canProject
+              ? <p className="mt-2 text-xs rounded-lg px-2.5 py-2 bg-sky-500/15 text-sky-200">Vous aidez à projeter : l'administrateur vous a autorisé.</p>
+              : <p className="mt-2 text-xs rounded-lg px-2.5 py-2 bg-amber-400/10 text-amber-200">{helperId ? "Une autre personne aide en ce moment." : "L'aide n'est pas activée."} Vous pouvez suivre l'écran, mais pas projeter tant que l'administrateur ne vous a pas autorisé.</p>
           )}
 
           <div className="grid grid-cols-4 lg:grid-cols-2 gap-1.5 lg:gap-2 mt-2 lg:mt-3">
