@@ -8,15 +8,12 @@ export default async function ControlLayout({ children }) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: m } = await supabase
-    .from("memberships")
-    .select("role, churches(id, name, screen_token)")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
+  // les deux requêtes partent en même temps (au lieu de l'une après l'autre)
+  const [{ data: m }, { data: profile }] = await Promise.all([
+    supabase.from("memberships").select("role, churches(id, name, screen_token)").eq("user_id", user.id).limit(1).maybeSingle(),
+    supabase.from("profiles").select("first_name, last_name").eq("user_id", user.id).maybeSingle(),
+  ]);
   if (!m?.churches) redirect("/onboarding");
-
-  const { data: profile } = await supabase.from("profiles").select("first_name, last_name").eq("user_id", user.id).maybeSingle();
 
   const { id, name, screen_token } = m.churches;
   return (
