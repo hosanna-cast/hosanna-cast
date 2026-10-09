@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import LogoutButton from "./LogoutButton";
 import { normalizeRole } from "@/lib/roles";
@@ -8,7 +9,6 @@ const cards = [
   { href: "/control?tab=notes", title: "Notes", desc: "Ouvrir vos notes de prédication (.docx)." },
   { href: "/control?tab=chants", title: "Chants", desc: "Parcourir et projeter les paroles de chants." },
   { href: "/admin", title: "Administration", desc: "Équipe, profils et invitations.", only: ["admin"] },
-  { href: "/login", title: "Connexion", desc: "Se connecter ou inscrire votre église." },
 ];
 
 export default async function Home() {
@@ -28,26 +28,26 @@ export default async function Home() {
     }
   } catch {}
 
-  // connecté : plus de bouton « Connexion »
-  // et chacun ne voit que ce qui lui est ouvert (profil « Chants » : chants seulement)
-  const list = (logged ? cards.filter((c) => c.href !== "/login") : cards.filter((c) => !c.only))
+  // pas connecté : la page d'accueil, c'est la connexion
+  if (!logged) redirect("/login");
+
+  // chacun ne voit que ce qui lui est ouvert (profil « Chants » : chants seulement)
+  const list = cards
     .filter((c) => !c.only || c.only.includes(role))
-    .filter((c) => !(logged && role === "standard" && ["Console", "Notes"].includes(c.title)));
+    .filter((c) => !(role === "standard" && ["Console", "Notes"].includes(c.title)));
 
   return (
     <main className="relative min-h-screen bg-neutral-900 text-white flex flex-col items-center justify-center p-6">
-      {logged && <LogoutButton />}
+      <LogoutButton />
       <img src="/logo.png" alt="" width={96} height={96} className="h-20 w-20 sm:h-24 sm:w-24 mb-4" />
       <h1 className="text-3xl sm:text-4xl font-semibold mb-2">
         Hosanna <span className="text-amber-400">Cast</span>
       </h1>
       <p className="text-neutral-400 mb-6 text-center">Projection de versets, notes et chants.</p>
 
-      {logged && (
-        <p className="mb-5 text-center text-neutral-200">
-          Bonjour <span className="text-amber-400 font-medium">{name}</span>, bienvenue sur ton espace
-        </p>
-      )}
+      <p className="mb-5 text-center text-neutral-200">
+        Bonjour <span className="text-amber-400 font-medium">{name}</span>, bienvenue sur ton espace
+      </p>
 
       <div className="grid gap-4 sm:grid-cols-2 w-full max-w-2xl">
         {list.map((c) => (
