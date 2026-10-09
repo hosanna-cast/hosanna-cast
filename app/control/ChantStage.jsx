@@ -9,12 +9,11 @@ const field = "w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 p
 const ghost = "px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-sm transition duration-100 active:scale-95";
 
 // Écran dédié aux chants : le chant ouvert occupe toute la colonne centrale.
-export default function ChantStage({ item, bible, refOf, textOf, isLiveVerse, liveSlide, pausedSlide, onSlide, onVerse, onFree, onUpdate, onRemove }) {
+export default function ChantStage({ item, bible, refOf, textOf, isLiveVerse, liveSlide, pausedSlide, onSlide, onVerse, onUpdate, onRemove }) {
   const [mode, setMode] = useState("view");               // "view" | "all" (tout le texte) | "cut" (choisir les coupures)
   const [f, setF] = useState({ title: "", person: "", text: "" });
   const [error, setError] = useState("");
   const [vq, setVq] = useState("");
-  const [free, setFree] = useState("");
   const [titleEdit, setTitleEdit] = useState(null);    // null = titre affiché, sinon texte en cours de saisie
   const [edit, setEdit] = useState(null);                 // { i, isNew } : un seul couplet en cours de modification
   const [draft, setDraft] = useState("");
@@ -34,7 +33,7 @@ export default function ChantStage({ item, bible, refOf, textOf, isLiveVerse, li
     }).filter(Boolean);
   }, [vq, bible]);
 
-  useEffect(() => { setMode("view"); setEdit(null); setTitleEdit(null); setVq(""); setFree(""); setError(""); }, [item?.id]);
+  useEffect(() => { setMode("view"); setEdit(null); setTitleEdit(null); setVq(""); setError(""); }, [item?.id]);
 
   useEffect(() => {
     if (liveSlide && item && liveSlide.id === item.id)
@@ -84,15 +83,6 @@ export default function ChantStage({ item, bible, refOf, textOf, isLiveVerse, li
     if (!window.confirm(`Supprimer la diapositive ${i + 1} ?`)) return;
     commit(slides.filter((_, k) => k !== i));
   };
-  const addFree = () => {
-    const t = free.trim();
-    if (!t) return;
-    const at = liveSlide && liveSlide.id === item.id ? liveSlide.i + 1 : slides.length;
-    const next = [...slides]; next.splice(at, 0, t);
-    commit(next);
-    setFree("");
-  };
-
   const paused = pausedSlide && pausedSlide.id === item.id ? pausedSlide : null;
 
   if (mode === "all") {
@@ -163,7 +153,7 @@ export default function ChantStage({ item, bible, refOf, textOf, isLiveVerse, li
       </div>
 
       {/* le chantre cite un verset / change une parole */}
-      <div className="rounded-xl bg-blue-400/5 border border-blue-400/30 p-3 mb-4 space-y-3">
+      <div className="rounded-xl bg-blue-400/5 border border-blue-400/30 p-3 mb-4">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm text-blue-300">Le chantre cite un verset ?</span>
@@ -200,19 +190,6 @@ export default function ChantStage({ item, bible, refOf, textOf, isLiveVerse, li
               ))}
             </div>
           )}
-        </div>
-
-        <div>
-          <div className="text-sm text-blue-300 mb-1.5">Le chantre change une parole ? Texte libre</div>
-          <textarea value={free} onChange={(e) => setFree(e.target.value)} rows={2}
-            onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && free.trim()) { e.preventDefault(); onFree(item, free.trim()); } }}
-            placeholder="Tape ici ce qui est chanté (une ligne par ligne à l'écran)"
-            className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-blue-400 resize-y" />
-          <div className="flex gap-2 mt-1.5">
-            <button disabled={!free.trim()} onClick={() => onFree(item, free.trim())}
-              className="rounded-lg bg-amber-400 text-black font-medium px-3 py-1.5 text-sm transition duration-100 active:scale-95 disabled:opacity-40 disabled:pointer-events-none">Projeter (Ctrl+Entrée)</button>
-            <button disabled={!free.trim()} onClick={addFree} className={`${ghost} disabled:opacity-40 disabled:pointer-events-none`}>+ Ajouter au chant</button>
-          </div>
         </div>
       </div>
 
