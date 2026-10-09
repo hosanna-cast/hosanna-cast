@@ -49,6 +49,10 @@ export default function Control() {
   const [peers, setPeers] = useState([]);                  // les autres opérateurs connectés
   const [lastBy, setLastBy] = useState(null);              // dernière action faite par quelqu'un d'autre { name, device, what }
   const [rPulse, setRPulse] = useState(false);
+  const [helpOn, setHelpOn] = useState(false);            // « aide autorisée » : l'Aide écran peut projeter
+  const [helpBusy, setHelpBusy] = useState(false);
+  // l'Aide écran ne peut projeter que si l'administrateur a appuyé sur « Autoriser l'aide »
+  const canProject = church.role !== "assistant" || helpOn;
   const mine = useRef(null);
   const stateRef = useRef({});
   const [pulse, setPulse] = useState(false);
@@ -70,16 +74,27 @@ export default function Control() {
   // donc tout le monde voit la même chose à l'écran et ← → repartent du bon endroit.
   // On ne déplace PAS la lecture de l'autre (sa Bible reste où il la consulte).
   useEffect(() => {
-    const me = { id: uuid(), name: church.firstName || church.email.split("@")[0], device: window.matchMedia("(min-width: 1024px)").matches ? "ordinateur" : "mobile" };
+    const me = { id: uuid(), name: church.firstName || church.email.split("@")[0], device: window.matchMedia("(min-width: 1024px)").matches ? "ordinateur" : "mobile", role: church.role };
     mine.current = me;
     const applyState = (m) => {
+      if (chantsOnly && m.shown && m.shown.kind !== "chant") { setShown(OTHER); setLive(null); setSlideLive(null); if (m.blank !== undefined) setBlank(m.blank); return; }
       if (m.shown !== undefined) setShown(m.shown);
       setLive(m.r || null);
       setSlideLive(m.s || null);
       if (m.liveKind) setLiveKind(m.liveKind);
       if (m.blank !== undefined) setBlank(m.blank);
     };
+    // profil « Chants » : il ne voit pas les versets ni les notes des autres, seulement « écran utilisé »
+    const chantsOnly = church.role === "standard";
+    const hide = (m) => chantsOnly && m.kind !== "chant";
+    const OTHER = { type: "show", kind: "other", ref: "", text: "", version: "" };
     const onRemote = (m) => {
+      if (m.type === "help") { if (m.by?.role === "admin") setHelpOn(!!m.on); return; }
+      if (chantsOnly && (m.type === "show" || m.type === "update") && hide(m)) {
+        setShown(OTHER); setLive(null); setSlideLive(null);
+        if (m.type === "show") setBlank(false);
+        return;
+      }
       const who = m.by ? { name: m.by.name, device: m.by.device } : null;
       const noted = (what) => { if (who) { setLastBy({ ...who, what }); setRPulse(true); setTimeout(() => setRPulse(false), 700); } };
       if (m.type === "show" || m.type === "update") {
@@ -106,7 +121,7 @@ export default function Control() {
     ch.current = openScreen(church.token, onRemote, {
       me,
       onPeers: (list) => setPeers(list.filter((p) => p.id !== me.id).filter((p, i, a) => a.findIndex((x) => x.id === p.id) === i)),
-      onReady: () => ch.current?.postMessage({ type: "sync?" }),
+      onReady: () => { ch.current?.postMessage({ type: "sync?" }); createClient().rpc("get_help").then(({ data }) => setHelpOn(data === true)); },
     });
     return () => ch.current.close();
   }, [church.token]);
@@ -166,6 +181,7 @@ export default function Control() {
   const flash = () => { setLastBy(null); setPulse(true); setTimeout(() => setPulse(false), 250); };
 
   const project = (r, citeRange) => {
+    if (!canProject) return;
     setView({ b: r.b, c: r.c });
     setCite((prev) => (citeRange !== undefined ? citeRange : prev && prev.b === r.b && prev.c === r.c ? prev : null));
     const msg = { type: "show", ref: refOf(r), text: textOf(r), version: label, r };
@@ -181,6 +197,7 @@ export default function Control() {
 
   // diapositive d'une note ou d'un chant
   const projectSlide = (kind, item, i, slides) => {
+    if (!canProject) return;
     const msg = { type: "show", kind: kind === "chants" ? "chant" : "slide", ref: `${item.title} · ${i + 1}/${slides.length}`, text: slides[i], version: "", s: { kind, id: item.id, i } };
     setSlideLive({ kind, id: item.id, i });
     setLiveKind("slide");
@@ -192,6 +209,7 @@ export default function Control() {
 
   // texte libre (le chantre change une parole) : projeté tel quel, on reste dessus
   const projectFree = (item, text) => {
+    if (!canProject) return;
     const msg = { type: "show", kind: "chant", ref: `${item.title} · texte libre`, text, version: "", free: true };
     setLiveKind("free");
     setShown(msg);
@@ -201,6 +219,7 @@ export default function Control() {
   };
 
   const clearScreen = () => {
+    if (!canProject) return;
     setQ("");
     ch.current?.postMessage({ type: "clear" });
     setLastBy(null);
@@ -209,10 +228,20 @@ export default function Control() {
     setShown(null);
   };
   // « noir » est explicite (on / off) : si deux personnes appuient, l'écran ne bascule pas dans le mauvais sens
-  const toggleBlank = () => { const on = !blank; ch.current?.postMessage({ type: "blank", on }); setBlank(on); setLastBy(null); };
+  const toggleHelp = async () => {
+    const on = !helpOn;
+    setHelpBusy(true);
+    const { error } = await createClient().rpc("set_help", { enabled: on });
+    setHelpBusy(false);
+    if (error) return alert("Impossible de changer le réglage : " + error.message);
+    setHelpOn(on);
+    ch.current?.postMessage({ type: "help", on });
+  };
+  const toggleBlank = () => { if (!canProject) return; const on = !blank; ch.current?.postMessage({ type: "blank", on }); setBlank(on); setLastBy(null); };
 
   // changement de version : le verset à l'écran est re-projeté dans la nouvelle version
   const reproject = (r) => {
+    if (!canProject) return;
     if (!bible?.[r.b]?.[r.c]?.[r.v]) return;           // verset absent de cette version : l'écran reste tel quel
     const msg = { type: "update", ref: refOf(r), text: textOf(r), version: label, r };
     setShown(msg);
@@ -245,7 +274,7 @@ export default function Control() {
   const isLiveVerse = (r) => liveKind === "verse" && live && live.b === r.b && live.c === r.c && live.v >= r.v && live.v <= (r.vEnd ?? r.v);
 
   const onSlides = liveKind === "slide" || liveKind === "free";
-  const canStep = onSlides ? !!slideLive : !!live;
+  const canStep = canProject && (onSlides ? !!slideLive : !!live);
   const step = (d) => {
     if (onSlides) {
       if (!slideLive) return;
@@ -489,7 +518,10 @@ export default function Control() {
             <span className={`hidden sm:block absolute top-2 left-3 text-xs ${blank ? "text-neutral-400" : shown ? "text-green-400" : "text-neutral-500"}`}>
               {blank ? "● Écran noir" : shown ? "● À l'écran" : "○ Rien à l'écran"}
             </span>
-            {shown && !blank && (
+            {shown && shown.kind === "other" && !blank && (
+              <div className="absolute inset-0 flex items-center justify-center px-4 text-center text-xs sm:text-sm text-neutral-400">Un autre opérateur utilise l'écran</div>
+            )}
+            {shown && shown.kind !== "other" && !blank && (
               <div className="absolute inset-0 flex flex-col px-3 sm:px-5 pt-2 sm:pt-8 pb-2 sm:pb-3 overflow-y-auto">
                 <div className="my-auto">
                 {shown.kind === "chant" ? (
@@ -513,12 +545,22 @@ export default function Control() {
             </p>
           )}
 
+          {church.role === "admin" && (
+            <button onClick={toggleHelp} disabled={helpBusy}
+              className={`mt-2 w-full rounded-lg py-2 text-sm transition duration-100 active:scale-95 disabled:opacity-60 ${helpOn ? "bg-sky-500/20 border border-sky-400 text-sky-100" : "bg-neutral-800 hover:bg-neutral-700"}`}>
+              {helpBusy ? "…" : helpOn ? "● Aide autorisée · Arrêter l'aide" : "Autoriser l'aide"}
+            </button>
+          )}
+          {church.role === "assistant" && !helpOn && (
+            <p className="mt-2 text-xs rounded-lg px-2.5 py-2 bg-amber-400/10 text-amber-200">L'aide n'est pas activée. L'administrateur doit appuyer sur « Autoriser l'aide » pour que vous puissiez projeter.</p>
+          )}
+
           <div className="grid grid-cols-4 lg:grid-cols-2 gap-1.5 lg:gap-2 mt-2 lg:mt-3">
             <button className={btn} disabled={!canStep} onClick={() => step(-1)}>← Préc.</button>
             <button className={btn} disabled={!canStep} onClick={() => step(1)}>Suiv. →</button>
-            <button onClick={toggleBlank}
+            <button onClick={toggleBlank} disabled={!canProject}
               className={`rounded-lg py-2 text-sm transition duration-100 active:scale-95 ${blank ? "bg-amber-400 text-black font-medium" : "bg-neutral-800 hover:bg-neutral-700"}`}>Noir</button>
-            <button className={btn} disabled={!shown} onClick={clearScreen}>Effacer</button>
+            <button className={btn} disabled={!shown || !canProject} onClick={clearScreen}>Effacer</button>
           </div>
 
           <div className="hidden lg:flex mt-4 flex-col items-center gap-2.5 text-xs xl:text-sm text-neutral-400">
