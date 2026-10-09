@@ -27,7 +27,11 @@ export async function POST(req) {
 
   // 3) création du compte (clé « service » à ajouter dans Vercel)
   const admin = createAdminClient();
-  if (!admin) return fail("Clé manquante : ajoutez SUPABASE_SERVICE_ROLE_KEY dans les variables d'environnement de Vercel, puis redéployez.", 500);
+  if (!admin) {
+    // diagnostic (noms seulement, jamais les valeurs) : montre ce que ce déploiement reçoit réellement de Vercel
+    const seen = Object.keys(process.env).filter((k) => /SUPABASE|SERVICE/i.test(k)).join(", ") || "aucune";
+    return fail(`Clé non reçue par ce déploiement. Environnement : ${process.env.VERCEL_ENV || "inconnu"} · variables Supabase vues : ${seen}`, 500);
+  }
 
   const { data, error } = await admin.auth.admin.createUser({ email, password, email_confirm: true });
   if (error) return fail(/already|registered|exists/i.test(error.message) ? "Cet email a déjà un compte." : error.message);
