@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+html, body { margin: 0; background: #171717; }
+
+/* barres de défilement discrètes (sinon la Bible de gauche affiche une barre blanche) */
+* { scrollbar-width: thin; scrollbar-color: #525252 transparent; }
