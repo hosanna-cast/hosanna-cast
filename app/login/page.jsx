@@ -1,13 +1,11 @@
 "use client";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 const input = "w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 outline-none focus:border-amber-400";
 const EMPTY = { church: "", city: "", country: "", first: "", last: "", email: "", password: "", confirm: "" };
 
 export default function Login() {
-  const router = useRouter();
   const [mode, setMode] = useState("in");          // "in" | "up"
   const [f, setF] = useState(EMPTY);
   const [msg, setMsg] = useState(null);
@@ -24,9 +22,8 @@ export default function Login() {
 
     if (!up) {
       const { error } = await supabase.auth.signInWithPassword({ email: f.email, password: f.password });
-      setBusy(false);
-      if (error) return setMsg(error.message);
-      router.push("/control"); router.refresh();
+      if (error) { setBusy(false); return setMsg(error.message); }
+      location.assign("/control");          // on reste en « connexion en cours » jusqu'au chargement de la console
       return;
     }
 
@@ -43,9 +40,8 @@ export default function Login() {
       first: f.first.trim(),
       last: f.last.trim(),
     });
-    setBusy(false);
-    if (e2) return setMsg(e2.message);
-    router.push("/control"); router.refresh();
+    if (e2) { setBusy(false); return setMsg(e2.message); }
+    location.assign("/control");
   };
 
   return (
@@ -72,7 +68,12 @@ export default function Login() {
         {up && <input type="password" required minLength={8} placeholder="Confirmer le mot de passe *" value={f.confirm} onChange={set("confirm")} className={input} />}
         {msg && <p className="text-sm text-amber-300">{msg}</p>}
         <button disabled={busy} className="w-full rounded-lg bg-amber-400 text-black font-medium py-2 hover:bg-amber-300 disabled:opacity-50 transition duration-100 active:scale-95">
-          {busy ? "…" : up ? "Créer mon compte" : "Se connecter"}
+          {busy ? (
+            <span className="inline-flex items-center justify-center gap-2">
+              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" opacity="0.25" /><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg>
+              {up ? "Création du compte…" : "Connexion en cours…"}
+            </span>
+          ) : up ? "Créer mon compte" : "Se connecter"}
         </button>
         <button type="button" onClick={() => { setMode(up ? "in" : "up"); setMsg(null); }} className="w-full text-sm text-neutral-400 hover:text-white">
           {up ? "J'ai déjà un compte" : "Pas encore de compte ? Inscrire mon église"}
