@@ -7,6 +7,7 @@ import { useLibrary, slidesOf } from "@/lib/library";
 import LibraryPanel from "./LibraryPanel";
 import ChantStage from "./ChantStage";
 import ChapterView from "./ChapterView";
+import QuickText from "./QuickText";
 import { useChurch } from "@/lib/church";
 import UserMenu from "./UserMenu";
 import HelpControl from "./HelpControl";
@@ -208,15 +209,25 @@ export default function Control() {
     flash();
   };
 
-  // texte libre (le chantre change une parole) : projeté tel quel, on reste dessus
-  const projectFree = (item, text) => {
+  // texte rapide (disponible dans tous les onglets) : projeté tel quel, on reste dessus
+  const projectFree = (text) => {
     if (!canProject) return;
-    const msg = { type: "show", kind: "chant", ref: `${item.title} · texte libre`, text, version: "", free: true };
+    const chant = tab === "chants" ? library.lib.chants.find((x) => x.id === chantId) : null;
+    const msg = { type: "show", kind: "chant", ref: chant ? `${chant.title} · texte libre` : "Texte rapide", text, version: "", free: true };
     setLiveKind("free");
     setShown(msg);
     setBlank(false);
     ch.current?.postMessage(msg);
     flash();
+  };
+  // ajoute le texte rapide comme nouvelle diapositive du chant ouvert (après celle à l'écran, sinon à la fin)
+  const addToChant = (text) => {
+    const item = library.lib.chants.find((x) => x.id === chantId);
+    if (!item) return;
+    const slides = slidesOf(item);
+    const at = slideLive && slideLive.id === item.id ? slideLive.i + 1 : slides.length;
+    const next = [...slides]; next.splice(at, 0, text);
+    library.update("chants", item.id, { slides: next, text: next.join("\n\n") });
   };
 
   const clearScreen = () => {
@@ -447,9 +458,16 @@ export default function Control() {
           </div>
         </section>
 
-        {/* ───── centre : recherche de versets (toujours disponible) ───── */}
+        {/* ───── centre : texte rapide (toujours en haut) puis contenu de l'onglet ───── */}
+        <div className="order-2 min-w-0 space-y-3">
+          <QuickText
+            onProject={projectFree}
+            disabled={!canProject}
+            onAdd={tab === "chants" && chantId ? addToChant : null}
+            addLabel="+ Ajouter au chant"
+          />
         {tab === "chants" ? (
-        <section className="order-2 min-w-0">
+        <section className="min-w-0">
           <ChantStage
             item={library.lib.chants.find((x) => x.id === chantId) || null}
             bible={bible}
@@ -458,7 +476,6 @@ export default function Control() {
             isLiveVerse={isLiveVerse}
             liveSlide={liveKind === "slide" && slideLive?.kind === "chants" ? slideLive : null}
             pausedSlide={liveKind !== "slide" && slideLive?.kind === "chants" ? slideLive : null}
-            onFree={projectFree}
             onSlide={(item, i, slides) => projectSlide("chants", item, i, slides)}
             onVerse={projectFirst}
             onUpdate={(id, patch) => library.update("chants", id, patch)}
@@ -466,7 +483,7 @@ export default function Control() {
           />
         </section>
         ) : (
-        <section className="order-2 min-w-0">
+        <section className="min-w-0">
           <input ref={searchRef} value={q} onChange={(e) => setQ(e.target.value)}
             onFocus={() => {
               setTyping(true);
@@ -513,6 +530,7 @@ export default function Control() {
           )}
         </section>
         )}
+        </div>
 
         {/* ───── droite : l'écran (en premier sur mobile) ───── */}
         <aside className="order-1 lg:order-3 lg:sticky lg:top-6">
