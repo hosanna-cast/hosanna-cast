@@ -21,9 +21,11 @@ export default async function Home() {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       logged = true;
-      const { data: m } = await supabase.from("memberships").select("role").eq("user_id", user.id).limit(1).maybeSingle();
+      const [{ data: m }, { data: profile }] = await Promise.all([
+        supabase.from("memberships").select("role").eq("user_id", user.id).limit(1).maybeSingle(),
+        supabase.from("profiles").select("first_name").eq("user_id", user.id).maybeSingle(),
+      ]);
       role = normalizeRole(m?.role);
-      const { data: profile } = await supabase.from("profiles").select("first_name").eq("user_id", user.id).maybeSingle();
       name = profile?.first_name || user.email?.split("@")[0] || "";
     }
   } catch {}
