@@ -14,8 +14,10 @@ export async function middleware(req) {
       },
     },
   });
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
+  // getSession lit le cookie (et le renouvelle si besoin) sans appeler Supabase à chaque page ;
+  // les pages /control et /admin vérifient ensuite l'utilisateur avec getUser.
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
     url.search = "";
