@@ -17,7 +17,7 @@ export default async function ControlLayout({ children }) {
 
   const { id, name, screen_token } = m.churches;
   return (
-    <ChurchProvider value={{ id, name, token: screen_token, role: normalizeRole(m.role), email: user.email, firstName: profile?.first_name || "", lastName: profile?.last_name || "" }}>
+    <ChurchProvider value={{ id, name, token: screen_token, role: normalizeRole(m.role), email: user.email, userId: user.id, firstName: profile?.first_name || "", lastName: profile?.last_name || "" }}>
       {children}
     </ChurchProvider>
   );
