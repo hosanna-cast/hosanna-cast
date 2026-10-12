@@ -9,6 +9,8 @@ const VERSIONS = [
   { name: "lsg", label: "LSG", full: "Louis Segond 1910", ids: ["fraLSG"], match: /segond/i },
   { name: "ostervald", label: "OST", full: "Ostervald", ids: ["fraOST", "fra_fob", "fraFOB"], match: /ostervald/i },
   { name: "darby", label: "DBY", full: "Darby", ids: ["fraDBY", "fra_dby", "fraDarby"], match: /darby/i },
+  { name: "martin", label: "MAR", full: "Martin 1744", ids: ["fraMAR", "fra_mar", "fraMartin"], match: /martin/i },
+  { name: "kjv", label: "KJV", full: "King James Version", lang: "eng", ids: ["eng-kjv", "engkjv", "eng_kjv"], match: /king james/i },
 ];
 const BASES = ["https://ebible.org/Scriptures/", "https://ebible.org/Bible/"];
 
@@ -28,11 +30,11 @@ function parseCSV(t) {
   return rows;
 }
 
-// Catalogue officiel eBible : retrouve l'identifiant d'une traduction française par son titre
-let catalog = null;
-async function catalogIds(rx) {
-  if (catalog === null) {
-    catalog = [];
+// Catalogue officiel eBible : retrouve l'identifiant d'une traduction par son titre (une langue à la fois)
+const catalogs = {};
+async function catalogIds(rx, lang = "fra") {
+  if (!catalogs[lang]) {
+    catalogs[lang] = [];
     try {
       const res = await fetch("https://ebible.org/Scriptures/translations.csv");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -41,13 +43,13 @@ async function catalogIds(rx) {
       const iId = h.indexOf("translationId"), iLang = h.indexOf("languageCode");
       if (iId < 0) throw new Error("colonne translationId introuvable");
       for (const r of rows.slice(1)) {
-        if (iLang >= 0 && r[iLang] !== "fra") continue;
-        catalog.push({ id: r[iId], text: r.join(" ") });
+        if (iLang >= 0 && r[iLang] !== lang) continue;
+        catalogs[lang].push({ id: r[iId], text: r.join(" ") });
       }
-      console.log("  catalogue fra :", catalog.map((c) => c.id).join(", "));
+      console.log(`  catalogue ${lang} :`, catalogs[lang].map((c) => c.id).join(", "));
     } catch (e) { console.warn("  catalogue indisponible :", e.message); }
   }
-  return catalog.filter((c) => rx.test(c.text)).map((c) => c.id);
+  return catalogs[lang].filter((c) => rx.test(c.text)).map((c) => c.id);
 }
 
 async function download(v) {
@@ -66,7 +68,7 @@ async function download(v) {
     return null;
   };
   for (const id of v.ids) { const r = await attempt(id); if (r) return r; }
-  for (const id of await catalogIds(v.match)) { const r = await attempt(id); if (r) return r; }
+  for (const id of await catalogIds(v.match, v.lang || "fra")) { const r = await attempt(id); if (r) return r; }
   return null;
 }
 
