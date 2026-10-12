@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { ROLES, ROLE_IDS } from "@/lib/roles";
 import { openScreen } from "@/lib/screen";
-import Backgrounds, { MAX_BG } from "../control/Backgrounds";
+import Backgrounds, { MAX_BG, DEFAULT_TEXT } from "../control/Backgrounds";
 
 const card = "rounded-xl bg-neutral-800/60 border border-neutral-700 p-4";
 const field = "rounded-lg bg-neutral-900 border border-neutral-600 px-3 py-2 text-sm outline-none focus:border-amber-400 w-full";
@@ -18,27 +18,32 @@ export default function AdminPanel({ churchName, churchId, token }) {
   // fond de l'écran : 3 maximum, un seul actif ; gardé dans ce navigateur et envoyé à l'écran
   const [bgs, setBgs] = useState(() => Array(MAX_BG).fill(null));
   const [bgActive, setBgActive] = useState(-1);
+  const [textColor, setTextColor] = useState(DEFAULT_TEXT);          // couleur du texte projeté
   const scr = useRef(null);
   const activeRef = useRef(null);
+  const textRef = useRef(DEFAULT_TEXT);
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem("hc.bgs." + churchId));
       const slots = Array.from({ length: MAX_BG }, (_, i) => saved?.slots?.[i] || null);
       setBgs(slots); setBgActive(slots[saved?.active] ? saved.active : -1);
       activeRef.current = slots[saved?.active] || null;
+      textRef.current = saved?.textColor || DEFAULT_TEXT;
+      setTextColor(textRef.current);
     } catch {}
     scr.current = openScreen(token, (m) => {
-      // l'écran vient de s'ouvrir et demande son fond
-      if (m.type === "bg?" && activeRef.current) scr.current?.postMessage({ type: "bg", bg: activeRef.current });
+      // l'écran vient de s'ouvrir et demande son fond et la couleur du texte
+      if (m.type === "bg?") scr.current?.postMessage({ type: "bg", bg: activeRef.current, textColor: textRef.current });
     });
     return () => scr.current?.close();
   }, [churchId, token]);
-  const saveBgs = (slots, active) => {
+  const saveBgs = (slots, active, tc = textRef.current) => {
     setBgs(slots); setBgActive(active);
     activeRef.current = slots[active] || null;
-    try { localStorage.setItem("hc.bgs." + churchId, JSON.stringify({ slots, active })); } catch { setMsg("Impossible d'enregistrer ce fond : mémoire du navigateur pleine."); }
+    textRef.current = tc; setTextColor(tc);
+    try { localStorage.setItem("hc.bgs." + churchId, JSON.stringify({ slots, active, textColor: tc })); } catch { setMsg("Impossible d'enregistrer ce fond : mémoire du navigateur pleine."); }
   };
-  const sendBg = (bg) => scr.current?.postMessage({ type: "bg", bg });
+  const sendBg = (bg, tc = textRef.current) => scr.current?.postMessage({ type: "bg", bg, textColor: tc });
   const pickBg = (i) => { saveBgs(bgs, i); sendBg(i >= 0 ? bgs[i] : null); };
   const setBgSlot = (i, bg) => { saveBgs(bgs.map((x, k) => (k === i ? bg : x)), bgActive); if (bgActive === i) sendBg(bg); };
   const removeBg = (i) => {
@@ -46,6 +51,7 @@ export default function AdminPanel({ churchName, churchId, token }) {
     saveBgs(bgs.map((x, k) => (k === i ? null : x)), was ? -1 : bgActive);
     if (was) sendBg(null);
   };
+  const pickText = (c) => { saveBgs(bgs, bgActive, c); sendBg(activeRef.current, c); };
 
   // création directe d'un profil (email + mot de passe provisoire)
   const EMPTY = { first: "", last: "", email: "", password: "", role: "standard" };
@@ -170,11 +176,11 @@ export default function AdminPanel({ churchName, churchId, token }) {
           {section === "fond" && (
         <section className={card}>
           <div className="flex items-center justify-between gap-3 mb-1">
-            <h2 className="font-medium">Fond de l'écran</h2>
+            <h2 className="font-medium">Fond et texte de l'écran</h2>
             <span className="text-xs text-neutral-500">3 maximum</span>
           </div>
           <p className="text-sm text-neutral-400 mb-3">Image ou couleur. Clique un fond pour l'afficher sur tout l'écran, clique-le encore pour l'enlever. Un écran noir (Ctrl+B) reste toujours noir.</p>
-          <Backgrounds slots={bgs} active={bgActive} onPick={pickBg} onSet={setBgSlot} onRemove={removeBg} />
+          <Backgrounds slots={bgs} active={bgActive} onPick={pickBg} onSet={setBgSlot} onRemove={removeBg} textColor={textColor} onText={pickText} />
           <p className="text-xs text-neutral-500 mt-3">Les fonds sont gardés sur cet appareil : fais ce réglage depuis l'ordinateur de la régie.</p>
         </section>
           )}
