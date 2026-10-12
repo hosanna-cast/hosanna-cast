@@ -83,9 +83,39 @@ export default function AdminPanel({ churchName, churchId, token }) {
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  const run = async (p) => { setMsg(null); const { error } = await p; if (error) setMsg(error.message); await load(); };
-  const changeRole = (id, r) => run(db().rpc("set_member_role", { target: id, new_role: r }));
-  const remove = (u) => confirm(`Retirer ${u.first_name || u.email} de l'équipe ?`) && run(db().rpc("remove_member", { target: u.user_id }));
+  // modifier / supprimer un profil (API serveur : le compte lui-même est modifié ou supprimé)
+  const [editId, setEditId] = useState(null);
+  const [edit, setEdit] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const setE = (k) => (e) => setEdit((x) => ({ ...x, [k]: e.target.value }));
+  const api = async (method, body) => {
+    const res = await fetch("/api/admin/member", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(out.error || "Action impossible.");
+  };
+  const startEdit = (u) => { setMsg(null); setMade(null); setEditId(u.user_id); setEdit({ first: u.first_name || "", last: u.last_name || "", email: u.email || "", role: u.role, password: "" }); };
+  const genEditPassword = () => {
+    const chars = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    const r = crypto.getRandomValues(new Uint32Array(10));
+    setEdit((x) => ({ ...x, password: Array.from(r, (n) => chars[n % chars.length]).join("") }));
+  };
+  const saveEdit = async (e) => {
+    e.preventDefault(); setMsg(null); setSaving(true);
+    try {
+      await api("PATCH", { userId: editId, ...edit });
+      if (edit.password) setMade({ title: "Profil modifié ✓", email: edit.email, password: edit.password });
+      setEditId(null); setEdit(null);
+      await load();
+    } catch (err) { setMsg(err.message); }
+    finally { setSaving(false); }
+  };
+  const remove = async (u) => {
+    if (!confirm(`Supprimer définitivement le profil de ${u.first_name || u.email} ?\nSon compte sera effacé et il ne pourra plus se connecter.`)) return;
+    setMsg(null);
+    try { await api("DELETE", { userId: u.user_id }); if (editId === u.user_id) { setEditId(null); setEdit(null); } }
+    catch (err) { setMsg(err.message); }
+    await load();
+  };
 
   return (
     <main className="min-h-screen bg-neutral-900 text-white p-4 sm:p-8">
@@ -126,8 +156,9 @@ export default function AdminPanel({ churchName, churchId, token }) {
 
           {made && (
             <div className="mb-4 rounded-lg bg-green-500/10 border border-green-500/40 p-3 text-sm">
-              <p className="text-green-300 font-medium mb-1">Profil créé ✓</p>
+              <p className="text-green-300 font-medium mb-1">{made.title || "Profil créé ✓"}</p>
               <p className="text-neutral-300">Email : <b className="font-medium">{made.email}</b><br />Mot de passe provisoire : <b className="font-mono">{made.password}</b></p>
+              <p className="text-xs text-neutral-400 mt-1">À sa première connexion, la personne devra choisir son propre mot de passe.</p>
               <button onClick={() => navigator.clipboard?.writeText(`Email : ${made.email}\nMot de passe : ${made.password}\n${location.origin}/login`)} className="mt-2 text-amber-400 hover:underline">Copier les identifiants</button>
               <button onClick={() => setMade(null)} className="mt-2 ml-4 text-neutral-400 hover:text-white">Fermer</button>
             </div>
@@ -155,16 +186,36 @@ export default function AdminPanel({ churchName, churchId, token }) {
           )}
           {!members ? <p className="text-sm text-neutral-500">Chargement…</p> : (
             <ul className="divide-y divide-neutral-700">
-              {members.map((u) => (
+              {members.map((u) => editId === u.user_id && edit ? (
+                <li key={u.user_id} className="py-3">
+                  <form onSubmit={saveEdit} className="rounded-lg bg-neutral-800 p-3 space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <input required placeholder="Prénom" value={edit.first} onChange={setE("first")} className={field} />
+                      <input placeholder="Nom" value={edit.last} onChange={setE("last")} className={field} />
+                    </div>
+                    <input required type="email" placeholder="Email" value={edit.email} onChange={setE("email")} className={field} />
+                    <select value={edit.role} onChange={setE("role")} className={select + " w-full"}>
+                      {ROLE_IDS.map((r) => <option key={r} value={r}>{ROLES[r].label} : {ROLES[r].desc}</option>)}
+                    </select>
+                    <div className="flex gap-2">
+                      <input minLength={8} placeholder="Nouveau mot de passe provisoire (laisser vide = inchangé)" value={edit.password} onChange={setE("password")} className={field + " flex-1 min-w-0"} />
+                      <button type="button" onClick={genEditPassword} className="rounded-lg bg-neutral-700 hover:bg-neutral-600 text-sm px-3">Générer</button>
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <button disabled={saving} className="flex-1 rounded-lg bg-amber-400 hover:bg-amber-300 disabled:opacity-60 text-black font-medium text-sm py-2">{saving ? "Enregistrement…" : "Enregistrer"}</button>
+                      <button type="button" onClick={() => { setEditId(null); setEdit(null); }} className="rounded-lg bg-neutral-700 hover:bg-neutral-600 text-sm px-4">Annuler</button>
+                    </div>
+                  </form>
+                </li>
+              ) : (
                 <li key={u.user_id} className="py-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
                   <div className="min-w-0 flex-1 basis-48">
                     <div className="text-sm truncate">{[u.first_name, u.last_name].filter(Boolean).join(" ") || u.email} {u.is_me && <span className="text-xs text-amber-300">(vous)</span>}</div>
                     <div className="text-xs text-neutral-500 truncate">{u.email}</div>
                   </div>
-                  <select value={u.role} onChange={(e) => changeRole(u.user_id, e.target.value)} className={select}>
-                    {ROLE_IDS.map((r) => <option key={r} value={r}>{ROLES[r].label}</option>)}
-                  </select>
-                  <button onClick={() => remove(u)} disabled={u.is_me} className="text-sm text-neutral-400 hover:text-red-400 disabled:opacity-30 disabled:pointer-events-none">Retirer</button>
+                  <span className="rounded-full bg-neutral-700 px-2.5 py-0.5 text-xs text-amber-300">{ROLES[u.role]?.label || u.role}</span>
+                  <button onClick={() => startEdit(u)} className="text-sm text-neutral-300 hover:text-amber-300">Modifier</button>
+                  <button onClick={() => remove(u)} disabled={u.is_me} className="text-sm text-neutral-400 hover:text-red-400 disabled:opacity-30 disabled:pointer-events-none">Supprimer</button>
                 </li>
               ))}
             </ul>
