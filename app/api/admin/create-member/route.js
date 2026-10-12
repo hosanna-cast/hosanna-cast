@@ -33,7 +33,7 @@ export async function POST(req) {
     return fail(`Clé non reçue par ce déploiement. Environnement : ${process.env.VERCEL_ENV || "inconnu"} · variables Supabase vues : ${seen}`, 500);
   }
 
-  const { data, error } = await admin.auth.admin.createUser({ email, password, email_confirm: true });
+  const { data, error } = await admin.auth.admin.createUser({ email, password, email_confirm: true, app_metadata: { must_change_password: true } });
   if (error) return fail(/already|registered|exists/i.test(error.message) ? "Cet email a déjà un compte." : error.message);
   const uid = data.user.id;
 
