@@ -8,6 +8,7 @@ export default async function AdminPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  if (user.app_metadata?.must_change_password) redirect("/change-password");
 
   const { data: m } = await supabase
     .from("memberships").select("role, churches(id, name, screen_token)").eq("user_id", user.id).limit(1).maybeSingle();
