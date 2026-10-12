@@ -23,7 +23,7 @@ export default function QuickText({ onProject, onAdd, addLabel, disabled }) {
         className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-amber-400 resize-y" />
       <div className="flex flex-wrap items-center gap-2 mt-1.5">
         <button disabled={!t || disabled} onClick={project}
-          className="rounded-lg bg-amber-400 hover:bg-amber-300 text-white font-medium px-3 py-1.5 text-sm transition duration-100 active:scale-95 disabled:opacity-70 disabled:pointer-events-none">
+          className="rounded-lg bg-amber-400 hover:bg-amber-300 font-medium px-3 py-1.5 text-sm transition duration-100 active:scale-95 disabled:opacity-70 disabled:pointer-events-none">
           Projeter (Ctrl+Entrée)
         </button>
         {onAdd && (
