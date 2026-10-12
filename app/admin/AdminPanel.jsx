@@ -70,7 +70,7 @@ export default function AdminPanel({ churchName, churchId, token }) {
       const res = await fetch("/api/admin/create-member", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
       const out = await res.json().catch(() => ({}));
       if (!res.ok) { setMsg(out.error || "Création impossible."); return; }
-      setMade({ email: form.email, password: form.password });
+      setMade({ email: form.email, password: form.password, first: form.first, roleId: form.role });
       setForm(null);
       await load();
     } catch { setMsg("Connexion impossible. Réessayez."); }
@@ -82,6 +82,19 @@ export default function AdminPanel({ churchName, churchId, token }) {
     if (m.error) setMsg(m.error.message); else setMembers(m.data);
   }, []);
   useEffect(() => { load(); }, [load]);
+
+  // message d'accueil envoyé à la personne (WhatsApp ou copie)
+  const [waNum, setWaNum] = useState("");
+  const WHY = {
+    standard: "projeter les paroles (lyrics) des chants",
+    assistant: "aider à projeter les versets, les notes et les chants",
+    admin: "gérer l'équipe et projeter les versets, les notes et les chants",
+  };
+  const welcome = (m) => `Bonjour ${m.first || ""},\n\nUn compte a été créé pour toi sur Hosanna Cast, pour que tu puisses ${WHY[m.roleId] || WHY.standard}.\n\nLien : ${location.origin}/login\n\nTes identifiants :\nLogin : ${m.email}\nPassword : ${m.password}\n\nPar mesure de sécurité, tu dois changer ton mot de passe à ta première connexion.`;
+  const sendWhatsApp = (m) => {
+    const num = waNum.replace(/\D/g, "");              // chiffres seulement, avec l'indicatif du pays (ex. 230 57123456)
+    window.open(`https://wa.me/${num}?text=${encodeURIComponent(welcome(m))}`, "_blank", "noopener");
+  };
 
   // modifier / supprimer un profil (API serveur : le compte lui-même est modifié ou supprimé)
   const [editId, setEditId] = useState(null);
@@ -103,7 +116,7 @@ export default function AdminPanel({ churchName, churchId, token }) {
     e.preventDefault(); setMsg(null); setSaving(true);
     try {
       await api("PATCH", { userId: editId, ...edit });
-      if (edit.password) setMade({ title: "Profil modifié ✓", email: edit.email, password: edit.password });
+      if (edit.password) setMade({ title: "Profil modifié ✓", email: edit.email, password: edit.password, first: edit.first, roleId: edit.role });
       setEditId(null); setEdit(null);
       await load();
     } catch (err) { setMsg(err.message); }
@@ -159,7 +172,12 @@ export default function AdminPanel({ churchName, churchId, token }) {
               <p className="text-green-300 font-medium mb-1">{made.title || "Profil créé ✓"}</p>
               <p className="text-neutral-300">Email : <b className="font-medium">{made.email}</b><br />Mot de passe provisoire : <b className="font-mono">{made.password}</b></p>
               <p className="text-xs text-neutral-400 mt-1">À sa première connexion, la personne devra choisir son propre mot de passe.</p>
-              <button onClick={() => navigator.clipboard?.writeText(`Email : ${made.email}\nMot de passe : ${made.password}\n${location.origin}/login`)} className="mt-2 text-amber-400 hover:underline">Copier les identifiants</button>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <input value={waNum} onChange={(e) => setWaNum(e.target.value)} inputMode="tel" placeholder="N° WhatsApp avec indicatif (facultatif)" className={field + " flex-1 min-w-[12rem]"} />
+                <button onClick={() => sendWhatsApp(made)} className="rounded-lg bg-green-600 hover:bg-green-500 text-white font-medium text-sm px-3.5 py-2 active:scale-95 transition duration-100">Envoyer par WhatsApp</button>
+              </div>
+              <p className="text-xs text-neutral-500 mt-1">Sans numéro, WhatsApp s'ouvre et tu choisis le contact.</p>
+              <button onClick={() => navigator.clipboard?.writeText(welcome(made))} className="mt-2 text-amber-400 hover:underline">Copier le message</button>
               <button onClick={() => setMade(null)} className="mt-2 ml-4 text-neutral-400 hover:text-white">Fermer</button>
             </div>
           )}
