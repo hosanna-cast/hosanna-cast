@@ -103,9 +103,6 @@ export default function Backgrounds({ slots, active, onPick, onSet, onRemove, te
               <button onClick={() => onText(DEFAULT_TEXT)} className="text-xs text-neutral-400 hover:text-white ml-1">Remettre en blanc</button>
             )}
           </div>
-          <div className="mt-3 aspect-video w-full max-w-md rounded-lg border border-neutral-600 flex items-center justify-center text-center font-bold text-2xl px-4" style={{ ...(active >= 0 && slots[active] ? bgStyle(slots[active]) : { backgroundColor: "#000" }), color: textColor }}>
-            Aperçu du texte
-          </div>
         </div>
       )}
     </div>
