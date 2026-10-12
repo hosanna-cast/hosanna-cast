@@ -10,9 +10,9 @@ export default async function AdminPage() {
   if (!user) redirect("/login");
 
   const { data: m } = await supabase
-    .from("memberships").select("role, churches(name)").eq("user_id", user.id).limit(1).maybeSingle();
+    .from("memberships").select("role, churches(id, name, screen_token)").eq("user_id", user.id).limit(1).maybeSingle();
   if (!m?.churches) redirect("/onboarding");
   if (!isAdmin(m.role)) redirect("/control");
 
-  return <AdminPanel churchName={m.churches.name} />;
+  return <AdminPanel churchName={m.churches.name} churchId={m.churches.id} token={m.churches.screen_token} />;
 }
