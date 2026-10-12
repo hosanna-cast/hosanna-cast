@@ -45,7 +45,7 @@ export default function Display() {
           <div ref={box} className="flex-1 flex items-center justify-center min-h-0">
             <p ref={txt} className="w-full text-center font-sans font-bold leading-[1.25] whitespace-pre-line">{v.text}</p>
           </div>
-          <div className="text-center opacity-40 text-[2.2vh] pt-[1.5vh]">{v.ref}</div>
+          <div className="text-center text-[2.2vh] pt-[1.5vh]">{v.ref}</div>
         </>
       )}
       {!blank && v && v.kind !== "chant" && (
@@ -53,7 +53,7 @@ export default function Display() {
           <div ref={box} className="flex-1 flex items-center min-h-0">
             <p ref={txt} className={`leading-snug font-serif whitespace-pre-line ${v.kind === "slide" ? "w-full text-center" : ""}`}>{v.text}</p>
           </div>
-          <div className="text-right text-amber-400 text-[4vh] pt-[2vh]">{v.ref} <span className="opacity-60 text-[2.5vh]">{v.version}</span></div>
+          <div className="text-right text-[4vh] pt-[2vh]">{v.ref} <span className="opacity-60 text-[2.5vh]">{v.version}</span></div>
         </>
       )}
     </div>
