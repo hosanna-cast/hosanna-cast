@@ -50,6 +50,7 @@ export default function Control() {
   const [blank, setBlank] = useState(false);
   const [history, setHistory] = useState([]);
   const [screenBg, setScreenBg] = useState(null);                       // fond réellement affiché à l'écran
+  const [screenText, setScreenText] = useState(null);                   // couleur du texte à l'écran (null = blanc)
   const [peers, setPeers] = useState([]);                  // les autres opérateurs connectés
   const [lastBy, setLastBy] = useState(null);              // dernière action faite par quelqu'un d'autre { name, device, what }
   const [rPulse, setRPulse] = useState(false);
@@ -72,7 +73,7 @@ export default function Control() {
     if (window.matchMedia("(min-width: 1024px)").matches) searchRef.current?.focus();
   }, [tab]);
 
-  stateRef.current = { shown, live, slideLive, liveKind, blank, screenBg };
+  stateRef.current = { shown, live, slideLive, liveKind, blank, screenBg, screenText };
 
   // Plusieurs personnes peuvent piloter le même écran : chaque console reçoit ce que les autres projettent,
   // donc tout le monde voit la même chose à l'écran et ← → repartent du bon endroit.
@@ -94,9 +95,9 @@ export default function Control() {
     const OTHER = { type: "show", kind: "other", ref: "", text: "", version: "" };
     const onRemote = (m) => {
       if (m.type === "helper") { if (m.by?.role === "admin") setHelperId(m.id || null); return; }
-      if (m.type === "bg") { setScreenBg(m.bg || null); return; }
+      if (m.type === "bg") { setScreenBg(m.bg || null); setScreenText(m.textColor || null); return; }
       // l'écran vient de s'ouvrir : on lui renvoie son fond
-      if (m.type === "bg?") { const b = stateRef.current.screenBg; if (b) ch.current?.postMessage({ type: "bg", bg: b }); return; }
+      if (m.type === "bg?") { const { screenBg: b, screenText: t } = stateRef.current; if (b || t) ch.current?.postMessage({ type: "bg", bg: b, textColor: t }); return; }
       if (chantsOnly && (m.type === "show" || m.type === "update") && hide(m)) {
         setShown(OTHER); setLive(null); setSlideLive(null);
         if (m.type === "show") setBlank(false);
@@ -157,6 +158,7 @@ export default function Control() {
     try {
       const saved = JSON.parse(localStorage.getItem("hc.bgs." + church.id));
       setScreenBg(saved?.slots?.[saved.active] || null);
+      setScreenText(saved?.textColor || null);
     } catch {}
   }, [church?.id]);
 
@@ -536,7 +538,7 @@ export default function Control() {
 
         {/* ───── droite : l'écran (en premier sur mobile) ───── */}
         <aside className="order-1 lg:order-3 lg:sticky lg:top-6">
-          <div className={`relative h-28 sm:h-auto sm:aspect-video rounded-xl bg-black border transition-all duration-300 ${pulse ? "border-green-400 shadow-[0_0_0_3px_rgba(74,222,128,0.35)]" : rPulse ? "border-sky-400 shadow-[0_0_0_3px_rgba(56,189,248,0.4)]" : "border-neutral-700"}`} style={bgStyle(blank ? null : screenBg)}>
+          <div className={`relative h-28 sm:h-auto sm:aspect-video rounded-xl bg-black border transition-all duration-300 ${pulse ? "border-green-400 shadow-[0_0_0_3px_rgba(74,222,128,0.35)]" : rPulse ? "border-sky-400 shadow-[0_0_0_3px_rgba(56,189,248,0.4)]" : "border-neutral-700"}`} style={{ ...bgStyle(blank ? null : screenBg), color: screenText || undefined }}>
             <span className={`hidden sm:block absolute top-2 left-3 text-xs ${blank ? "text-neutral-400" : shown ? "text-green-400" : "text-neutral-500"}`}>
               {blank ? "● Écran noir" : shown ? "● À l'écran" : "○ Rien à l'écran"}
             </span>
