@@ -90,7 +90,7 @@ export default function AdminPanel({ churchName, churchId, token }) {
     assistant: "aider à projeter les versets, les notes et les chants",
     admin: "gérer l'équipe et projeter les versets, les notes et les chants",
   };
-  const welcome = (m) => `Bonjour ${m.first || ""},\n\nUn compte a été créé pour toi sur Hosanna Cast, pour que tu puisses ${WHY[m.roleId] || WHY.standard}.\n\nLien : ${location.origin}/login\n\nTes identifiants :\nLogin : ${m.email}\nPassword : ${m.password}\n\nPar mesure de sécurité, tu dois changer ton mot de passe à ta première connexion.`;
+  const welcome = (m) => `Bonjour ${m.first || ""} 🙏\n\nBienvenue dans l'équipe ! 🚀 Un compte a été créé pour toi sur Hosanna Cast, pour que tu puisses ${WHY[m.roleId] || WHY.standard} \n\nLien : ${location.origin}/login\n\nTes identifiants :\nLogin : ${m.email}\nPassword : ${m.password}\n\n🔐 Par mesure de sécurité, tu dois changer ton mot de passe à ta première connexion.`;
   const sendWhatsApp = (m) => {
     const num = waNum.replace(/\D/g, "");              // chiffres seulement, avec l'indicatif du pays (ex. 230 57123456)
     window.open(`https://wa.me/${num}?text=${encodeURIComponent(welcome(m))}`, "_blank", "noopener");
