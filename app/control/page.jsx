@@ -220,16 +220,6 @@ export default function Control() {
     ch.current?.postMessage(msg);
     flash();
   };
-  // ajoute le texte rapide comme nouvelle diapositive du chant ouvert (après celle à l'écran, sinon à la fin)
-  const addToChant = (text) => {
-    const item = library.lib.chants.find((x) => x.id === chantId);
-    if (!item) return;
-    const slides = slidesOf(item);
-    const at = slideLive && slideLive.id === item.id ? slideLive.i + 1 : slides.length;
-    const next = [...slides]; next.splice(at, 0, text);
-    library.update("chants", item.id, { slides: next, text: next.join("\n\n") });
-  };
-
   const clearScreen = () => {
     if (!canProject) return;
     setQ("");
@@ -463,8 +453,6 @@ export default function Control() {
           <QuickText
             onProject={projectFree}
             disabled={!canProject}
-            onAdd={tab === "chants" && chantId ? addToChant : null}
-            addLabel="+ Ajouter au chant"
           />
         {tab === "chants" ? (
         <section className="min-w-0">
