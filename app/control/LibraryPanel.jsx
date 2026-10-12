@@ -242,13 +242,11 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
   /* ───── liste ───── */
   return (
     <div>
-      <div className="flex gap-2 mb-2">
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t.search} className={field} />
-        <button onClick={startAdd} aria-label={t.add} title={t.add}
-          className="shrink-0 w-9 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-amber-400 text-lg leading-none transition duration-100 active:scale-90">+</button>
-      </div>
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t.search} className={`${field} mb-2`} />
+      <button onClick={startAdd}
+        className="w-full mb-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-amber-400 py-2 text-sm font-medium transition duration-100 active:scale-95">+ {t.add}</button>
       {!ready ? null : !items.length ? (
-        <p className="text-sm text-neutral-500 mt-3">{t.empty} Utilise <span className="text-amber-400">+</span> pour en ajouter.</p>
+        <p className="text-sm text-neutral-500 mt-3">{t.empty} Utilise le bouton ci-dessus pour en ajouter.</p>
       ) : !filtered.length ? (
         <p className="text-sm text-neutral-500 mt-3">Aucun résultat.</p>
       ) : (
