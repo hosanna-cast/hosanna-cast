@@ -10,7 +10,7 @@ const VERSIONS = [
   { name: "ostervald", label: "OST", full: "Ostervald", ids: ["fraOST", "fra_fob", "fraFOB"], match: /ostervald/i },
   { name: "darby", label: "DBY", full: "Darby", ids: ["fraDBY", "fra_dby", "fraDarby"], match: /darby/i },
   { name: "martin", label: "MAR", full: "Martin 1744", ids: ["fraMAR", "fra_mar", "fraMartin"], match: /martin/i },
-  { name: "kjv", label: "KJV", full: "King James Version", lang: "eng", ids: ["eng-kjv", "engkjv", "eng_kjv"], match: /king james/i },
+  { name: "kjv", label: "KJV", full: "King James Version", lang: "eng", ids: ["eng-kjv2006", "engkjv", "eng-kjv"], match: /king james/i },
 ];
 const BASES = ["https://ebible.org/Scriptures/", "https://ebible.org/Bible/"];
 
