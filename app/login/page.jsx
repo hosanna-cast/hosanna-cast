@@ -23,7 +23,7 @@ export default function Login() {
     if (!up) {
       const { error } = await supabase.auth.signInWithPassword({ email: f.email, password: f.password });
       if (error) { setBusy(false); return setMsg(error.message); }
-      location.assign("/control");          // on reste en « connexion en cours » jusqu'au chargement de la console
+      location.assign("/");                 // page d'accueil : on reste en « connexion en cours » jusqu'à son chargement
       return;
     }
 
@@ -41,7 +41,7 @@ export default function Login() {
       last: f.last.trim(),
     });
     if (e2) { setBusy(false); return setMsg(e2.message); }
-    location.assign("/control");
+    location.assign("/");
   };
 
   return (
