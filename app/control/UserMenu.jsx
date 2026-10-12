@@ -13,6 +13,7 @@ const I = {
   copy: ["M9 9h11v11H9z", "M5 15V5a1 1 0 0 1 1-1h10"],
   check: ["m5 12 5 5L20 7"],
   admin: ["M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z", "m9 12 2 2 4-4"],
+  key: ["M21 2l-2 2m-7.6 7.6a5.5 5.5 0 1 1-7.8 7.8 5.5 5.5 0 0 1 7.8-7.8z", "m15.5 7.5 3 3L22 7l-3-3"],
   logout: ["M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4", "m16 17 5-5-5-5", "M21 12H9"],
 };
 
@@ -71,6 +72,10 @@ export default function UserMenu({ church, copied, onCopy, onLogout }) {
                 <span className="block text-xs text-neutral-400">Pour le PC du vidéoprojecteur</span>
               </span>
             </button>
+            <a role="menuitem" href="/change-password" className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-neutral-300 hover:bg-neutral-700">
+              <Icon d={I.key} className="h-[18px] w-[18px] text-neutral-400" />
+              Changer le mot de passe
+            </a>
             <button role="menuitem" onClick={onLogout} className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-neutral-300 hover:bg-neutral-700">
               <Icon d={I.logout} className="h-[18px] w-[18px] text-neutral-400" />
               Déconnexion
