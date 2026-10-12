@@ -21,9 +21,9 @@ export default function Login() {
     const supabase = createClient();
 
     if (!up) {
-      const { error } = await supabase.auth.signInWithPassword({ email: f.email, password: f.password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email: f.email, password: f.password });
       if (error) { setBusy(false); return setMsg(error.message); }
-      location.assign("/");                 // page d'accueil : on reste en « connexion en cours » jusqu'à son chargement
+      location.assign(data?.user?.app_metadata?.must_change_password ? "/change-password" : "/");                 // page d'accueil : on reste en « connexion en cours » jusqu'à son chargement
       return;
     }
 
