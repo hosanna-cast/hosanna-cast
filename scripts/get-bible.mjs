@@ -74,23 +74,25 @@ async function download(v) {
 
 fs.mkdirSync("public/bible", { recursive: true });
 const done = [];
+const skipped = [];
 
 for (const v of VERSIONS) {
   const out = `public/bible/${v.name}.json`;
   console.log(`== ${v.full} (${v.name})`);
   if (!fs.existsSync(out)) {
     const dl = await download(v);
-    if (!dl) { console.warn(`  -> ${v.full} ignorée (téléchargement impossible)`); continue; }
+    if (!dl) { console.warn(`  -> ${v.full} ignorée (téléchargement impossible)`); skipped.push(v.full); continue; }
     console.log("  téléchargé :", dl.url);
     try {
       const dir = `usfm/${v.name}`;
       new AdmZip(dl.buf).extractAllTo(dir, true);
       execFileSync("node", ["scripts/usfm-to-json.mjs", dir, out], { stdio: "inherit" });
-    } catch (e) { console.warn("  conversion échouée :", e.message); continue; }
+    } catch (e) { console.warn("  conversion échouée :", e.message); skipped.push(v.full); continue; }
   }
   if (!fs.existsSync(out) || count(out) < 20000) {
     console.warn(`  -> ${v.full} ignorée (fichier incomplet)`);
     fs.rmSync(out, { force: true });
+    skipped.push(v.full);
     continue;
   }
   done.push({ id: v.name, label: v.label, full: v.full });
@@ -99,3 +101,4 @@ for (const v of VERSIONS) {
 if (!done.length) { console.error("Aucune Bible générée."); process.exit(1); }
 fs.writeFileSync("public/bible/versions.json", JSON.stringify(done));
 console.log("Versions disponibles :", done.map((d) => d.label).join(", "));
+if (skipped.length) console.warn("VERSIONS IGNORÉES :", skipped.join(", "));
