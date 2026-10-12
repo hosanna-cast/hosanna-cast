@@ -2,6 +2,8 @@
 import { useState } from "react";
 
 export const MAX_BG = 3;
+export const DEFAULT_TEXT = "#ffffff";
+const TEXT_SWATCHES = [["#ffffff", "Blanc"], ["#facc15", "Jaune"], ["#fbbf24", "Ambre"], ["#000000", "Noir"]];
 
 // bg = { type: "color" | "image", value: "#rrggbb" | "data:image/jpeg;base64,…" } ou null (noir)
 export const bgStyle = (bg, dim = 0) => {
@@ -32,7 +34,7 @@ export async function fileToBg(file) {
 }
 
 // Panneau de l'administration : 3 emplacements maximum, un seul fond actif pour tout l'écran.
-export default function Backgrounds({ slots, active, onPick, onSet, onRemove }) {
+export default function Backgrounds({ slots, active, onPick, onSet, onRemove, textColor = DEFAULT_TEXT, onText }) {
   const [busy, setBusy] = useState(-1);
   const [err, setErr] = useState("");
 
@@ -76,6 +78,28 @@ export default function Backgrounds({ slots, active, onPick, onSet, onRemove }) 
         Aucun fond (noir)
       </button>
       {err && <p className="text-xs text-red-400 mt-2">{err}</p>}
+
+      {onText && (
+        <div className="mt-4 pt-3 border-t border-neutral-700">
+          <div className="text-sm font-medium mb-2">Couleur du texte</div>
+          <div className="flex flex-wrap items-center gap-2">
+            {TEXT_SWATCHES.map(([c, name]) => (
+              <button key={c} title={name} onClick={() => onText(c)} style={{ backgroundColor: c }}
+                className={`w-8 h-8 rounded-full border-2 transition duration-100 active:scale-90 ${textColor.toLowerCase() === c ? "border-amber-400 ring-2 ring-amber-400/40" : "border-neutral-500"}`} />
+            ))}
+            <label title="Autre couleur" className="relative w-8 h-8 rounded-full border-2 border-dashed border-neutral-500 overflow-hidden cursor-pointer flex items-center justify-center text-neutral-400 text-sm">
+              +
+              <input type="color" value={textColor} onChange={(e) => onText(e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer" />
+            </label>
+            {textColor.toLowerCase() !== DEFAULT_TEXT && (
+              <button onClick={() => onText(DEFAULT_TEXT)} className="text-xs text-neutral-400 hover:text-white ml-1">Remettre en blanc</button>
+            )}
+          </div>
+          <div className="mt-3 aspect-video max-w-xs rounded-lg flex items-center justify-center text-center font-bold text-lg px-3" style={{ ...(active >= 0 && slots[active] ? bgStyle(slots[active]) : { backgroundColor: "#000" }), color: textColor }}>
+            Aperçu du texte
+          </div>
+        </div>
+      )}
     </div>
   );
 }
