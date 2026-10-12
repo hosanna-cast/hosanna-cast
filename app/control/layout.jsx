@@ -7,6 +7,7 @@ export default async function ControlLayout({ children }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  if (user.app_metadata?.must_change_password) redirect("/change-password");   // première connexion : mot de passe à changer
 
   // les deux requêtes partent en même temps (au lieu de l'une après l'autre)
   const [{ data: m }, { data: profile }] = await Promise.all([
