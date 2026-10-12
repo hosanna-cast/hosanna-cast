@@ -16,11 +16,13 @@ export default async function Home() {
   let name = "";
   let logged = false;
   let role = "standard";
+  let mustChange = false;
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       logged = true;
+      mustChange = !!user.app_metadata?.must_change_password;
       const [{ data: m }, { data: profile }] = await Promise.all([
         supabase.from("memberships").select("role").eq("user_id", user.id).limit(1).maybeSingle(),
         supabase.from("profiles").select("first_name").eq("user_id", user.id).maybeSingle(),
@@ -32,6 +34,7 @@ export default async function Home() {
 
   // pas connecté : la page d'accueil, c'est la connexion
   if (!logged) redirect("/login");
+  if (mustChange) redirect("/change-password");      // première connexion : mot de passe à changer
 
   // chacun ne voit que ce qui lui est ouvert (profil « Chants » : chants seulement)
   const list = cards
