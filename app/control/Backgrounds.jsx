@@ -62,9 +62,12 @@ export default function Backgrounds({ slots, active, onPick, onSet, onRemove, te
             <button title="Supprimer ce fond" onClick={(e) => { e.stopPropagation(); onRemove(i); }}
               className="absolute top-1.5 right-1.5 w-6 h-6 rounded bg-black/60 hover:bg-red-600 text-white text-xs">✕</button>
             {bg.type === "color" && (
-              <input type="color" value={bg.value} title="Changer la couleur" onClick={(e) => e.stopPropagation()}
-                onChange={(e) => onSet(i, { type: "color", value: e.target.value })}
-                className="absolute bottom-1.5 right-1.5 w-7 h-7 p-0 border-0 rounded cursor-pointer bg-transparent" />
+              <label title="Changer la couleur du fond" onClick={(e) => e.stopPropagation()}
+                className="absolute bottom-1.5 right-1.5 flex items-center gap-1 rounded-full bg-black/70 hover:bg-black/90 text-white text-xs px-2 py-1 cursor-pointer overflow-hidden transition duration-100 active:scale-95">
+                <span aria-hidden>🎨</span><span>Couleur</span>
+                <input type="color" value={bg.value} onChange={(e) => onSet(i, { type: "color", value: e.target.value })}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+              </label>
             )}
           </div>
         ) : (
@@ -103,7 +106,6 @@ export default function Backgrounds({ slots, active, onPick, onSet, onRemove, te
           <div className="mt-3 aspect-video w-full max-w-md rounded-lg border border-neutral-600 flex items-center justify-center text-center font-bold text-2xl px-4" style={{ ...(active >= 0 && slots[active] ? bgStyle(slots[active]) : { backgroundColor: "#000" }), color: textColor }}>
             Aperçu du texte
           </div>
-          <p className="text-xs text-neutral-500 mt-1">Aperçu sur {active >= 0 && slots[active] ? "le fond actif" : "fond noir"}</p>
         </div>
       )}
     </div>
