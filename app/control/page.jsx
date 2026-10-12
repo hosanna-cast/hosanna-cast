@@ -555,7 +555,7 @@ export default function Control() {
                 ) : (
                   <>
                     <p className={`font-serif leading-snug whitespace-pre-line ${shown.kind === "slide" ? "text-center" : ""} ${size}`}>{shown.text}</p>
-                    <div className="mt-2 text-right text-sm text-amber-400">{shown.ref} <span className="text-xs text-neutral-500">{shown.version}</span></div>
+                    <div className="mt-2 text-right text-sm">{shown.ref} <span className="text-xs opacity-60">{shown.version}</span></div>
                   </>
                 )}
                 </div>
