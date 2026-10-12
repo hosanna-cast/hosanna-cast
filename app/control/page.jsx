@@ -312,10 +312,15 @@ export default function Control() {
   const onKey = (e) => {
     const t = e.target;
     // on tape dans le formulaire d'une note : les raccourcis ne s'appliquent pas
-    if (t.tagName === "TEXTAREA" || (t.tagName === "INPUT" && t !== searchRef.current)) {
+    if (t.tagName === "TEXTAREA" || t.isContentEditable || (t.tagName === "INPUT" && t !== searchRef.current)) {
       if (e.key === "Escape") t.blur();
       return;
     }
+    // le clavier agit sur une liste déroulante ou un bouton : on le laisse faire (Entrée / Espace / flèches)
+    if (t.tagName === "SELECT") return;
+    if ((t.tagName === "BUTTON" || t.tagName === "A") && (e.key === "Enter" || e.key === " ")) return;
+    // autres combinaisons (Ctrl+flèche, Alt+…) : ce ne sont pas nos raccourcis, sauf Ctrl+B
+    if ((e.ctrlKey || e.metaKey || e.altKey) && !((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b")) return;
     const inField = t === searchRef.current;
     const k = e.key.toLowerCase();
     if ((e.ctrlKey || e.metaKey) && k === "b") { e.preventDefault(); toggleBlank(); }
@@ -328,12 +333,21 @@ export default function Control() {
     else if (!q && !inField && k === "b") toggleBlank();
   };
 
+  // les raccourcis écoutent toute la page (et plus seulement la zone où se trouve le curseur)
+  const keyRef = useRef(null);
+  keyRef.current = onKey;
+  useEffect(() => {
+    const h = (e) => keyRef.current?.(e);
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, []);
+
   const btn = "rounded-lg bg-neutral-800 hover:bg-neutral-700 py-2 text-sm transition duration-100 active:scale-95 disabled:opacity-40 disabled:pointer-events-none";
   const size = shown ? (shown.text.length < 110 ? "text-sm sm:text-lg" : shown.text.length < 220 ? "text-xs sm:text-base" : "text-xs sm:text-sm") : "";
   const chapters = nav.b !== null ? bible?.[nav.b] : null;
 
   return (
-    <main className={`min-h-screen bg-neutral-900 text-white p-3 sm:p-6 2xl:px-10 ${typing ? "pb-[55vh] lg:pb-6" : ""}`} onKeyDown={onKey}>
+    <main className={`min-h-screen bg-neutral-900 text-white p-3 sm:p-6 2xl:px-10 ${typing ? "pb-[55vh] lg:pb-6" : ""}`}>
       {/* barre du haut */}
       <header className="flex items-center justify-between gap-3 mb-3 sm:mb-5">
         <a href="/" title="Accueil" className="inline-flex items-center gap-2.5 transition duration-100 active:scale-95">
