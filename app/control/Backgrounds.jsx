@@ -53,6 +53,11 @@ export default function Backgrounds({ slots, active, onPick, onSet, onRemove, te
             onKeyDown={(e) => { if (e.key === "Enter") onPick(active === i ? -1 : i); }}
             style={bgStyle(bg)}
             className={`relative aspect-video rounded-lg cursor-pointer border-2 transition duration-100 active:scale-95 ${active === i ? "border-amber-400" : "border-neutral-600 hover:border-neutral-400"}`}>
+            {onText && (
+              <span className="absolute inset-0 flex items-center justify-center text-center font-bold text-sm sm:text-base px-2 pointer-events-none select-none" style={{ color: textColor }}>
+                Aperçu du texte
+              </span>
+            )}
             {active === i && <span className="absolute bottom-1.5 left-1.5 rounded bg-amber-400 text-white text-xs font-medium px-2 py-0.5">Actif</span>}
             <button title="Supprimer ce fond" onClick={(e) => { e.stopPropagation(); onRemove(i); }}
               className="absolute top-1.5 right-1.5 w-6 h-6 rounded bg-black/60 hover:bg-red-600 text-white text-xs">✕</button>
@@ -95,9 +100,10 @@ export default function Backgrounds({ slots, active, onPick, onSet, onRemove, te
               <button onClick={() => onText(DEFAULT_TEXT)} className="text-xs text-neutral-400 hover:text-white ml-1">Remettre en blanc</button>
             )}
           </div>
-          <div className="mt-3 aspect-video max-w-xs rounded-lg flex items-center justify-center text-center font-bold text-lg px-3" style={{ ...(active >= 0 && slots[active] ? bgStyle(slots[active]) : { backgroundColor: "#000" }), color: textColor }}>
+          <div className="mt-3 aspect-video w-full max-w-md rounded-lg border border-neutral-600 flex items-center justify-center text-center font-bold text-2xl px-4" style={{ ...(active >= 0 && slots[active] ? bgStyle(slots[active]) : { backgroundColor: "#000" }), color: textColor }}>
             Aperçu du texte
           </div>
+          <p className="text-xs text-neutral-500 mt-1">Aperçu sur {active >= 0 && slots[active] ? "le fond actif" : "fond noir"}</p>
         </div>
       )}
     </div>
