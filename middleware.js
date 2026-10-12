@@ -26,4 +26,4 @@ export async function middleware(req) {
   return res;
 }
 
-export const config = { matcher: ["/control/:path*", "/admin/:path*", "/onboarding"] };
+export const config = { matcher: ["/control/:path*", "/admin/:path*", "/onboarding", "/change-password"] };
