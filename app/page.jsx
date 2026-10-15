@@ -4,14 +4,15 @@ import { createClient } from "@/lib/supabase/server";
 import LogoutButton from "./LogoutButton";
 import { normalizeRole } from "@/lib/roles";
 
-// `roles` : profils qui voient la carte (tous si absent). « Annonces » est en tête de liste.
+// `roles` : profils qui voient la carte. `row` : "top" = grande rangée en haut (pleine largeur), "bottom" = rangée du dessous.
 const cards = [
-  { href: "/control?tab=annonces", title: "Annonces", desc: "Photos et vidéos à projeter : régulières, temps spéciaux, ponctuelles.", accent: true, roles: ["admin", "assistant", "annonces"] },
-  { href: "/control", title: "Console", desc: "Bible, notes et chants : pilotez la projection (connexion requise).", roles: ["admin", "assistant"] },
-  { href: "/control?tab=notes", title: "Notes", desc: "Ouvrir vos notes de prédication (.docx).", roles: ["admin", "assistant"] },
-  { href: "/control?tab=chants", title: "Chants", desc: "Parcourir et projeter les paroles de chants.", roles: ["admin", "assistant", "standard"] },
-  { href: "/admin", title: "Administration", desc: "Équipe, profils et invitations.", roles: ["admin"] },
+  { href: "/control", title: "Console", desc: "Bible, notes et chants : pilotez la projection (connexion requise).", row: "top", roles: ["admin", "assistant"] },
+  { href: "/admin", title: "Administration", desc: "Équipe, profils et invitations.", row: "top", roles: ["admin"] },
+  { href: "/control?tab=notes", title: "Notes", desc: "Ouvrir vos notes de prédication (.docx).", row: "bottom", roles: ["admin", "assistant"] },
+  { href: "/control?tab=chants", title: "Chants", desc: "Parcourir et projeter les paroles de chants.", row: "bottom", roles: ["admin", "assistant", "standard"] },
+  { href: "/control?tab=annonces", title: "Annonces", desc: "Photos et vidéos à projeter : régulières, temps spéciaux, ponctuelles.", row: "bottom", roles: ["admin", "assistant", "annonces"] },
 ];
+const COLS = { 1: "sm:grid-cols-1", 2: "sm:grid-cols-2", 3: "sm:grid-cols-3" };
 
 export default async function Home() {
   // utilisateur connecté ? (la page reste utilisable si Supabase ne répond pas)
@@ -54,22 +55,22 @@ export default async function Home() {
         Bonjour <span className="text-amber-400 font-medium">{name}</span>, bienvenue sur ton espace
       </p>
 
-      <div className="grid gap-4 sm:grid-cols-2 w-full max-w-2xl">
-        {list.map((c) => (
-          <Link
-            key={c.href}
-            href={c.href}
-            target={c.external ? "_blank" : undefined}
-            className={`rounded-xl p-5 border transition duration-100 active:scale-95 ${
-              c.accent
-                ? "bg-amber-400 text-black border-amber-400 hover:bg-amber-300"
-                : "bg-neutral-800 border-neutral-700 hover:bg-neutral-700"
-            }`}
-          >
-            <div className="text-lg font-semibold">{c.title}</div>
-            <div className={`text-sm mt-1 ${c.accent ? "text-black/70" : "text-neutral-400"}`}>{c.desc}</div>
-          </Link>
-        ))}
+      <div className="w-full max-w-5xl space-y-4">
+        {["top", "bottom"].map((row) => {
+          const items = list.filter((c) => c.row === row);
+          if (!items.length) return null;
+          return (
+            <div key={row} className={`grid gap-4 grid-cols-1 ${COLS[items.length]}`}>
+              {items.map((c) => (
+                <Link key={c.href} href={c.href}
+                  className="rounded-xl p-5 border bg-neutral-800 border-neutral-700 hover:bg-neutral-700 transition duration-100 active:scale-95">
+                  <div className="text-lg font-semibold">{c.title}</div>
+                  <div className="text-sm mt-1 text-neutral-400">{c.desc}</div>
+                </Link>
+              ))}
+            </div>
+          );
+        })}
       </div>
     </main>
   );

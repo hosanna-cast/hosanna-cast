@@ -10,7 +10,7 @@ function DaysPicker({ days, onChange }) {
     <div className="flex flex-wrap gap-1">
       {DAY_ORDER.map((d) => (
         <button key={d} type="button" onClick={() => toggle(d)}
-          className={`px-2 py-1 rounded-md text-xs transition duration-100 active:scale-90 ${days.includes(d) ? "bg-amber-400 text-black font-medium" : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700"}`}>{DAY_SHORT[d]}</button>
+          className={`px-2 py-1 rounded-md text-xs transition duration-100 active:scale-90 ${days.includes(d) ? "bg-amber-400 text-black font-medium" : "bg-neutral-800 text-white hover:bg-neutral-700"}`}>{DAY_SHORT[d]}</button>
       ))}
     </div>
   );
@@ -23,10 +23,10 @@ function TypePicker({ value, onChange }) {
       <div className="grid grid-cols-3 gap-1">
         {TYPE_IDS.map((t) => (
           <button key={t} type="button" onClick={() => onChange(t)}
-            className={`rounded-md px-1 py-1.5 text-xs transition duration-100 active:scale-95 ${value === t ? "bg-amber-400 text-black font-medium" : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700"}`}>{TYPES[t].label}</button>
+            className={`rounded-md px-1 py-1.5 text-xs transition duration-100 active:scale-95 ${value === t ? "bg-amber-400 text-black font-medium" : "bg-neutral-800 text-white hover:bg-neutral-700"}`}>{TYPES[t].label}</button>
         ))}
       </div>
-      <p className="text-[11px] text-neutral-500 mt-1 leading-4">{TYPES[value].hint}</p>
+      <p className="text-[11px] text-white mt-1 leading-4">{TYPES[value].hint}</p>
     </div>
   );
 }
@@ -37,17 +37,17 @@ function TypeFields({ v, onChange }) {
   return (
     <>
       <div>
-        <p className="text-xs text-neutral-400 mb-1">Jours{v.type === "special" ? " (facultatif, ex. chaque dimanche)" : " habituels (facultatif)"} : mise en avant ces jours-là.</p>
+        <p className="text-xs text-white mb-1">Jours{v.type === "special" ? " (facultatif, ex. chaque dimanche)" : " habituels (facultatif)"} : mise en avant ces jours-là.</p>
         <DaysPicker days={v.days} onChange={(days) => onChange({ ...v, days })} />
       </div>
       {v.type === "special" && (
         <div>
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-neutral-400">Date de l'événement</span>
+            <span className="text-xs text-white">Date de l'événement</span>
             <input type="date" min={todayInput()} value={v.until || ""} onChange={(e) => onChange({ ...v, until: e.target.value })}
               className="rounded-md bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs [color-scheme:dark]" />
           </div>
-          <p className="text-[11px] text-neutral-500 mt-1 leading-4">Obligatoire. L'annonce reste affichée jusqu'à ce jour-là, puis disparaît le lendemain.</p>
+          <p className="text-[11px] text-white mt-1 leading-4">Obligatoire. L'annonce reste affichée jusqu'à ce jour-là, puis disparaît le lendemain.</p>
         </div>
       )}
     </>
@@ -67,7 +67,7 @@ function Tile({ a, live, canProject, onProject, onEdit, onDelete }) {
         </div>
         <div className="px-2 py-1.5">
           <span className="block text-xs font-medium truncate">{a.kind === "video" ? "🎬 " : ""}{a.name}</span>
-          <span className="block text-[11px] text-neutral-500 truncate">{{ regular: `↻ ${daysText(a.days)}`, special: `★ ${specialText(a)}`, oneoff: `s'efface dans ${timeLeft(a.expires_at)}` }[typeOf(a)]}</span>
+          <span className="block text-[11px] text-white truncate">{{ regular: `↻ ${daysText(a.days)}`, special: `★ ${specialText(a)}`, oneoff: `s'efface dans ${timeLeft(a.expires_at)}` }[typeOf(a)]}</span>
         </div>
       </button>
       {live && <span className="absolute top-1 left-1 rounded bg-green-600 text-white text-[10px] px-1.5 py-0.5">À l'écran</span>}
@@ -131,21 +131,21 @@ export default function AnnoncesPanel({ ann, liveId, canProject, onProject }) {
           {editId === a.id && (
             <li className="col-span-2 rounded-lg border border-amber-400/40 bg-neutral-900 p-2.5 space-y-2.5">
               <div>
-                <p className="text-xs text-neutral-400 mb-1">Nom</p>
+                <p className="text-xs text-white mb-1">Nom</p>
                 <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} maxLength={80}
                   className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-sm" />
               </div>
 
               <TypePicker value={draft.type} onChange={(type) => setDraft({ ...draft, type })} />
               <TypeFields v={draft} onChange={setDraft} />
-              {draft.type === "oneoff" && a.keep && <p className="text-xs text-neutral-500">Elle s'effacera 3 jours à partir de maintenant.</p>}
+              {draft.type === "oneoff" && a.keep && <p className="text-xs text-white">Elle s'effacera 3 jours à partir de maintenant.</p>}
 
               <div className="border-t border-neutral-800 pt-2.5">
                 <label className={`block w-full rounded-lg bg-neutral-800 hover:bg-neutral-700 text-amber-400 py-1.5 text-center text-sm transition duration-100 active:scale-95 cursor-pointer ${busy ? "opacity-50 pointer-events-none" : ""}`}>
                   {busy ? "Envoi en cours…" : "Changer la photo / vidéo"}
                   <input type="file" accept={ACCEPT} onChange={(e) => onReplace(a, e)} className="hidden" />
                 </label>
-                <p className="text-[11px] text-neutral-500 mt-1 leading-4">Seule l'image change : le nom, le type, les jours et la date sont gardés.</p>
+                <p className="text-[11px] text-white mt-1 leading-4">Seule l'image change : le nom, le type, les jours et la date sont gardés.</p>
               </div>
 
               <div className="grid grid-cols-2 gap-1.5">
@@ -162,8 +162,8 @@ export default function AnnoncesPanel({ ann, liveId, canProject, onProject }) {
   return (
     <div>
       <div className="flex items-baseline justify-between mb-1.5">
-        <span className="text-xs text-neutral-400 font-medium">Photos et vidéos</span>
-        <span className="text-[11px] text-neutral-500">3 sections</span>
+        <span className="text-xs text-white font-medium">Photos et vidéos</span>
+        <span className="text-[11px] text-white">3 sections</span>
       </div>
 
       {error && (
@@ -174,14 +174,14 @@ export default function AnnoncesPanel({ ann, liveId, canProject, onProject }) {
       )}
 
       <div className="rounded-lg border border-neutral-700 p-2 mb-2 space-y-2">
-        <p className="text-xs text-neutral-400">Type de la prochaine annonce</p>
+        <p className="text-xs text-white">Type de la prochaine annonce</p>
         <TypePicker value={rec.type} onChange={(type) => setRec({ ...rec, type })} />
         <TypeFields v={rec} onChange={setRec} />
         <label className={`block w-full rounded-lg bg-neutral-800 hover:bg-neutral-700 text-amber-400 py-2 text-center text-sm font-medium transition duration-100 active:scale-95 cursor-pointer ${error || busy || (rec.type === "special" && !rec.until) ? "opacity-50 pointer-events-none" : ""}`}>
           {busy ? "Envoi en cours… (une vidéo peut prendre un moment)" : "+ Ajouter photos ou vidéos"}
           <input type="file" multiple accept={ACCEPT} onChange={onFiles} className="hidden" />
         </label>
-        <p className="text-[11px] text-neutral-500 leading-4">Vidéos : MP4 (H.264), 50 Mo maximum chacune. Les photos sont réduites automatiquement.</p>
+        <p className="text-[11px] text-white leading-4">Vidéos : MP4 (H.264), 50 Mo maximum chacune. Les photos sont réduites automatiquement.</p>
       </div>
 
       {errs.length > 0 && (
@@ -192,12 +192,12 @@ export default function AnnoncesPanel({ ann, liveId, canProject, onProject }) {
       )}
 
       {!ready ? null : !list.length ? (
-        <p className="text-sm text-neutral-500 mt-3">Aucune annonce pour l'instant. Utilise le bouton ci-dessus pour ajouter une photo ou une vidéo.</p>
+        <p className="text-sm text-white mt-3">Aucune annonce pour l'instant. Utilise le bouton ci-dessus pour ajouter une photo ou une vidéo.</p>
       ) : (
         <>
           {sections.map(({ t, items }) => items.length > 0 && (
             <div key={t}>
-              <div className="text-[11px] text-neutral-400 font-medium mt-3 mb-1.5">{TYPES[t].short} <span className="text-neutral-600">({items.length})</span></div>
+              <div className="text-[11px] text-white font-medium mt-3 mb-1.5">{TYPES[t].short} <span className="text-white">({items.length})</span></div>
               {grid(items)}
             </div>
           ))}
