@@ -12,6 +12,8 @@ import { bgStyle } from "./Backgrounds";
 import { useChurch } from "@/lib/church";
 import UserMenu from "./UserMenu";
 import HelpControl from "./HelpControl";
+import Playlist from "./Playlist";
+import { usePlaylist } from "@/lib/playlist";
 import { openScreen } from "@/lib/screen";
 import { createClient } from "@/lib/supabase/client";
 import { uuid } from "@/lib/uuid";
@@ -28,6 +30,8 @@ export default function Control() {
   const [version, setVersion] = useState("lsg");
   const { bible, index, loaded, loading } = useBible(version);
   const library = useLibrary();
+  const pl = usePlaylist(church.id);                     // playlist du culte
+  const [activeId, setActiveId] = useState(null);       // élément de la playlist actuellement projeté
   const [chantId, setChantId] = useState(null);
   const [view, setView] = useState(null);                // chapitre affiché au centre { b, c }
   const [cite, setCite] = useState(null);                // plage citée dans la note { b, c, v, vEnd }
@@ -73,7 +77,7 @@ export default function Control() {
     if (window.matchMedia("(min-width: 1024px)").matches) searchRef.current?.focus();
   }, [tab]);
 
-  stateRef.current = { shown, live, slideLive, liveKind, blank, screenBg, screenText };
+  stateRef.current = { shown, live, slideLive, liveKind, blank, screenBg, screenText, playlist: pl.items };
 
   // Plusieurs personnes peuvent piloter le même écran : chaque console reçoit ce que les autres projettent,
   // donc tout le monde voit la même chose à l'écran et ← → repartent du bon endroit.
@@ -88,6 +92,7 @@ export default function Control() {
       setSlideLive(m.s || null);
       if (m.liveKind) setLiveKind(m.liveKind);
       if (m.blank !== undefined) setBlank(m.blank);
+      if (m.playlist?.length) pl.set(m.playlist);
     };
     // profil « Chants » : il ne voit pas les versets ni les notes des autres, seulement « écran utilisé »
     const chantsOnly = church.role === "standard";
@@ -97,6 +102,8 @@ export default function Control() {
       if (m.type === "helper") { if (m.by?.role === "admin") setHelperId(m.id || null); return; }
       if (m.type === "bg") { setScreenBg(m.bg || null); setScreenText(m.textColor || null); return; }
       // l'écran vient de s'ouvrir : on lui renvoie son fond
+      if (m.type === "playlist") { pl.set(Array.isArray(m.items) ? m.items : []); return; }
+      if (m.type === "speaker?") { const st = stateRef.current; if (st.shown || st.blank) ch.current?.postMessage({ type: "speakerState", shown: st.shown, blank: st.blank }); return; }
       if (m.type === "bg?") { const { screenBg: b, screenText: t } = stateRef.current; if (b || t) ch.current?.postMessage({ type: "bg", bg: b, textColor: t }); return; }
       if (chantsOnly && (m.type === "show" || m.type === "update") && hide(m)) {
         setShown(OTHER); setLive(null); setSlideLive(null);
@@ -105,7 +112,7 @@ export default function Control() {
       const who = m.by ? { name: m.by.name, device: m.by.device } : null;
       const noted = (what) => { if (who) { setLastBy({ ...who, what }); setRPulse(true); setTimeout(() => setRPulse(false), 700); } };
       if (m.type === "show" || m.type === "update") {
-        setShown({ type: m.type, kind: m.kind, ref: m.ref, text: m.text, version: m.version });
+        setShown({ type: m.type, kind: m.kind, ref: m.ref, text: m.text, version: m.version, next: m.next });
         if (m.r) {
           setLive(m.r); setLiveKind("verse");
           if (m.type === "show") setHistory((h) => [m.r, ...h.filter((x) => !(x.b === m.r.b && x.c === m.r.c && x.v === m.r.v && x.vEnd === m.r.vEnd))].slice(0, 15));
@@ -121,7 +128,7 @@ export default function Control() {
       } else if (m.type === "sync?") {
         // quelqu'un vient d'ouvrir la console : on lui dit ce qui est à l'écran
         const st = stateRef.current;
-        if (st.shown || st.blank) ch.current?.postMessage({ type: "state", to: m.by?.id, shown: st.shown, r: st.live, s: st.slideLive, liveKind: st.liveKind, blank: st.blank });
+        if (st.shown || st.blank || st.playlist?.length) ch.current?.postMessage({ type: "state", to: m.by?.id, shown: st.shown, r: st.live, s: st.slideLive, liveKind: st.liveKind, blank: st.blank, playlist: st.playlist });
       } else if (m.type === "state" && m.to === me.id) applyState(m);
     };
     ch.current = openScreen(church.token, onRemote, {
@@ -194,13 +201,22 @@ export default function Control() {
   };
   const refOf = (r) => `${BOOKS[r.b]} ${r.c + 1}:${r.v + 1}${r.vEnd && r.vEnd > r.v ? "-" + (r.vEnd + 1) : ""}`;
 
+  // verset suivant : envoyé à la vue orateur (« à venir »)
+  const nextVerse = (r) => {
+    const vs = bible?.[r.b]?.[r.c];
+    const nv = (r.vEnd ?? r.v) + 1;
+    if (!vs || vs[nv] === undefined) return null;
+    const n = { b: r.b, c: r.c, v: nv, vEnd: null };
+    return { ref: refOf(n), text: textOf(n) };
+  };
+
   const flash = () => { setLastBy(null); setPulse(true); setTimeout(() => setPulse(false), 250); };
 
   const project = (r, citeRange) => {
     if (!canProject) return;
     setView({ b: r.b, c: r.c });
     setCite((prev) => (citeRange !== undefined ? citeRange : prev && prev.b === r.b && prev.c === r.c ? prev : null));
-    const msg = { type: "show", ref: refOf(r), text: textOf(r), version: label, r };
+    const msg = { type: "show", ref: refOf(r), text: textOf(r), version: label, r, next: nextVerse(r) };
     setLive(r);
     setLiveKind("verse");
     setShown(msg);
@@ -213,7 +229,7 @@ export default function Control() {
   // diapositive d'une note ou d'un chant
   const projectSlide = (kind, item, i, slides) => {
     if (!canProject) return;
-    const msg = { type: "show", kind: kind === "chants" ? "chant" : "slide", ref: `${item.title} · ${i + 1}/${slides.length}`, text: slides[i], version: "", s: { kind, id: item.id, i } };
+    const msg = { type: "show", kind: kind === "chants" ? "chant" : "slide", ref: `${item.title} · ${i + 1}/${slides.length}`, text: slides[i], version: "", s: { kind, id: item.id, i }, next: slides[i + 1] ? { ref: "", text: slides[i + 1] } : null };
     setSlideLive({ kind, id: item.id, i });
     setLiveKind("slide");
     setShown(msg);
@@ -252,11 +268,64 @@ export default function Control() {
   };
   const toggleBlank = () => { if (!canProject) return; const on = !blank; ch.current?.postMessage({ type: "blank", on }); setBlank(on); setLastBy(null); };
 
+  // ───── playlist du culte ─────
+  const commitPl = (next) => { pl.set(next); ch.current?.postMessage({ type: "playlist", items: next }); };
+  const playItem = (it) => {
+    if (!canProject) return;
+    if (it.k === "verse") {
+      if (!bible?.[it.r.b]?.[it.r.c]?.[it.r.v]) return alert("Ce verset n'existe pas dans la version affichée.");
+      project(it.r);
+    } else if (it.k === "text") {
+      projectFree(it.text);
+    } else {
+      const item = library.lib[it.k]?.find((x) => x.id === it.itemId);
+      if (!item) return alert("Cet élément n'existe plus dans la bibliothèque.");
+      const slides = slidesOf(item);
+      if (!slides.length) return;
+      projectSlide(it.k, item, 0, slides);
+    }
+    setActiveId(it.id);
+  };
+  const playStep = (d) => {
+    if (!canProject || !pl.items.length) return;
+    const i = pl.items.findIndex((x) => x.id === activeId);
+    const t = i < 0 ? (d > 0 ? 0 : -1) : i + d;
+    if (pl.items[t]) playItem(pl.items[t]);
+  };
+  const plAddRef = (txt) => {
+    const ref = parseRef(txt);
+    if (!ref || !bible) return false;
+    const b = ref.books[0];
+    const c = ref.chapter ? ref.chapter - 1 : 0;
+    const v = ref.verse ? ref.verse - 1 : 0;
+    if (bible[b]?.[c]?.[v] === undefined) return false;
+    const r = { b, c, v, vEnd: ref.verseEnd && ref.verseEnd - 1 > v ? ref.verseEnd - 1 : null };
+    commitPl([...pl.items, { id: uuid(), k: "verse", r, title: refOf(r) }]);
+    return true;
+  };
+  const plAddLib = (kind, id) => {
+    const item = library.lib[kind]?.find((x) => x.id === id);
+    if (item) commitPl([...pl.items, { id: uuid(), k: kind, itemId: id, title: item.title }]);
+  };
+  const plAddText = (text) => commitPl([...pl.items, { id: uuid(), k: "text", text: text.trim(), title: text.trim().split("\n")[0].slice(0, 40) }]);
+  const canAddCurrent = (liveKind === "verse" && !!live) || (liveKind === "slide" && !!slideLive) || (liveKind === "free" && !!shown?.text);
+  const plAddCurrent = () => {
+    if (liveKind === "verse" && live) commitPl([...pl.items, { id: uuid(), k: "verse", r: live, title: refOf(live) }]);
+    else if (liveKind === "slide" && slideLive) plAddLib(slideLive.kind, slideLive.id);
+    else if (liveKind === "free" && shown?.text) plAddText(shown.text);
+  };
+  const plMove = (id, d) => {
+    const a = [...pl.items]; const i = a.findIndex((x) => x.id === id); const j = i + d;
+    if (i < 0 || j < 0 || j >= a.length) return;
+    [a[i], a[j]] = [a[j], a[i]];
+    commitPl(a);
+  };
+
   // changement de version : le verset à l'écran est re-projeté dans la nouvelle version
   const reproject = (r) => {
     if (!canProject) return;
     if (!bible?.[r.b]?.[r.c]?.[r.v]) return;           // verset absent de cette version : l'écran reste tel quel
-    const msg = { type: "update", ref: refOf(r), text: textOf(r), version: label, r };
+    const msg = { type: "update", ref: refOf(r), text: textOf(r), version: label, r, next: nextVerse(r) };
     setShown(msg);
     ch.current?.postMessage(msg);
     flash();
@@ -323,6 +392,8 @@ export default function Control() {
     else if (e.key === "ArrowUp" && results.length) { e.preventDefault(); setSel((s) => Math.max(s - 1, 0)); }
     else if (e.key === "Enter" && results[sel]) { project(results[sel]); setQ(""); }
     else if (e.key === "Escape") clearScreen();
+    else if (e.key === "PageDown") { e.preventDefault(); playStep(1); }
+    else if (e.key === "PageUp") { e.preventDefault(); playStep(-1); }
     else if (!q && e.key === "ArrowRight") step(1);
     else if (!q && e.key === "ArrowLeft") step(-1);
     else if (!q && !inField && k === "b") toggleBlank();
@@ -601,8 +672,16 @@ export default function Control() {
             <div className="flex flex-wrap justify-center gap-x-4 gap-y-2">
               <span className="flex items-center gap-1.5"><Kbd>Échap</Kbd> effacer</span>
               <span className="flex items-center gap-1.5"><Kbd>Ctrl+B</Kbd> écran noir</span>
+              {tabs.length > 1 && <span className="flex items-center gap-1.5"><Kbd>Page ↓↑</Kbd> playlist</span>}
             </div>
           </div>
+
+          {tabs.length > 1 && (
+            <Playlist items={pl.items} activeId={activeId} canProject={canProject} lib={library.lib}
+              onPlay={playItem} onNext={() => playStep(1)} onPrev={() => playStep(-1)}
+              onRemove={(id) => commitPl(pl.items.filter((x) => x.id !== id))} onMove={plMove} onClear={() => commitPl([])}
+              onAddRef={plAddRef} onAddLib={plAddLib} onAddText={plAddText} onAddCurrent={plAddCurrent} canAddCurrent={canAddCurrent} />
+          )}
 
           {history.length > 0 && (
             <section className="mt-3 lg:mt-4">
