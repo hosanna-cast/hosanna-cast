@@ -100,14 +100,12 @@ export default function Control() {
       if (m.type === "bg?") { const { screenBg: b, screenText: t } = stateRef.current; if (b || t) ch.current?.postMessage({ type: "bg", bg: b, textColor: t }); return; }
       if (chantsOnly && (m.type === "show" || m.type === "update") && hide(m)) {
         setShown(OTHER); setLive(null); setSlideLive(null);
-        if (m.type === "show") setBlank(false);
         return;
       }
       const who = m.by ? { name: m.by.name, device: m.by.device } : null;
       const noted = (what) => { if (who) { setLastBy({ ...who, what }); setRPulse(true); setTimeout(() => setRPulse(false), 700); } };
       if (m.type === "show" || m.type === "update") {
         setShown({ type: m.type, kind: m.kind, ref: m.ref, text: m.text, version: m.version });
-        if (m.type === "show") setBlank(false);
         if (m.r) {
           setLive(m.r); setLiveKind("verse");
           if (m.type === "show") setHistory((h) => [m.r, ...h.filter((x) => !(x.b === m.r.b && x.c === m.r.c && x.v === m.r.v && x.vEnd === m.r.vEnd))].slice(0, 15));
@@ -206,7 +204,6 @@ export default function Control() {
     setLive(r);
     setLiveKind("verse");
     setShown(msg);
-    setBlank(false);
     setNav({ b: r.b, c: r.c });
     setHistory((h) => [r, ...h.filter((x) => refOf(x) !== refOf(r))].slice(0, 15));
     ch.current?.postMessage(msg);
@@ -220,7 +217,6 @@ export default function Control() {
     setSlideLive({ kind, id: item.id, i });
     setLiveKind("slide");
     setShown(msg);
-    setBlank(false);
     ch.current?.postMessage(msg);
     flash();
   };
@@ -232,7 +228,6 @@ export default function Control() {
     const msg = { type: "show", kind: "chant", ref: chant ? `${chant.title} · texte libre` : "Texte rapide", text, version: "", free: true };
     setLiveKind("free");
     setShown(msg);
-    setBlank(false);
     ch.current?.postMessage(msg);
     flash();
   };
