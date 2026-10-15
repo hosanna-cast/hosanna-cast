@@ -1,6 +1,6 @@
 "use client";
 import { Fragment, useState } from "react";
-import { timeLeft, DAY_ORDER, DAY_SHORT, recurText, runsToday, hasEnd, toInputDate, todayInput } from "@/lib/expiry";
+import { timeLeft, DAY_ORDER, DAY_SHORT, runsToday, toInputDate, todayInput, TYPES, TYPE_IDS, typeOf, optsOf, daysText, specialText } from "@/lib/expiry";
 
 const ACCEPT = "image/*,video/mp4,video/webm,video/quicktime,.mp4,.m4v,.webm,.mov";
 
@@ -16,18 +16,41 @@ function DaysPicker({ days, onChange }) {
   );
 }
 
-// Date de fin facultative : après ce jour-là, l'annonce s'efface toute seule
-function UntilField({ value, onChange }) {
+// Choix du type d'annonce : un seul choix clair à la place de la case « récurrente »
+function TypePicker({ value, onChange }) {
   return (
     <div>
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs text-neutral-400">Jusqu'au</span>
-        <input type="date" min={todayInput()} value={value || ""} onChange={(e) => onChange(e.target.value)}
-          className="rounded-md bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs [color-scheme:dark]" />
-        {value && <button type="button" onClick={() => onChange("")} className="text-xs text-neutral-400 underline">Sans date de fin</button>}
+      <div className="grid grid-cols-3 gap-1">
+        {TYPE_IDS.map((t) => (
+          <button key={t} type="button" onClick={() => onChange(t)}
+            className={`rounded-md px-1 py-1.5 text-xs transition duration-100 active:scale-95 ${value === t ? "bg-amber-400 text-black font-medium" : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700"}`}>{TYPES[t].label}</button>
+        ))}
       </div>
-      <p className="text-[11px] text-neutral-500 mt-1 leading-4">Facultatif. Après ce jour-là, l'annonce disparaît toute seule (ex. évangélisation du 30 novembre).</p>
+      <p className="text-[11px] text-neutral-500 mt-1 leading-4">{TYPES[value].hint}</p>
     </div>
+  );
+}
+
+// Champs qui changent selon le type : jours (Régulière, Temps spécial), date de l'événement (Temps spécial)
+function TypeFields({ v, onChange }) {
+  if (v.type === "oneoff") return null;
+  return (
+    <>
+      <div>
+        <p className="text-xs text-neutral-400 mb-1">Jours{v.type === "special" ? " (facultatif, ex. chaque dimanche)" : " habituels (facultatif)"} : mise en avant ces jours-là.</p>
+        <DaysPicker days={v.days} onChange={(days) => onChange({ ...v, days })} />
+      </div>
+      {v.type === "special" && (
+        <div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-neutral-400">Date de l'événement</span>
+            <input type="date" min={todayInput()} value={v.until || ""} onChange={(e) => onChange({ ...v, until: e.target.value })}
+              className="rounded-md bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs [color-scheme:dark]" />
+          </div>
+          <p className="text-[11px] text-neutral-500 mt-1 leading-4">Obligatoire. L'annonce reste affichée jusqu'à ce jour-là, puis disparaît le lendemain.</p>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -44,45 +67,48 @@ function Tile({ a, live, canProject, onProject, onEdit, onDelete }) {
         </div>
         <div className="px-2 py-1.5">
           <span className="block text-xs font-medium truncate">{a.kind === "video" ? "🎬 " : ""}{a.name}</span>
-          <span className="block text-[11px] text-neutral-500 truncate">{a.keep ? `↻ ${recurText(a)}` : `s'efface dans ${timeLeft(a.expires_at)}`}</span>
+          <span className="block text-[11px] text-neutral-500 truncate">{{ regular: `↻ ${daysText(a.days)}`, special: `★ ${specialText(a)}`, oneoff: `s'efface dans ${timeLeft(a.expires_at)}` }[typeOf(a)]}</span>
         </div>
       </button>
       {live && <span className="absolute top-1 left-1 rounded bg-green-600 text-white text-[10px] px-1.5 py-0.5">À l'écran</span>}
       {!live && isToday && <span className="absolute top-1 left-1 rounded bg-amber-400 text-black text-[10px] font-medium px-1.5 py-0.5">Aujourd'hui</span>}
       <button onClick={() => onDelete(a)} aria-label="Supprimer" className="absolute top-1 right-1 w-6 h-6 rounded bg-black/60 hover:bg-red-600 text-white text-xs">✕</button>
-      <button onClick={() => onEdit(a)} aria-label="Modifier" title="Modifier l'annonce (nom, jours, date de fin, photo)"
-        className={`absolute top-1 right-8 w-6 h-6 rounded text-xs ${a.keep ? "bg-amber-400 text-black" : "bg-black/60 hover:bg-amber-400 hover:text-black text-white"}`}>↻</button>
+      <button onClick={() => onEdit(a)} aria-label="Modifier" title="Modifier l'annonce (nom, type, jours, date, photo)"
+        className="absolute top-1 right-8 w-6 h-6 rounded text-xs bg-black/60 hover:bg-amber-400 hover:text-black text-white">✎</button>
     </li>
   );
 }
 
-// Annonces : photos et vidéos à afficher à l'écran.
-// Temporaires : effacées après 3 jours.
-// Récurrentes (ex. cellule le mercredi, prière le vendredi, culte le dimanche) : gardées, avec des jours facultatifs
-// et une date de fin facultative (ex. évangélisation chaque dimanche jusqu'au 30 novembre).
+// Annonces : photos et vidéos à afficher à l'écran, en trois sections :
+//  Régulières (cellule, prière, culte…) : jamais effacées.
+//  Temps spéciaux (convention, évangélisation…) : effacées après la date de l'événement.
+//  Ponctuelles : effacées 3 jours après l'ajout.
 export default function AnnoncesPanel({ ann, liveId, canProject, onProject }) {
   const { list, ready, error, busy, upload, update, replace, remove } = ann;
   const [errs, setErrs] = useState([]);
-  const [rec, setRec] = useState({ keep: false, days: [], until: "" });      // réglage appliqué aux prochains envois
+  const [rec, setRec] = useState({ type: "oneoff", days: [], until: "" });      // réglage appliqué aux prochains envois
   const [editId, setEditId] = useState(null);
-  const [draft, setDraft] = useState({ keep: false, days: [], until: "", name: "" });
+  const [draft, setDraft] = useState({ type: "oneoff", days: [], until: "", name: "" });
 
   const onFiles = async (e) => {
     const files = e.target.files;
     if (!files?.length) return;
     const copy = Array.from(files);
     e.target.value = "";
-    setErrs(await upload(copy, rec));
+    if (rec.type === "special" && !rec.until) { setErrs(["Temps spécial : choisis d'abord la date de l'événement."]); return; }
+    setErrs(await upload(copy, optsOf(rec)));
   };
   const edit = (a) => {
     if (editId === a.id) return setEditId(null);
-    setDraft({ keep: a.keep, days: a.days, until: hasEnd(a) ? toInputDate(a.expires_at) : "", name: a.name });
+    setDraft({ type: typeOf(a), days: a.days, until: typeOf(a) === "special" ? toInputDate(a.expires_at) : "", name: a.name });
     setEditId(a.id);
   };
   const del = (a) => { if (window.confirm(`Supprimer « ${a.name} » ?`)) remove(a.id); };
   const save = async (a) => {
-    if (draft.keep && draft.until && draft.until < todayInput()) { setErrs([`${a.name} : la date de fin est déjà passée.`]); return; }
-    const m = await update(a.id, draft);
+    if (draft.type === "special" && !draft.until) { setErrs([`${a.name} : choisis la date de l'événement.`]); return; }
+    const keepDate = draft.type === "special" && typeOf(a) === "special" && draft.until === toInputDate(a.expires_at);
+    if (draft.type === "special" && !keepDate && draft.until < todayInput()) { setErrs([`${a.name} : la date de l'événement est déjà passée.`]); return; }
+    const m = await update(a.id, { ...optsOf(draft), name: draft.name });
     if (m) setErrs([`${a.name} : ${m}`]);
     setEditId(null);
   };
@@ -95,9 +121,7 @@ export default function AnnoncesPanel({ ann, liveId, canProject, onProject }) {
     else { setErrs([]); setEditId(null); }
   };
 
-  const today = list.filter(runsToday);
-  const recurring = list.filter((a) => a.keep && !runsToday(a));
-  const temp = list.filter((a) => !a.keep);
+  const sections = TYPE_IDS.map((t) => ({ t, items: list.filter((a) => typeOf(a) === t) }));
 
   const grid = (items) => (
     <ul className="grid grid-cols-2 gap-2">
@@ -112,28 +136,16 @@ export default function AnnoncesPanel({ ann, liveId, canProject, onProject }) {
                   className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-sm" />
               </div>
 
-              <label className="flex items-start gap-2 text-sm cursor-pointer">
-                <input type="checkbox" checked={draft.keep} onChange={(e) => setDraft({ ...draft, keep: e.target.checked })} className="mt-1 accent-amber-400" />
-                <span>Annonce récurrente<span className="block text-xs text-neutral-500">Gardée : elle ne s'efface pas après 3 jours.</span></span>
-              </label>
-              {draft.keep ? (
-                <>
-                  <div>
-                    <p className="text-xs text-neutral-400 mb-1">Jours habituels (facultatif) : elle est mise en avant ces jours-là.</p>
-                    <DaysPicker days={draft.days} onChange={(days) => setDraft({ ...draft, days })} />
-                  </div>
-                  <UntilField value={draft.until} onChange={(until) => setDraft({ ...draft, until })} />
-                </>
-              ) : (
-                <p className="text-xs text-neutral-500">Elle s'effacera 3 jours à partir de maintenant.</p>
-              )}
+              <TypePicker value={draft.type} onChange={(type) => setDraft({ ...draft, type })} />
+              <TypeFields v={draft} onChange={setDraft} />
+              {draft.type === "oneoff" && a.keep && <p className="text-xs text-neutral-500">Elle s'effacera 3 jours à partir de maintenant.</p>}
 
               <div className="border-t border-neutral-800 pt-2.5">
                 <label className={`block w-full rounded-lg bg-neutral-800 hover:bg-neutral-700 text-amber-400 py-1.5 text-center text-sm transition duration-100 active:scale-95 cursor-pointer ${busy ? "opacity-50 pointer-events-none" : ""}`}>
                   {busy ? "Envoi en cours…" : "Changer la photo / vidéo"}
                   <input type="file" accept={ACCEPT} onChange={(e) => onReplace(a, e)} className="hidden" />
                 </label>
-                <p className="text-[11px] text-neutral-500 mt-1 leading-4">Seule l'image change : le nom, les jours et la date de fin sont gardés.</p>
+                <p className="text-[11px] text-neutral-500 mt-1 leading-4">Seule l'image change : le nom, le type, les jours et la date sont gardés.</p>
               </div>
 
               <div className="grid grid-cols-2 gap-1.5">
@@ -151,7 +163,7 @@ export default function AnnoncesPanel({ ann, liveId, canProject, onProject }) {
     <div>
       <div className="flex items-baseline justify-between mb-1.5">
         <span className="text-xs text-neutral-400 font-medium">Photos et vidéos</span>
-        <span className="text-[11px] text-neutral-500">effacées après 3 jours</span>
+        <span className="text-[11px] text-neutral-500">3 sections</span>
       </div>
 
       {error && (
@@ -162,20 +174,10 @@ export default function AnnoncesPanel({ ann, liveId, canProject, onProject }) {
       )}
 
       <div className="rounded-lg border border-neutral-700 p-2 mb-2 space-y-2">
-        <label className="flex items-start gap-2 text-sm cursor-pointer">
-          <input type="checkbox" checked={rec.keep} onChange={(e) => setRec({ ...rec, keep: e.target.checked })} className="mt-1 accent-amber-400" />
-          <span>↻ Annonce récurrente<span className="block text-xs text-neutral-500">Pour une annonce qui revient (cellule, prière, culte…) : elle est gardée.</span></span>
-        </label>
-        {rec.keep && (
-          <>
-            <div>
-              <p className="text-xs text-neutral-400 mb-1">Jours habituels (facultatif)</p>
-              <DaysPicker days={rec.days} onChange={(days) => setRec({ ...rec, days })} />
-            </div>
-            <UntilField value={rec.until} onChange={(until) => setRec({ ...rec, until })} />
-          </>
-        )}
-        <label className={`block w-full rounded-lg bg-neutral-800 hover:bg-neutral-700 text-amber-400 py-2 text-center text-sm font-medium transition duration-100 active:scale-95 cursor-pointer ${error || busy ? "opacity-50 pointer-events-none" : ""}`}>
+        <p className="text-xs text-neutral-400">Type de la prochaine annonce</p>
+        <TypePicker value={rec.type} onChange={(type) => setRec({ ...rec, type })} />
+        <TypeFields v={rec} onChange={setRec} />
+        <label className={`block w-full rounded-lg bg-neutral-800 hover:bg-neutral-700 text-amber-400 py-2 text-center text-sm font-medium transition duration-100 active:scale-95 cursor-pointer ${error || busy || (rec.type === "special" && !rec.until) ? "opacity-50 pointer-events-none" : ""}`}>
           {busy ? "Envoi en cours… (une vidéo peut prendre un moment)" : "+ Ajouter photos ou vidéos"}
           <input type="file" multiple accept={ACCEPT} onChange={onFiles} className="hidden" />
         </label>
@@ -193,24 +195,12 @@ export default function AnnoncesPanel({ ann, liveId, canProject, onProject }) {
         <p className="text-sm text-neutral-500 mt-3">Aucune annonce pour l'instant. Utilise le bouton ci-dessus pour ajouter une photo ou une vidéo.</p>
       ) : (
         <>
-          {today.length > 0 && (
-            <>
-              <div className="text-[11px] text-amber-400 font-medium mt-3 mb-1.5">● Aujourd'hui</div>
-              {grid(today)}
-            </>
-          )}
-          {recurring.length > 0 && (
-            <>
-              <div className="text-[11px] text-neutral-500 mt-3 mb-1.5">↻ Récurrentes</div>
-              {grid(recurring)}
-            </>
-          )}
-          {temp.length > 0 && (
-            <>
-              <div className="text-[11px] text-neutral-500 mt-3 mb-1.5">Temporaires (3 jours)</div>
-              {grid(temp)}
-            </>
-          )}
+          {sections.map(({ t, items }) => items.length > 0 && (
+            <div key={t}>
+              <div className="text-[11px] text-neutral-400 font-medium mt-3 mb-1.5">{TYPES[t].short} <span className="text-neutral-600">({items.length})</span></div>
+              {grid(items)}
+            </div>
+          ))}
         </>
       )}
     </div>

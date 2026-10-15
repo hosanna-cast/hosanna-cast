@@ -87,6 +87,7 @@ export default function AdminPanel({ churchName, churchId, token }) {
   const [waNum, setWaNum] = useState("");
   const WHY = {
     standard: "projeter les paroles (lyrics) des chants",
+    annonces: "gérer et projeter les annonces (photos et vidéos)",
     assistant: "aider à projeter les versets, les notes et les chants",
     admin: "gérer l'équipe et projeter les versets, les notes et les chants",
   };

@@ -7,6 +7,7 @@ create or replace function public.role_of(church uuid)
 returns text language sql security definer stable set search_path = public as $$
   select case when m.role in ('owner','admin') then 'admin'
               when m.role = 'assistant' then 'assistant'
+              when m.role = 'annonces' then 'annonces'
               else 'standard' end
   from memberships m where m.user_id = auth.uid() and m.church_id = church limit 1
 $$;
@@ -15,7 +16,7 @@ $$;
 create table if not exists public.invites (
   code text primary key default left(replace(gen_random_uuid()::text, '-', ''), 20),
   church_id uuid not null references public.churches(id) on delete cascade,
-  role text not null check (role in ('admin','assistant','standard')),
+  role text not null check (role in ('admin','assistant','standard','annonces')),
   created_by uuid default auth.uid(),
   expires_at timestamptz not null default now() + interval '7 days',
   created_at timestamptz not null default now()
@@ -43,7 +44,7 @@ declare c uuid := public.require_admin();
 begin
   return query
     select m.user_id, p.first_name::text, p.last_name::text, u.email::text,
-           case when m.role in ('owner','admin') then 'admin' when m.role = 'assistant' then 'assistant' else 'standard' end,
+           case when m.role in ('owner','admin') then 'admin' when m.role = 'assistant' then 'assistant' when m.role = 'annonces' then 'annonces' else 'standard' end,
            (m.user_id = auth.uid())
     from memberships m
     join auth.users u on u.id = m.user_id
@@ -56,7 +57,7 @@ create or replace function public.set_member_role(target uuid, new_role text)
 returns void language plpgsql security definer set search_path = public as $$
 declare c uuid := public.require_admin(); admins int;
 begin
-  if new_role not in ('admin','assistant','standard') then raise exception 'Rôle inconnu'; end if;
+  if new_role not in ('admin','assistant','standard','annonces') then raise exception 'Rôle inconnu'; end if;
   select count(*) into admins from memberships where church_id = c and role in ('owner','admin');
   if new_role <> 'admin' and admins <= 1
      and exists (select 1 from memberships where church_id = c and user_id = target and role in ('owner','admin')) then
@@ -80,7 +81,7 @@ create or replace function public.create_invite(new_role text)
 returns text language plpgsql security definer set search_path = public as $$
 declare c uuid := public.require_admin(); k text;
 begin
-  if new_role not in ('admin','assistant','standard') then raise exception 'Rôle inconnu'; end if;
+  if new_role not in ('admin','assistant','standard','annonces') then raise exception 'Rôle inconnu'; end if;
   insert into invites (church_id, role) values (c, new_role) returning code into k;
   return k;
 end $$;
@@ -135,5 +136,5 @@ grant execute on function public.invite_info(text) to anon, authenticated;
 drop policy if exists "chants_only_for_standard" on public.library_items;
 create policy "chants_only_for_standard" on public.library_items
   as restrictive for all to authenticated
-  using (kind = 'chants' or public.role_of(church_id) in ('admin','assistant'))
-  with check (kind = 'chants' or public.role_of(church_id) in ('admin','assistant'));
+  using (public.role_of(church_id) in ('admin','assistant') or (kind = 'chants' and public.role_of(church_id) <> 'annonces'))
+  with check (public.role_of(church_id) in ('admin','assistant') or (kind = 'chants' and public.role_of(church_id) <> 'annonces'));

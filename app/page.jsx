@@ -4,11 +4,13 @@ import { createClient } from "@/lib/supabase/server";
 import LogoutButton from "./LogoutButton";
 import { normalizeRole } from "@/lib/roles";
 
+// `roles` : profils qui voient la carte (tous si absent). « Annonces » est en tête de liste.
 const cards = [
-  { href: "/control", title: "Console", desc: "Bible, notes et chants : pilotez la projection (connexion requise).", accent: true },
-  { href: "/control?tab=notes", title: "Notes", desc: "Ouvrir vos notes de prédication (.docx)." },
-  { href: "/control?tab=chants", title: "Chants", desc: "Parcourir et projeter les paroles de chants." },
-  { href: "/admin", title: "Administration", desc: "Équipe, profils et invitations.", only: ["admin"] },
+  { href: "/control?tab=annonces", title: "Annonces", desc: "Photos et vidéos à projeter : régulières, temps spéciaux, ponctuelles.", accent: true, roles: ["admin", "assistant", "annonces"] },
+  { href: "/control", title: "Console", desc: "Bible, notes et chants : pilotez la projection (connexion requise).", roles: ["admin", "assistant"] },
+  { href: "/control?tab=notes", title: "Notes", desc: "Ouvrir vos notes de prédication (.docx).", roles: ["admin", "assistant"] },
+  { href: "/control?tab=chants", title: "Chants", desc: "Parcourir et projeter les paroles de chants.", roles: ["admin", "assistant", "standard"] },
+  { href: "/admin", title: "Administration", desc: "Équipe, profils et invitations.", roles: ["admin"] },
 ];
 
 export default async function Home() {
@@ -37,9 +39,7 @@ export default async function Home() {
   if (mustChange) redirect("/change-password");      // première connexion : mot de passe à changer
 
   // chacun ne voit que ce qui lui est ouvert (profil « Chants » : chants seulement)
-  const list = cards
-    .filter((c) => !c.only || c.only.includes(role))
-    .filter((c) => !(role === "standard" && ["Console", "Notes"].includes(c.title)));
+  const list = cards.filter((c) => !c.roles || c.roles.includes(role));
 
   return (
     <main className="relative min-h-screen bg-neutral-900 text-white flex flex-col items-center justify-center p-6">

@@ -37,12 +37,12 @@ alter table public.announcements enable row level security;
 drop policy if exists "announcements_read" on public.announcements;
 create policy "announcements_read" on public.announcements
   for select to authenticated
-  using (church_id = public.my_church() and public.role_of(church_id) in ('admin','assistant'));
+  using (church_id = public.my_church() and public.role_of(church_id) in ('admin','assistant','annonces'));
 drop policy if exists "announcements_write" on public.announcements;
 create policy "announcements_write" on public.announcements
   for all to authenticated
-  using (church_id = public.my_church() and public.role_of(church_id) in ('admin','assistant'))
-  with check (church_id = public.my_church() and public.role_of(church_id) in ('admin','assistant'));
+  using (church_id = public.my_church() and public.role_of(church_id) in ('admin','assistant','annonces'))
+  with check (church_id = public.my_church() and public.role_of(church_id) in ('admin','assistant','annonces'));
 
 -- 3) Stockage des fichiers (lecture publique : l'écran de projection n'est pas connecté) ----------
 -- Taille max par fichier : 50 Mo (limite du forfait gratuit Supabase). Modifiable ici si tu passes à un forfait payant.
@@ -60,12 +60,12 @@ drop policy if exists "announcements_files_insert" on storage.objects;
 create policy "announcements_files_insert" on storage.objects
   for insert to authenticated
   with check (bucket_id = 'announcements' and (storage.foldername(name))[1] = public.my_church()::text
-              and public.role_of(public.my_church()) in ('admin','assistant'));
+              and public.role_of(public.my_church()) in ('admin','assistant','annonces'));
 drop policy if exists "announcements_files_delete" on storage.objects;
 create policy "announcements_files_delete" on storage.objects
   for delete to authenticated
   using (bucket_id = 'announcements' and (storage.foldername(name))[1] = public.my_church()::text
-         and public.role_of(public.my_church()) in ('admin','assistant'));
+         and public.role_of(public.my_church()) in ('admin','assistant','annonces'));
 
 -- 4) Mise à jour en direct entre appareils ------------------------------------------------------
 do $$ begin alter publication supabase_realtime add table public.playlists;     exception when others then null; end $$;

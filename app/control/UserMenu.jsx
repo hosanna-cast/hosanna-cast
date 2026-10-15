@@ -72,7 +72,7 @@ export default function UserMenu({ church, copied, onCopy, onLogout }) {
                 <span className="block text-xs text-neutral-400">Pour le PC du vidéoprojecteur</span>
               </span>
             </button>
-            {church.role !== "standard" && (
+            {church.role !== "standard" && church.role !== "annonces" && (
               <a role="menuitem" href={`/speaker?k=${church.token}`} target="_blank" className="w-full flex items-start gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-neutral-700">
                 <Icon d={I.out} className="h-[18px] w-[18px] mt-0.5 text-neutral-400" />
                 <span>Vue orateur<span className="block text-xs text-neutral-400">Écran de la chaire : verset, suivant, chrono</span></span>

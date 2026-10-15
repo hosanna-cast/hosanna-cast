@@ -90,7 +90,7 @@ export default function Control() {
     const me = { id: uuid(), name: church.firstName || church.email.split("@")[0], device: window.matchMedia("(min-width: 1024px)").matches ? "ordinateur" : "mobile", role: church.role, uid: church.userId };
     mine.current = me;
     const applyState = (m) => {
-      if (chantsOnly && m.shown && m.shown.kind !== "chant") { setShown(OTHER); setLive(null); setSlideLive(null); if (m.blank !== undefined) setBlank(m.blank); return; }
+      if (chantsOnly && m.shown && m.shown.kind !== allowedKind) { setShown(OTHER); setLive(null); setSlideLive(null); if (m.blank !== undefined) setBlank(m.blank); return; }
       if (m.shown !== undefined) setShown(m.shown);
       setLive(m.r || null);
       setSlideLive(m.s || null);
@@ -98,9 +98,10 @@ export default function Control() {
       if (m.blank !== undefined) setBlank(m.blank);
       setMediaLive(m.media || null);
     };
-    // profil « Chants » : il ne voit pas les versets ni les notes des autres, seulement « écran utilisé »
-    const chantsOnly = church.role === "standard";
-    const hide = (m) => chantsOnly && m.kind !== "chant";
+    // profils « Chants » et « Annonces » : ils ne voient que leur propre contenu (chants / annonces), le reste s'affiche « écran utilisé »
+    const chantsOnly = church.role === "standard" || church.role === "annonces";
+    const allowedKind = church.role === "annonces" ? "media" : "chant";
+    const hide = (m) => chantsOnly && m.kind !== allowedKind;
     const OTHER = { type: "show", kind: "other", ref: "", text: "", version: "" };
     const onRemote = (m) => {
       if (m.type === "helper") { if (m.by?.role === "admin") setHelperId(m.id || null); return; }
@@ -147,10 +148,10 @@ export default function Control() {
   const copyScreen = () => navigator.clipboard?.writeText(screenUrl()).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); });
   const logout = async () => { await createClient().auth.signOut(); location.href = "/login"; };
 
-  // /control?tab=notes ou /control?tab=chants (liens de la page d'accueil)
+  // /control?tab=notes, chants ou annonces (liens de la page d'accueil)
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get("tab");
-    if ((t === "notes" || t === "chants") && tabs.includes(t)) setTab(t);
+    if ((t === "notes" || t === "chants" || t === "annonces") && tabs.includes(t)) setTab(t);
   }, []);
 
   // liste des versions réellement générées au build
@@ -518,10 +519,12 @@ export default function Control() {
 
         {/* ───── centre : texte rapide (toujours en haut) puis contenu de l'onglet ───── */}
         <div className="order-2 min-w-0 space-y-3">
+          {church.role !== "annonces" && (
           <QuickText
             onProject={projectFree}
             disabled={!canProject}
           />
+          )}
         {tab === "annonces" ? (
         <section className="min-w-0">
           <AnnonceStage
