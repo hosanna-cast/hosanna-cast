@@ -64,7 +64,7 @@ export default async function Home() {
               {items.map((c) => (
                 <Link key={c.href} href={c.href}
                   className="rounded-xl p-5 border bg-neutral-800 border-neutral-700 hover:bg-neutral-700 transition duration-100 active:scale-95">
-                  <div className="text-lg font-semibold">{c.title}</div>
+                  <div className="text-lg text-amber-400 font-semibold">{c.title}</div>
                   <div className="text-sm mt-1 text-neutral-500">{c.desc}</div>
                 </Link>
               ))}
