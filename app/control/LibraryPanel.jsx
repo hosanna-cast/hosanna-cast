@@ -5,6 +5,7 @@ import { findRefs } from "@/lib/refs";
 import { readTextFile } from "@/lib/readFile";
 import { fold } from "@/lib/textUtil";
 import { parseRef } from "@/lib/parseRef";
+import ChantPlaylists from "./ChantPlaylists";
 import Cutter, { linesFromSlides, slidesFromLines } from "./Cutter";
 
 const COPY = {
@@ -13,7 +14,7 @@ const COPY = {
 };
 const field = "w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-amber-400";
 
-export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUpdate, onPick, selectedId, bible, refOf, textOf, isLiveVerse, liveSlide, pausedSlide, onSlide, onVerse }) {
+export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUpdate, onPick, selectedId, bible, refOf, textOf, isLiveVerse, liveSlide, pausedSlide, onSlide, onVerse, playlists }) {
   const t = COPY[kind];
   const [openId, setOpenId] = useState(null);
   const [adding, setAdding] = useState(false);
@@ -24,6 +25,8 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
   const [editing, setEditing] = useState(false);
   const [cutLines, setCutLines] = useState(null);         // découpage des paroles à l'ajout (chants)
   const [vq, setVq] = useState("");                       // « aller au verset » (chants)
+  const [plOpen, setPlOpen] = useState(null);               // playlist ouverte : ses chants se complètent avec le bouton ＋
+  const openPl = kind === "chants" && playlists ? playlists.list.find((p) => p.id === plOpen) || null : null;
 
   const open = items.find((x) => x.id === openId) || null;
   const slides = useMemo(() => (open ? splitSlides(open.text) : []), [open]);
@@ -242,6 +245,9 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
   /* ───── liste ───── */
   return (
     <div>
+      {kind === "chants" && playlists && (
+        <ChantPlaylists playlists={playlists} chants={items} openId={plOpen} setOpenId={setPlOpen} selectedId={selectedId} onPick={onPick} />
+      )}
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t.search} className={`${field} mb-2`} />
       <button onClick={startAdd}
         className="w-full mb-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-amber-400 py-2 text-sm font-medium transition duration-100 active:scale-95">+ {t.add}</button>
@@ -253,13 +259,25 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
         groups.map(([g, list]) => (
           <div key={g || "all"}>
             {g && <div className="text-[11px] text-neutral-500 mt-3 mb-1.5">{g}</div>}
-            {list.map((x) => (
-              <button key={x.id} onClick={() => (kind === "chants" ? onPick?.(x.id) : setOpenId(x.id))}
-                className={`block w-full text-left px-3 py-2 rounded-lg mb-1 transition duration-100 active:scale-[0.98] ${selectedId === x.id ? "bg-amber-400 text-black" : "bg-neutral-800 hover:bg-neutral-700"}`}>
-                <span className="block text-sm font-medium truncate">{x.title}</span>
-                {x.person && <span className={`block text-xs truncate ${selectedId === x.id ? "text-black/60" : "text-neutral-500"}`}>{x.person}</span>}
-              </button>
-            ))}
+            {list.map((x) => {
+              const inPl = openPl ? openPl.chant_ids.includes(x.id) : false;
+              return (
+                <div key={x.id} className="flex gap-1 mb-1">
+                  <button onClick={() => (kind === "chants" ? onPick?.(x.id) : setOpenId(x.id))}
+                    className={`block flex-1 min-w-0 text-left px-3 py-2 rounded-lg transition duration-100 active:scale-[0.98] ${selectedId === x.id ? "bg-amber-400 text-black" : "bg-neutral-800 hover:bg-neutral-700"}`}>
+                    <span className="block text-sm font-medium truncate">{x.title}</span>
+                    {x.person && <span className={`block text-xs truncate ${selectedId === x.id ? "text-black/60" : "text-neutral-500"}`}>{x.person}</span>}
+                  </button>
+                  {openPl && (
+                    <button onClick={() => playlists.setChants(openPl.id, inPl ? openPl.chant_ids.filter((id) => id !== x.id) : [...openPl.chant_ids, x.id])}
+                      title={inPl ? `Retirer de « ${openPl.name} »` : `Ajouter à « ${openPl.name} »`}
+                      className={`w-10 shrink-0 rounded-lg text-lg font-medium transition duration-100 active:scale-90 ${inPl ? "bg-green-600 text-white" : "bg-neutral-800 hover:bg-amber-400 hover:text-black text-amber-400"}`}>
+                      {inPl ? "✓" : "+"}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ))
       )}

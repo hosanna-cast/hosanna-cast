@@ -12,8 +12,10 @@ import { bgStyle } from "./Backgrounds";
 import { useChurch } from "@/lib/church";
 import UserMenu from "./UserMenu";
 import HelpControl from "./HelpControl";
-import Playlist from "./Playlist";
-import { usePlaylist } from "@/lib/playlist";
+import AnnoncesPanel from "./AnnoncesPanel";
+import AnnonceStage from "./AnnonceStage";
+import { usePlaylists } from "@/lib/playlists";
+import { useAnnouncements } from "@/lib/announcements";
 import { openScreen } from "@/lib/screen";
 import { createClient } from "@/lib/supabase/client";
 import { uuid } from "@/lib/uuid";
@@ -30,8 +32,9 @@ export default function Control() {
   const [version, setVersion] = useState("lsg");
   const { bible, index, loaded, loading } = useBible(version);
   const library = useLibrary();
-  const pl = usePlaylist(church.id);                     // playlist du culte
-  const [activeId, setActiveId] = useState(null);       // élément de la playlist actuellement projeté
+  const playlists = usePlaylists();                      // playlists de chants (effacées après 3 jours)
+  const ann = useAnnouncements();                        // annonces : photos et vidéos (effacées après 3 jours)
+  const [mediaLive, setMediaLive] = useState(null);       // dernière annonce projetée { id }
   const [chantId, setChantId] = useState(null);
   const [view, setView] = useState(null);                // chapitre affiché au centre { b, c }
   const [cite, setCite] = useState(null);                // plage citée dans la note { b, c, v, vEnd }
@@ -77,7 +80,7 @@ export default function Control() {
     if (window.matchMedia("(min-width: 1024px)").matches) searchRef.current?.focus();
   }, [tab]);
 
-  stateRef.current = { shown, live, slideLive, liveKind, blank, screenBg, screenText, playlist: pl.items };
+  stateRef.current = { shown, live, slideLive, liveKind, blank, screenBg, screenText, mediaLive };
 
   // Plusieurs personnes peuvent piloter le même écran : chaque console reçoit ce que les autres projettent,
   // donc tout le monde voit la même chose à l'écran et ← → repartent du bon endroit.
@@ -92,7 +95,7 @@ export default function Control() {
       setSlideLive(m.s || null);
       if (m.liveKind) setLiveKind(m.liveKind);
       if (m.blank !== undefined) setBlank(m.blank);
-      if (m.playlist?.length) pl.set(m.playlist);
+      setMediaLive(m.media || null);
     };
     // profil « Chants » : il ne voit pas les versets ni les notes des autres, seulement « écran utilisé »
     const chantsOnly = church.role === "standard";
@@ -102,7 +105,6 @@ export default function Control() {
       if (m.type === "helper") { if (m.by?.role === "admin") setHelperId(m.id || null); return; }
       if (m.type === "bg") { setScreenBg(m.bg || null); setScreenText(m.textColor || null); return; }
       // l'écran vient de s'ouvrir : on lui renvoie son fond
-      if (m.type === "playlist") { pl.set(Array.isArray(m.items) ? m.items : []); return; }
       if (m.type === "speaker?") { const st = stateRef.current; if (st.shown || st.blank) ch.current?.postMessage({ type: "speakerState", shown: st.shown, blank: st.blank }); return; }
       if (m.type === "bg?") { const { screenBg: b, screenText: t } = stateRef.current; if (b || t) ch.current?.postMessage({ type: "bg", bg: b, textColor: t }); return; }
       if (chantsOnly && (m.type === "show" || m.type === "update") && hide(m)) {
@@ -112,15 +114,16 @@ export default function Control() {
       const who = m.by ? { name: m.by.name, device: m.by.device } : null;
       const noted = (what) => { if (who) { setLastBy({ ...who, what }); setRPulse(true); setTimeout(() => setRPulse(false), 700); } };
       if (m.type === "show" || m.type === "update") {
-        setShown({ type: m.type, kind: m.kind, ref: m.ref, text: m.text, version: m.version, next: m.next });
+        setShown({ type: m.type, kind: m.kind, ref: m.ref, text: m.text, version: m.version, next: m.next, mediaType: m.mediaType, url: m.url });
         if (m.r) {
           setLive(m.r); setLiveKind("verse");
           if (m.type === "show") setHistory((h) => [m.r, ...h.filter((x) => !(x.b === m.r.b && x.c === m.r.c && x.v === m.r.v && x.vEnd === m.r.vEnd))].slice(0, 15));
+        } else if (m.media) { setMediaLive(m.media); setLiveKind("media");
         } else if (m.s) { setSlideLive(m.s); setLiveKind("slide"); }
         else if (m.free) setLiveKind("free");
         if (m.type === "show") noted(m.ref);
       } else if (m.type === "clear") {
-        setLive(null); setSlideLive(null); setShown(null);
+        setLive(null); setSlideLive(null); setMediaLive(null); setShown(null);
         noted("a effacé l'écran");
       } else if (m.type === "blank") {
         setBlank(m.on === undefined ? (b) => !b : m.on);
@@ -128,7 +131,7 @@ export default function Control() {
       } else if (m.type === "sync?") {
         // quelqu'un vient d'ouvrir la console : on lui dit ce qui est à l'écran
         const st = stateRef.current;
-        if (st.shown || st.blank || st.playlist?.length) ch.current?.postMessage({ type: "state", to: m.by?.id, shown: st.shown, r: st.live, s: st.slideLive, liveKind: st.liveKind, blank: st.blank, playlist: st.playlist });
+        if (st.shown || st.blank) ch.current?.postMessage({ type: "state", to: m.by?.id, shown: st.shown, r: st.live, s: st.slideLive, media: st.mediaLive, liveKind: st.liveKind, blank: st.blank });
       } else if (m.type === "state" && m.to === me.id) applyState(m);
     };
     ch.current = openScreen(church.token, onRemote, {
@@ -247,6 +250,17 @@ export default function Control() {
     ch.current?.postMessage(msg);
     flash();
   };
+  // annonce (photo / vidéo) : projetée plein écran
+  const projectMedia = (a) => {
+    if (!canProject) return;
+    const msg = { type: "show", kind: "media", mediaType: a.kind, url: a.url, ref: a.name, text: "", version: "", media: { id: a.id } };
+    setMediaLive({ id: a.id });
+    setLiveKind("media");
+    setShown(msg);
+    ch.current?.postMessage(msg);
+    flash();
+  };
+  const mediaCmd = (cmd) => { if (canProject) ch.current?.postMessage({ type: "media", cmd }); };
   const clearScreen = () => {
     if (!canProject) return;
     setQ("");
@@ -254,6 +268,7 @@ export default function Control() {
     setLastBy(null);
     setLive(null);
     setSlideLive(null);
+    setMediaLive(null);
     setShown(null);
   };
   // « noir » est explicite (on / off) : si deux personnes appuient, l'écran ne bascule pas dans le mauvais sens
@@ -267,59 +282,6 @@ export default function Control() {
     ch.current?.postMessage({ type: "helper", id: uid });
   };
   const toggleBlank = () => { if (!canProject) return; const on = !blank; ch.current?.postMessage({ type: "blank", on }); setBlank(on); setLastBy(null); };
-
-  // ───── playlist du culte ─────
-  const commitPl = (next) => { pl.set(next); ch.current?.postMessage({ type: "playlist", items: next }); };
-  const playItem = (it) => {
-    if (!canProject) return;
-    if (it.k === "verse") {
-      if (!bible?.[it.r.b]?.[it.r.c]?.[it.r.v]) return alert("Ce verset n'existe pas dans la version affichée.");
-      project(it.r);
-    } else if (it.k === "text") {
-      projectFree(it.text);
-    } else {
-      const item = library.lib[it.k]?.find((x) => x.id === it.itemId);
-      if (!item) return alert("Cet élément n'existe plus dans la bibliothèque.");
-      const slides = slidesOf(item);
-      if (!slides.length) return;
-      projectSlide(it.k, item, 0, slides);
-    }
-    setActiveId(it.id);
-  };
-  const playStep = (d) => {
-    if (!canProject || !pl.items.length) return;
-    const i = pl.items.findIndex((x) => x.id === activeId);
-    const t = i < 0 ? (d > 0 ? 0 : -1) : i + d;
-    if (pl.items[t]) playItem(pl.items[t]);
-  };
-  const plAddRef = (txt) => {
-    const ref = parseRef(txt);
-    if (!ref || !bible) return false;
-    const b = ref.books[0];
-    const c = ref.chapter ? ref.chapter - 1 : 0;
-    const v = ref.verse ? ref.verse - 1 : 0;
-    if (bible[b]?.[c]?.[v] === undefined) return false;
-    const r = { b, c, v, vEnd: ref.verseEnd && ref.verseEnd - 1 > v ? ref.verseEnd - 1 : null };
-    commitPl([...pl.items, { id: uuid(), k: "verse", r, title: refOf(r) }]);
-    return true;
-  };
-  const plAddLib = (kind, id) => {
-    const item = library.lib[kind]?.find((x) => x.id === id);
-    if (item) commitPl([...pl.items, { id: uuid(), k: kind, itemId: id, title: item.title }]);
-  };
-  const plAddText = (text) => commitPl([...pl.items, { id: uuid(), k: "text", text: text.trim(), title: text.trim().split("\n")[0].slice(0, 40) }]);
-  const canAddCurrent = (liveKind === "verse" && !!live) || (liveKind === "slide" && !!slideLive) || (liveKind === "free" && !!shown?.text);
-  const plAddCurrent = () => {
-    if (liveKind === "verse" && live) commitPl([...pl.items, { id: uuid(), k: "verse", r: live, title: refOf(live) }]);
-    else if (liveKind === "slide" && slideLive) plAddLib(slideLive.kind, slideLive.id);
-    else if (liveKind === "free" && shown?.text) plAddText(shown.text);
-  };
-  const plMove = (id, d) => {
-    const a = [...pl.items]; const i = a.findIndex((x) => x.id === id); const j = i + d;
-    if (i < 0 || j < 0 || j >= a.length) return;
-    [a[i], a[j]] = [a[j], a[i]];
-    commitPl(a);
-  };
 
   // changement de version : le verset à l'écran est re-projeté dans la nouvelle version
   const reproject = (r) => {
@@ -356,8 +318,14 @@ export default function Control() {
   const isLiveVerse = (r) => liveKind === "verse" && live && live.b === r.b && live.c === r.c && live.v >= r.v && live.v <= (r.vEnd ?? r.v);
 
   const onSlides = liveKind === "slide" || liveKind === "free";
-  const canStep = canProject && (onSlides ? !!slideLive : !!live);
+  const canStep = canProject && (liveKind === "media" ? !!mediaLive : onSlides ? !!slideLive : !!live);
   const step = (d) => {
+    if (liveKind === "media") {
+      const i = ann.list.findIndex((x) => x.id === mediaLive?.id);
+      const t = ann.list[i + d];
+      if (i >= 0 && t) projectMedia(t);
+      return;
+    }
     if (onSlides) {
       if (!slideLive) return;
       const item = library.lib[slideLive.kind].find((x) => x.id === slideLive.id);
@@ -392,8 +360,6 @@ export default function Control() {
     else if (e.key === "ArrowUp" && results.length) { e.preventDefault(); setSel((s) => Math.max(s - 1, 0)); }
     else if (e.key === "Enter" && results[sel]) { project(results[sel]); setQ(""); }
     else if (e.key === "Escape") clearScreen();
-    else if (e.key === "PageDown") { e.preventDefault(); playStep(1); }
-    else if (e.key === "PageUp") { e.preventDefault(); playStep(-1); }
     else if (!q && e.key === "ArrowRight") step(1);
     else if (!q && e.key === "ArrowLeft") step(-1);
     else if (!q && !inField && k === "b") toggleBlank();
@@ -441,7 +407,7 @@ export default function Control() {
         <section className="order-3 lg:order-1 lg:sticky lg:top-6">
           {tabs.length > 1 && (
           <div className="flex gap-1 bg-neutral-800 rounded-lg p-1 mb-1.5 sm:mb-2">
-            {[["bible", "Bible"], ["notes", "Notes"], ["chants", "Chants"]].filter(([k]) => tabs.includes(k)).map(([k, l]) => (
+            {[["bible", "Bible"], ["notes", "Notes"], ["chants", "Chants"], ["annonces", "Annonces"]].filter(([k]) => tabs.includes(k)).map(([k, l]) => (
               <button key={k} onClick={() => setTab(k)}
                 className={`flex-1 px-3 py-1.5 rounded-md text-sm transition duration-100 active:scale-95 ${tab === k ? "bg-neutral-600 text-white font-medium" : "text-neutral-400 hover:text-white"}`}>{l}</button>
             ))}
@@ -460,7 +426,9 @@ export default function Control() {
           )}
 
           <div ref={panel} className="relative bg-neutral-800/60 border border-neutral-700 rounded-xl p-2 sm:p-3 max-h-[55vh] lg:max-h-[calc(100vh-7.5rem)] overflow-y-auto">
-            {tab !== "bible" ? (
+            {tab === "annonces" ? (
+              <AnnoncesPanel ann={ann} liveId={liveKind === "media" ? mediaLive?.id : null} canProject={canProject} onProject={projectMedia} />
+            ) : tab !== "bible" ? (
               <LibraryPanel
                 key={tab}
                 kind={tab}
@@ -471,6 +439,7 @@ export default function Control() {
                 onUpdate={(id, patch) => library.update(tab, id, patch)}
                 onPick={setChantId}
                 selectedId={chantId}
+                playlists={playlists}
                 bible={bible}
                 refOf={refOf}
                 textOf={textOf}
@@ -550,7 +519,19 @@ export default function Control() {
             onProject={projectFree}
             disabled={!canProject}
           />
-        {tab === "chants" ? (
+        {tab === "annonces" ? (
+        <section className="min-w-0">
+          <AnnonceStage
+            item={ann.list.find((x) => x.id === mediaLive?.id) || null}
+            live={liveKind === "media" && !!shown && shown.kind === "media"}
+            blank={blank}
+            canProject={canProject}
+            canStep={canStep}
+            onStep={step}
+            onCmd={mediaCmd}
+          />
+        </section>
+        ) : tab === "chants" ? (
         <section className="min-w-0">
           <ChantStage
             item={library.lib.chants.find((x) => x.id === chantId) || null}
@@ -628,7 +609,12 @@ export default function Control() {
             {shown && shown.kind !== "other" && !blank && (
               <div className="absolute inset-0 flex flex-col px-3 sm:px-5 pt-2 sm:pt-8 pb-2 sm:pb-3 overflow-y-auto">
                 <div className="my-auto">
-                {shown.kind === "chant" ? (
+                {shown.kind === "media" ? (
+                  <div className="flex flex-col items-center gap-1">
+                    {shown.mediaType === "image" ? <img src={shown.url} alt="" className="max-h-20 sm:max-h-40 object-contain rounded" /> : <span className="text-3xl">🎬</span>}
+                    <span className="text-xs sm:text-sm text-neutral-300 truncate max-w-full">{shown.ref}</span>
+                  </div>
+                ) : shown.kind === "chant" ? (
                   <>
                     <p className={`font-sans font-bold leading-snug whitespace-pre-line text-center ${size}`}>{shown.text}</p>
                   </>
@@ -672,16 +658,8 @@ export default function Control() {
             <div className="flex flex-wrap justify-center gap-x-4 gap-y-2">
               <span className="flex items-center gap-1.5"><Kbd>Échap</Kbd> effacer</span>
               <span className="flex items-center gap-1.5"><Kbd>Ctrl+B</Kbd> écran noir</span>
-              {tabs.length > 1 && <span className="flex items-center gap-1.5"><Kbd>Page ↓↑</Kbd> playlist</span>}
             </div>
           </div>
-
-          {tabs.length > 1 && (
-            <Playlist items={pl.items} activeId={activeId} canProject={canProject} lib={library.lib}
-              onPlay={playItem} onNext={() => playStep(1)} onPrev={() => playStep(-1)}
-              onRemove={(id) => commitPl(pl.items.filter((x) => x.id !== id))} onMove={plMove} onClear={() => commitPl([])}
-              onAddRef={plAddRef} onAddLib={plAddLib} onAddText={plAddText} onAddCurrent={plAddCurrent} canAddCurrent={canAddCurrent} />
-          )}
 
           {history.length > 0 && (
             <section className="mt-3 lg:mt-4">

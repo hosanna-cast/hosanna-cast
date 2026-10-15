@@ -104,7 +104,14 @@ export default function Speaker() {
 
       {/* texte en cours */}
       <div className="flex-1 min-h-0 flex flex-col px-[4vw] py-[2vh]">
-        {v ? (
+        {v && v.kind === "media" ? (
+          <div className="flex-1 min-h-0 flex flex-col items-center justify-center gap-3">
+            {v.mediaType === "image"
+              ? <img src={v.url} alt="" className={`max-h-[70%] max-w-full object-contain rounded ${blank ? "opacity-50" : ""}`} />
+              : <span className="text-7xl">🎬</span>}
+            <div className="text-amber-300 text-[3vh]">{v.mediaType === "video" ? "Vidéo : " : ""}{v.ref}</div>
+          </div>
+        ) : v ? (
           <>
             <div ref={box} className={`flex-1 min-h-0 flex ${chant ? "justify-center" : ""} items-center`}>
               <p ref={txt} className={`${chant ? "w-full text-center font-sans font-bold leading-[1.25]" : "font-serif leading-snug"} ${v.kind === "slide" ? "w-full text-center" : ""} whitespace-pre-line ${blank ? "opacity-60" : ""}`}>{v.text}</p>
