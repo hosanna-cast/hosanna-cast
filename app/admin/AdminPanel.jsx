@@ -248,7 +248,7 @@ export default function AdminPanel({ churchName, churchId, token }) {
             <h2 className="font-medium">Fond et texte de l'écran</h2>
             <span className="text-xs text-neutral-500">3 maximum</span>
           </div>
-          <p className="text-sm text-neutral-400 mb-3">Image ou couleur. Clique un fond pour l'afficher sur tout l'écran, clique-le encore pour l'enlever. Un écran noir (Ctrl+B) reste toujours noir.</p>
+          <p className="text-sm text-neutral-400 mb-3">Image ou couleur. Clique un fond pour l'afficher sur tout l'écran, clique-le encore pour l'enlever. Un écran noir (Ctrl+B) reste noir tant que tu ne le désactives pas.</p>
           <Backgrounds slots={bgs} active={bgActive} onPick={pickBg} onSet={setBgSlot} onRemove={removeBg} textColor={textColor} onText={pickText} />
           <p className="text-xs text-neutral-500 mt-3">Les fonds sont gardés sur cet appareil : fais ce réglage depuis l'ordinateur de la régie.</p>
         </section>
