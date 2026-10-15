@@ -16,7 +16,7 @@ export default function Display() {
     const token = new URLSearchParams(window.location.search).get("k");
     const ch = openScreen(token, (m) => {
       if (m.type === "bg") { setBg(m.bg || null); setTextColor(m.textColor || "#ffffff"); return; }
-      if (m.type === "show") { setBlank(false); setV(m); }
+      if (m.type === "show") setV(m);               // l'écran noir reste noir : seul « Noir » / Ctrl+B le désactive
       if (m.type === "update") setV(m);            // changement de version : l'écran noir reste noir
       if (m.type === "clear") setV(null);
       if (m.type === "blank") setBlank((b) => (m.on === undefined ? !b : m.on));   // « on » explicite : deux opérateurs ne se contredisent plus
