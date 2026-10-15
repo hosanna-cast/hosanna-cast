@@ -12,6 +12,7 @@ export default function Display() {
   const box = useRef(null);
   const txt = useRef(null);
   const vid = useRef(null);
+  const chRef = useRef(null);
   const resume = useRef({ url: null, t: 0 });              // reprise de la vidéo si l'écran noir est activé puis retiré
 
   useEffect(() => {
@@ -32,6 +33,7 @@ export default function Display() {
         else if (m.cmd === "unmute") { el.muted = false; setForcedMute(false); }
       }
     });
+    chRef.current = ch;
     ch.postMessage({ type: "bg?" });                // l'écran vient de s'ouvrir : on demande le fond et la couleur du texte
     return () => ch.close();
   }, []);
@@ -48,6 +50,8 @@ export default function Display() {
   }, [v, blank]);
 
   // vidéo : démarre toute seule ; si le navigateur refuse le son, elle démarre sans son (un clic le réactive)
+  // la console sait ainsi si la vidéo joue vraiment (et pourquoi pas)
+  const report = (status) => chRef.current?.postMessage({ type: "mediaStatus", status });
   const media = !blank && v?.kind === "media" && v.mediaType === "video";
   useEffect(() => {
     const el = vid.current;
@@ -56,6 +60,7 @@ export default function Display() {
     el.play().catch(() => {
       el.muted = true;
       setForcedMute(true);
+      report("muted");
       el.play().catch(() => {});
     });
   }, [media, v?.url]);
@@ -77,6 +82,8 @@ export default function Display() {
         <div className="absolute inset-0 bg-black flex items-center justify-center">
           {v.mediaType === "video" ? (
             <video key={v.url} ref={vid} src={v.url} playsInline className="max-w-full max-h-full"
+              onPlaying={() => report(vid.current?.muted && forcedMute ? "muted" : "playing")}
+              onError={() => report("error")}
               onLoadedMetadata={(e) => { if (resume.current.url === v.url) e.currentTarget.currentTime = resume.current.t; }}
               onTimeUpdate={(e) => { resume.current = { url: v.url, t: e.currentTarget.currentTime }; }} />
           ) : (

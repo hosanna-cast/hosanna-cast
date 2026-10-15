@@ -35,6 +35,7 @@ export default function Control() {
   const playlists = usePlaylists();                      // playlists de chants (effacées après 3 jours)
   const ann = useAnnouncements();                        // annonces : photos et vidéos (effacées après 3 jours)
   const [mediaLive, setMediaLive] = useState(null);       // dernière annonce projetée { id }
+  const [mediaStatus, setMediaStatus] = useState(null);   // ce que l'écran dit de la vidéo : playing | muted | error
   const [chantId, setChantId] = useState(null);
   const [view, setView] = useState(null);                // chapitre affiché au centre { b, c }
   const [cite, setCite] = useState(null);                // plage citée dans la note { b, c, v, vEnd }
@@ -105,6 +106,7 @@ export default function Control() {
       if (m.type === "helper") { if (m.by?.role === "admin") setHelperId(m.id || null); return; }
       if (m.type === "bg") { setScreenBg(m.bg || null); setScreenText(m.textColor || null); return; }
       // l'écran vient de s'ouvrir : on lui renvoie son fond
+      if (m.type === "mediaStatus") { setMediaStatus(m.status); return; }
       if (m.type === "speaker?") { const st = stateRef.current; if (st.shown || st.blank) ch.current?.postMessage({ type: "speakerState", shown: st.shown, blank: st.blank }); return; }
       if (m.type === "bg?") { const { screenBg: b, screenText: t } = stateRef.current; if (b || t) ch.current?.postMessage({ type: "bg", bg: b, textColor: t }); return; }
       if (chantsOnly && (m.type === "show" || m.type === "update") && hide(m)) {
@@ -255,6 +257,7 @@ export default function Control() {
     if (!canProject) return;
     const msg = { type: "show", kind: "media", mediaType: a.kind, url: a.url, ref: a.name, text: "", version: "", media: { id: a.id } };
     setMediaLive({ id: a.id });
+    setMediaStatus(null);
     setLiveKind("media");
     setShown(msg);
     ch.current?.postMessage(msg);
@@ -529,6 +532,7 @@ export default function Control() {
             canStep={canStep}
             onStep={step}
             onCmd={mediaCmd}
+            status={mediaStatus}
           />
         </section>
         ) : tab === "chants" ? (

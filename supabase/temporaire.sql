@@ -1,6 +1,6 @@
 -- Hosanna Cast : playlists de chants + annonces (photos / vidéos), effacées automatiquement après 3 jours
 -- À coller UNE FOIS dans Supabase → SQL Editor → Run (après roles.sql, car on utilise my_church() et role_of()).
--- Ne supprime rien d'existant : tout est ajouté.
+-- Ne supprime rien d'existant : tout est ajouté. Tu peux le relancer sans danger (utile après une mise à jour).
 
 -- 1) Playlists de chants ---------------------------------------------------------------
 create table if not exists public.playlists (
@@ -30,6 +30,9 @@ create table if not exists public.announcements (
   created_at  timestamptz not null default now(),
   expires_at  timestamptz not null default now() + interval '3 days'
 );
+-- Annonces récurrentes (ex. temps de prière chaque mardi) : gardées, sans effacement automatique
+alter table public.announcements add column if not exists keep boolean not null default false;
+alter table public.announcements add column if not exists days smallint[] not null default '{}';   -- jours (0 = dimanche … 6 = samedi), facultatif
 alter table public.announcements enable row level security;
 drop policy if exists "announcements_read" on public.announcements;
 create policy "announcements_read" on public.announcements
