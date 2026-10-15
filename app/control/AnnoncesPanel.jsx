@@ -1,8 +1,8 @@
 "use client";
 import { Fragment, useState } from "react";
-import { timeLeft, DAY_ORDER, DAY_SHORT, daysText } from "@/lib/expiry";
+import { timeLeft, DAY_ORDER, DAY_SHORT, recurText, runsToday, hasEnd, toInputDate, todayInput } from "@/lib/expiry";
 
-const today = () => new Date().getDay();
+const ACCEPT = "image/*,video/mp4,video/webm,video/quicktime,.mp4,.m4v,.webm,.mov";
 
 function DaysPicker({ days, onChange }) {
   const toggle = (d) => onChange(days.includes(d) ? days.filter((x) => x !== d) : [...days, d]);
@@ -16,8 +16,23 @@ function DaysPicker({ days, onChange }) {
   );
 }
 
+// Date de fin facultative : après ce jour-là, l'annonce s'efface toute seule
+function UntilField({ value, onChange }) {
+  return (
+    <div>
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs text-neutral-400">Jusqu'au</span>
+        <input type="date" min={todayInput()} value={value || ""} onChange={(e) => onChange(e.target.value)}
+          className="rounded-md bg-neutral-800 border border-neutral-700 px-2 py-1 text-xs [color-scheme:dark]" />
+        {value && <button type="button" onClick={() => onChange("")} className="text-xs text-neutral-400 underline">Sans date de fin</button>}
+      </div>
+      <p className="text-[11px] text-neutral-500 mt-1 leading-4">Facultatif. Après ce jour-là, l'annonce disparaît toute seule (ex. évangélisation du 30 novembre).</p>
+    </div>
+  );
+}
+
 function Tile({ a, live, canProject, onProject, onEdit, onDelete }) {
-  const isToday = a.keep && a.days.includes(today());
+  const isToday = runsToday(a);
   return (
     <li className={`relative rounded-lg overflow-hidden border-2 ${live ? "border-green-500" : isToday ? "border-amber-400" : "border-transparent"} bg-neutral-800`}>
       <button disabled={!canProject} onClick={() => onProject(a)} title={canProject ? "Afficher à l'écran" : ""}
@@ -29,26 +44,28 @@ function Tile({ a, live, canProject, onProject, onEdit, onDelete }) {
         </div>
         <div className="px-2 py-1.5">
           <span className="block text-xs font-medium truncate">{a.kind === "video" ? "🎬 " : ""}{a.name}</span>
-          <span className="block text-[11px] text-neutral-500 truncate">{a.keep ? `↻ ${daysText(a.days)}` : `s'efface dans ${timeLeft(a.expires_at)}`}</span>
+          <span className="block text-[11px] text-neutral-500 truncate">{a.keep ? `↻ ${recurText(a)}` : `s'efface dans ${timeLeft(a.expires_at)}`}</span>
         </div>
       </button>
       {live && <span className="absolute top-1 left-1 rounded bg-green-600 text-white text-[10px] px-1.5 py-0.5">À l'écran</span>}
       {!live && isToday && <span className="absolute top-1 left-1 rounded bg-amber-400 text-black text-[10px] font-medium px-1.5 py-0.5">Aujourd'hui</span>}
       <button onClick={() => onDelete(a)} aria-label="Supprimer" className="absolute top-1 right-1 w-6 h-6 rounded bg-black/60 hover:bg-red-600 text-white text-xs">✕</button>
-      <button onClick={() => onEdit(a)} aria-label="Récurrence" title="Annonce récurrente"
+      <button onClick={() => onEdit(a)} aria-label="Modifier" title="Modifier l'annonce (nom, jours, date de fin, photo)"
         className={`absolute top-1 right-8 w-6 h-6 rounded text-xs ${a.keep ? "bg-amber-400 text-black" : "bg-black/60 hover:bg-amber-400 hover:text-black text-white"}`}>↻</button>
     </li>
   );
 }
 
 // Annonces : photos et vidéos à afficher à l'écran.
-// Temporaires : effacées après 3 jours. Récurrentes (ex. temps de prière chaque mardi) : gardées, avec des jours facultatifs.
+// Temporaires : effacées après 3 jours.
+// Récurrentes (ex. cellule le mercredi, prière le vendredi, culte le dimanche) : gardées, avec des jours facultatifs
+// et une date de fin facultative (ex. évangélisation chaque dimanche jusqu'au 30 novembre).
 export default function AnnoncesPanel({ ann, liveId, canProject, onProject }) {
-  const { list, ready, error, busy, upload, update, remove } = ann;
+  const { list, ready, error, busy, upload, update, replace, remove } = ann;
   const [errs, setErrs] = useState([]);
-  const [rec, setRec] = useState({ keep: false, days: [] });      // réglage appliqué aux prochains envois
+  const [rec, setRec] = useState({ keep: false, days: [], until: "" });      // réglage appliqué aux prochains envois
   const [editId, setEditId] = useState(null);
-  const [draft, setDraft] = useState({ keep: false, days: [] });
+  const [draft, setDraft] = useState({ keep: false, days: [], until: "", name: "" });
 
   const onFiles = async (e) => {
     const files = e.target.files;
@@ -59,18 +76,27 @@ export default function AnnoncesPanel({ ann, liveId, canProject, onProject }) {
   };
   const edit = (a) => {
     if (editId === a.id) return setEditId(null);
-    setDraft({ keep: a.keep, days: a.days });
+    setDraft({ keep: a.keep, days: a.days, until: hasEnd(a) ? toInputDate(a.expires_at) : "", name: a.name });
     setEditId(a.id);
   };
   const del = (a) => { if (window.confirm(`Supprimer « ${a.name} » ?`)) remove(a.id); };
   const save = async (a) => {
+    if (draft.keep && draft.until && draft.until < todayInput()) { setErrs([`${a.name} : la date de fin est déjà passée.`]); return; }
     const m = await update(a.id, draft);
     if (m) setErrs([`${a.name} : ${m}`]);
     setEditId(null);
   };
+  const onReplace = async (a, e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const m = await replace(a.id, file);
+    if (m) setErrs([`${a.name} : ${m}`]);
+    else { setErrs([]); setEditId(null); }
+  };
 
-  const t = today();
-  const recurring = list.filter((a) => a.keep).sort((a, b) => Number(b.days.includes(t)) - Number(a.days.includes(t)));
+  const today = list.filter(runsToday);
+  const recurring = list.filter((a) => a.keep && !runsToday(a));
   const temp = list.filter((a) => !a.keep);
 
   const grid = (items) => (
@@ -79,19 +105,37 @@ export default function AnnoncesPanel({ ann, liveId, canProject, onProject }) {
         <Fragment key={a.id}>
           <Tile a={a} live={liveId === a.id} canProject={canProject} onProject={onProject} onEdit={edit} onDelete={del} />
           {editId === a.id && (
-            <li className="col-span-2 rounded-lg border border-amber-400/40 bg-neutral-900 p-2.5 space-y-2">
+            <li className="col-span-2 rounded-lg border border-amber-400/40 bg-neutral-900 p-2.5 space-y-2.5">
+              <div>
+                <p className="text-xs text-neutral-400 mb-1">Nom</p>
+                <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} maxLength={80}
+                  className="w-full rounded-md bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-sm" />
+              </div>
+
               <label className="flex items-start gap-2 text-sm cursor-pointer">
                 <input type="checkbox" checked={draft.keep} onChange={(e) => setDraft({ ...draft, keep: e.target.checked })} className="mt-1 accent-amber-400" />
                 <span>Annonce récurrente<span className="block text-xs text-neutral-500">Gardée : elle ne s'efface pas après 3 jours.</span></span>
               </label>
               {draft.keep ? (
                 <>
-                  <p className="text-xs text-neutral-400">Jours habituels (facultatif) : elle est mise en avant ces jours-là.</p>
-                  <DaysPicker days={draft.days} onChange={(days) => setDraft({ ...draft, days })} />
+                  <div>
+                    <p className="text-xs text-neutral-400 mb-1">Jours habituels (facultatif) : elle est mise en avant ces jours-là.</p>
+                    <DaysPicker days={draft.days} onChange={(days) => setDraft({ ...draft, days })} />
+                  </div>
+                  <UntilField value={draft.until} onChange={(until) => setDraft({ ...draft, until })} />
                 </>
               ) : (
                 <p className="text-xs text-neutral-500">Elle s'effacera 3 jours à partir de maintenant.</p>
               )}
+
+              <div className="border-t border-neutral-800 pt-2.5">
+                <label className={`block w-full rounded-lg bg-neutral-800 hover:bg-neutral-700 text-amber-400 py-1.5 text-center text-sm transition duration-100 active:scale-95 cursor-pointer ${busy ? "opacity-50 pointer-events-none" : ""}`}>
+                  {busy ? "Envoi en cours…" : "Changer la photo / vidéo"}
+                  <input type="file" accept={ACCEPT} onChange={(e) => onReplace(a, e)} className="hidden" />
+                </label>
+                <p className="text-[11px] text-neutral-500 mt-1 leading-4">Seule l'image change : le nom, les jours et la date de fin sont gardés.</p>
+              </div>
+
               <div className="grid grid-cols-2 gap-1.5">
                 <button onClick={() => setEditId(null)} className="rounded-lg bg-neutral-800 hover:bg-neutral-700 py-1.5 text-sm active:scale-95">Annuler</button>
                 <button onClick={() => save(a)} className="rounded-lg bg-amber-400 text-black font-medium py-1.5 text-sm active:scale-95">Enregistrer</button>
@@ -120,17 +164,20 @@ export default function AnnoncesPanel({ ann, liveId, canProject, onProject }) {
       <div className="rounded-lg border border-neutral-700 p-2 mb-2 space-y-2">
         <label className="flex items-start gap-2 text-sm cursor-pointer">
           <input type="checkbox" checked={rec.keep} onChange={(e) => setRec({ ...rec, keep: e.target.checked })} className="mt-1 accent-amber-400" />
-          <span>↻ Annonce récurrente<span className="block text-xs text-neutral-500">Pour une annonce qui revient (temps de prière…) : elle est gardée.</span></span>
+          <span>↻ Annonce récurrente<span className="block text-xs text-neutral-500">Pour une annonce qui revient (cellule, prière, culte…) : elle est gardée.</span></span>
         </label>
         {rec.keep && (
-          <div>
-            <p className="text-xs text-neutral-400 mb-1">Jours habituels (facultatif)</p>
-            <DaysPicker days={rec.days} onChange={(days) => setRec({ ...rec, days })} />
-          </div>
+          <>
+            <div>
+              <p className="text-xs text-neutral-400 mb-1">Jours habituels (facultatif)</p>
+              <DaysPicker days={rec.days} onChange={(days) => setRec({ ...rec, days })} />
+            </div>
+            <UntilField value={rec.until} onChange={(until) => setRec({ ...rec, until })} />
+          </>
         )}
         <label className={`block w-full rounded-lg bg-neutral-800 hover:bg-neutral-700 text-amber-400 py-2 text-center text-sm font-medium transition duration-100 active:scale-95 cursor-pointer ${error || busy ? "opacity-50 pointer-events-none" : ""}`}>
           {busy ? "Envoi en cours… (une vidéo peut prendre un moment)" : "+ Ajouter photos ou vidéos"}
-          <input type="file" multiple accept="image/*,video/mp4,video/webm,video/quicktime,.mp4,.m4v,.webm,.mov" onChange={onFiles} className="hidden" />
+          <input type="file" multiple accept={ACCEPT} onChange={onFiles} className="hidden" />
         </label>
         <p className="text-[11px] text-neutral-500 leading-4">Vidéos : MP4 (H.264), 50 Mo maximum chacune. Les photos sont réduites automatiquement.</p>
       </div>
@@ -146,6 +193,12 @@ export default function AnnoncesPanel({ ann, liveId, canProject, onProject }) {
         <p className="text-sm text-neutral-500 mt-3">Aucune annonce pour l'instant. Utilise le bouton ci-dessus pour ajouter une photo ou une vidéo.</p>
       ) : (
         <>
+          {today.length > 0 && (
+            <>
+              <div className="text-[11px] text-amber-400 font-medium mt-3 mb-1.5">● Aujourd'hui</div>
+              {grid(today)}
+            </>
+          )}
           {recurring.length > 0 && (
             <>
               <div className="text-[11px] text-neutral-500 mt-3 mb-1.5">↻ Récurrentes</div>
