@@ -18,3 +18,7 @@ Vercel : Framework Preset = Next.js, Root Directory = vide (racine du dépôt).
 
 Les versions en ligne apparaissent à côté de LSG/OST/… ; leurs chapitres sont téléchargés à la demande
 (recherche par référence uniquement, pas par mots).
+
+### Bouton « Ouvrir sur bible.com »
+Pour une version sans accès API : mettre son numéro bible.com dans le champ `web` de `config/online-versions.json`
+(le numéro est dans l'adresse : bible.com/bible/**63**/JHN.3.16 → 63). Un bouton ouvre alors le verset visé dans un nouvel onglet.

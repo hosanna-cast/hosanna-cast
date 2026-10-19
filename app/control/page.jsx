@@ -20,6 +20,11 @@ import { openScreen } from "@/lib/screen";
 import { createClient } from "@/lib/supabase/client";
 import { uuid } from "@/lib/uuid";
 import { tabsFor } from "@/lib/roles";
+import { USFM } from "@/lib/usfmBooks";
+import ONLINE from "@/config/online-versions.json";
+
+// versions à ouvrir sur bible.com (champ "web" = numéro dans l'adresse bible.com/bible/NUMÉRO/...)
+const WEB_VERSIONS = ONLINE.filter((v) => v.web);
 
 const Kbd = ({ children }) => (
   <kbd className="px-2 py-0.5 rounded-md border border-blue-400/60 text-blue-300 text-xs font-sans whitespace-nowrap">{children}</kbd>
@@ -460,6 +465,22 @@ export default function Control() {
             ))}
           </div>
           )}
+          {tabs.includes("bible") && WEB_VERSIONS.length > 0 && (() => {
+            // le verset visé : résultat sélectionné, sinon verset à l'écran, sinon chapitre affiché
+            const t = q.trim() ? results[sel] : liveKind === "verse" && live ? live : view ? { b: view.b, c: view.c, v: null } : null;
+            const passage = t ? `${USFM[t.b]}.${t.c + 1}${t.v != null ? `.${t.v + 1}${t.vEnd != null && t.vEnd > t.v ? `-${t.vEnd + 1}` : ""}` : ""}` : null;
+            return (
+              <div className="flex items-center gap-1.5 mb-1.5 sm:mb-2 text-xs">
+                <span className="text-neutral-500 shrink-0">Ouvrir sur bible.com :</span>
+                {WEB_VERSIONS.map((v) => passage ? (
+                  <a key={v.id} href={`https://www.bible.com/bible/${v.web}/${passage}`} target="_blank" rel="noopener noreferrer" title={`${v.full} — s'ouvre dans un nouvel onglet`}
+                    className="px-2.5 py-1 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-200 transition duration-100 active:scale-95">{v.label} ↗</a>
+                ) : (
+                  <span key={v.id} title="Tape ou choisis d'abord un verset" className="px-2.5 py-1 rounded bg-neutral-800 text-neutral-600">{v.label} ↗</span>
+                ))}
+              </div>
+            );
+          })()}
           {tabs.includes("bible") && online && (
             <p className="text-[10px] leading-snug text-neutral-500 mb-1.5">
               {bibleError ? <span className="text-red-400">Version en ligne indisponible : {bibleError}</span> : versions.find((v) => v.id === version)?.copyright}

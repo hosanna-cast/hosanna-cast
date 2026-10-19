@@ -1,5 +1,5 @@
 [
-  { "id": "s21",    "label": "S21", "full": "Segond 21",         "yv": null },
-  { "id": "semeur", "label": "BDS", "full": "La Bible du Semeur", "yv": null },
-  { "id": "fc",     "label": "BFC", "full": "Français courant",   "yv": null }
+  { "id": "s21",    "label": "S21", "full": "Segond 21",          "web": null, "yv": null },
+  { "id": "semeur", "label": "BDS", "full": "La Bible du Semeur", "web": null, "yv": null },
+  { "id": "fc",     "label": "BFC", "full": "Français courant",   "web": 63,   "yv": null }
 ]
