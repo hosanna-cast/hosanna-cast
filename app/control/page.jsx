@@ -466,18 +466,24 @@ export default function Control() {
           </div>
           )}
           {tabs.includes("bible") && WEB_VERSIONS.length > 0 && (() => {
-            // le verset visé : résultat sélectionné, sinon verset à l'écran, sinon chapitre affiché
+            // le chapitre visé : résultat sélectionné, sinon verset à l'écran, sinon chapitre affiché
             const t = q.trim() ? results[sel] : liveKind === "verse" && live ? live : view ? { b: view.b, c: view.c, v: null } : null;
-            const passage = t ? `${USFM[t.b]}.${t.c + 1}${t.v != null ? `.${t.v + 1}${t.vEnd != null && t.vEnd > t.v ? `-${t.vEnd + 1}` : ""}` : ""}` : null;
+            const passage = t ? `${USFM[t.b]}.${t.c + 1}` : null;   // le chapitre entier, pour lire les versets avant et après
             return (
-              <div className="flex items-center gap-1.5 mb-1.5 sm:mb-2 text-xs">
-                <span className="text-neutral-500 shrink-0">Ouvrir sur bible.com :</span>
-                {WEB_VERSIONS.map((v) => passage ? (
-                  <a key={v.id} href={`https://www.bible.com/bible/${v.web}/${passage}`} target="_blank" rel="noopener noreferrer" title={`${v.full} — s'ouvre dans un nouvel onglet`}
-                    className="px-2.5 py-1 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-200 transition duration-100 active:scale-95">{v.label} ↗</a>
-                ) : (
-                  <span key={v.id} title="Tape ou choisis d'abord un verset" className="px-2.5 py-1 rounded bg-neutral-800 text-neutral-600">{v.label} ↗</span>
-                ))}
+              <div className="flex items-center gap-2 mb-1.5 sm:mb-2 text-xs">
+                <span className="text-blue-400 font-medium shrink-0">Ouvrir sur bible.com :</span>
+                <select
+                  value=""
+                  disabled={!passage}
+                  title={passage ? "Ouvre ce chapitre dans un nouvel onglet" : "Tape ou choisis d'abord un verset"}
+                  onChange={(e) => {
+                    const v = WEB_VERSIONS.find((x) => x.id === e.target.value);
+                    if (v && passage) window.open(`https://www.bible.com/bible/${v.web}/${passage}`, "_blank", "noopener,noreferrer");
+                  }}
+                  className="flex-1 min-w-0 rounded bg-neutral-800 border border-neutral-700 text-neutral-200 px-2 py-1 disabled:opacity-40">
+                  <option value="">Choisir une version…</option>
+                  {WEB_VERSIONS.map((v) => <option key={v.id} value={v.id}>{v.label} · {v.full}</option>)}
+                </select>
               </div>
             );
           })()}
