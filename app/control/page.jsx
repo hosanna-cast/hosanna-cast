@@ -30,7 +30,10 @@ export default function Control() {
   const [copied, setCopied] = useState(false);
   const [versions, setVersions] = useState([{ id: "lsg", label: "LSG", full: "Louis Segond 1910" }]);
   const [version, setVersion] = useState("lsg");
-  const { bible, index, loaded, loading } = useBible(version);
+  const online = !!versions.find((v) => v.id === version)?.online;   // version servie par l'API YouVersion
+  const { bible, index, loaded, loading, error: bibleError, ensureChapter, chapterReady } = useBible(version, online);
+  const pendingProject = useRef(null);
+  const pendingReproject = useRef(null);
   const library = useLibrary();
   const playlists = usePlaylists();                      // playlists de chants (effacées après 3 jours)
   const ann = useAnnouncements();                        // annonces : photos et vidéos (effacées après 3 jours)
@@ -155,13 +158,39 @@ export default function Control() {
   }, []);
 
   // liste des versions réellement générées au build
+  // + les versions en ligne (Semeur, Segond 21…) si la clé YouVersion est configurée sur le serveur
   useEffect(() => {
-    fetch("/bible/versions.json").then((r) => r.json()).then((list) => {
-      if (!Array.isArray(list) || !list.length) return;
+    Promise.all([
+      fetch("/bible/versions.json").then((r) => r.json()).catch(() => []),
+      fetch("/api/bible?action=versions").then((r) => (r.ok ? r.json() : [])).catch(() => []),
+    ]).then(([local, remote]) => {
+      const list = [...(Array.isArray(local) ? local : []), ...(Array.isArray(remote) ? remote : [])];
+      if (!list.length) return;
       setVersions(list);
       setVersion((cur) => (list.some((v) => v.id === cur) ? cur : list[0].id));
-    }).catch(() => {});
+    });
   }, []);
+
+  // versions en ligne : on télécharge les chapitres dont on a besoin (référence tapée, chapitre affiché)
+  useEffect(() => {
+    if (!bible || !q.trim()) return;
+    const ref = parseRef(q);
+    if (!ref || !ref.chapter) return;
+    ref.books.slice(0, 3).forEach((b) => { if (bible[b]?.[ref.chapter - 1]) ensureChapter(b, ref.chapter - 1); });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, loaded]);
+  useEffect(() => {
+    if (view && bible?.[view.b]?.[view.c]) ensureChapter(view.b, view.c);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, loaded]);
+  // le chapitre demandé vient d'arriver : on termine la projection / la re-projection en attente
+  useEffect(() => {
+    const p = pendingProject.current;
+    if (p && chapterReady(p.r.b, p.r.c)) { pendingProject.current = null; project(p.r, p.citeRange); }
+    const r = pendingReproject.current;
+    if (r && chapterReady(r.b, r.c)) { pendingReproject.current = null; reproject(r); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bible]);
 
   // fond de l'écran : choisi dans l'Administration (gardé dans ce navigateur, séparé par église)
   useEffect(() => {
@@ -203,7 +232,7 @@ export default function Control() {
     const vs = bible?.[r.b]?.[r.c];
     if (!vs) return "";
     const end = Math.min(r.vEnd ?? r.v, vs.length - 1);
-    return vs.slice(r.v, end + 1).map((t, i) => (end > r.v ? `${r.v + i + 1} ` : "") + t).join(" ");
+    return vs.slice(r.v, end + 1).map((t, i) => (end > r.v ? `${r.v + i + 1} ` : "") + (t ?? "")).join(" ");
   };
   const refOf = (r) => `${BOOKS[r.b]} ${r.c + 1}:${r.v + 1}${r.vEnd && r.vEnd > r.v ? "-" + (r.vEnd + 1) : ""}`;
 
@@ -220,6 +249,7 @@ export default function Control() {
 
   const project = (r, citeRange) => {
     if (!canProject) return;
+    if (!chapterReady(r.b, r.c)) { pendingProject.current = { r, citeRange }; ensureChapter(r.b, r.c); return; }
     setView({ b: r.b, c: r.c });
     setCite((prev) => (citeRange !== undefined ? citeRange : prev && prev.b === r.b && prev.c === r.c ? prev : null));
     const msg = { type: "show", ref: refOf(r), text: textOf(r), version: label, r, next: nextVerse(r) };
@@ -290,6 +320,7 @@ export default function Control() {
   // changement de version : le verset à l'écran est re-projeté dans la nouvelle version
   const reproject = (r) => {
     if (!canProject) return;
+    if (!chapterReady(r.b, r.c)) { pendingReproject.current = r; ensureChapter(r.b, r.c); return; }
     if (!bible?.[r.b]?.[r.c]?.[r.v]) return;           // verset absent de cette version : l'écran reste tel quel
     const msg = { type: "update", ref: refOf(r), text: textOf(r), version: label, r, next: nextVerse(r) };
     setShown(msg);
@@ -340,7 +371,8 @@ export default function Control() {
       return;
     }
     if (!live || !bible) return;
-    const vs = bible[live.b][live.c];
+    const vs = bible[live.b]?.[live.c];
+    if (!vs) return;
     const v = (live.vEnd ?? live.v) + d;
     if (v >= 0 && v < vs.length) project({ b: live.b, c: live.c, v, vEnd: null });
   };
@@ -428,6 +460,11 @@ export default function Control() {
             ))}
           </div>
           )}
+          {tabs.includes("bible") && online && (
+            <p className="text-[10px] leading-snug text-neutral-500 mb-1.5">
+              {bibleError ? <span className="text-red-400">Version en ligne indisponible : {bibleError}</span> : versions.find((v) => v.id === version)?.copyright}
+            </p>
+          )}
 
           <div ref={panel} className="relative bg-neutral-800/60 border border-neutral-700 rounded-xl p-2 sm:p-3 max-h-[55vh] lg:max-h-[calc(100vh-7.5rem)] overflow-y-auto">
             {tab === "annonces" ? (
@@ -494,7 +531,7 @@ export default function Control() {
                   </div>
                 )}
 
-                {!wide && nav.b !== null && nav.c !== null && chapters?.[nav.c] && (
+                {!wide && nav.b !== null && nav.c !== null && chapters?.[nav.c] && chapterReady(nav.b, nav.c) && (
                   <div>
                     <div className="flex justify-between gap-2 mb-2 text-sm">
                       <button disabled={nav.c === 0} onClick={() => go({ b: nav.b, c: nav.c - 1 })} className="px-3 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30">‹ {nav.c}</button>
@@ -577,7 +614,7 @@ export default function Control() {
             ))}
           </ul>
 
-          {!q.trim() && bible && (view && bible[view.b]?.[view.c] ? (
+          {!q.trim() && bible && (view && bible[view.b]?.[view.c] && chapterReady(view.b, view.c) ? (
             wide ? <div>
             <ChapterView
               verses={bible[view.b][view.c]}
@@ -591,6 +628,8 @@ export default function Control() {
               onChapter={(d) => { setView({ b: view.b, c: view.c + d }); setNav({ b: view.b, c: view.c + d }); }}
             />
             </div> : null
+          ) : view && !chapterReady(view.b, view.c) ? (
+            <p className="mt-4 text-sm text-neutral-500">Chargement du chapitre…</p>
           ) : (
             <p className="hidden lg:block mt-4 text-sm text-neutral-500 leading-6">
               Tape une référence (<span className="text-neutral-300">jn 3 16</span>, <span className="text-neutral-300">1 co 13</span>) ou quelques mots du verset.
@@ -598,7 +637,7 @@ export default function Control() {
             </p>
           ))}
           {q.trim() && bible && !results.length && (
-            <p className="mt-3 text-sm text-neutral-500">{index ? "Aucun résultat. Essaie d'autres mots." : "Préparation de la recherche…"}</p>
+            <p className="mt-3 text-sm text-neutral-500">{online ? "Cette version en ligne se cherche par référence (jn 3 16), pas par mots." : index ? "Aucun résultat. Essaie d'autres mots." : "Préparation de la recherche…"}</p>
           )}
         </section>
         )}
