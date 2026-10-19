@@ -468,17 +468,18 @@ export default function Control() {
           {tabs.includes("bible") && WEB_VERSIONS.length > 0 && (() => {
             // le chapitre visé : résultat sélectionné, sinon verset à l'écran, sinon chapitre affiché
             const t = q.trim() ? results[sel] : liveKind === "verse" && live ? live : view ? { b: view.b, c: view.c, v: null } : null;
-            const passage = t ? `${USFM[t.b]}.${t.c + 1}` : null;   // le chapitre entier, pour lire les versets avant et après
+            // chapitre + verset(s) visé(s) : bible.com ouvre le chapitre et met le verset en surbrillance
+            const passage = t ? `${USFM[t.b]}.${t.c + 1}${t.v != null ? `.${t.v + 1}${t.vEnd != null && t.vEnd > t.v ? `-${t.vEnd + 1}` : ""}` : ""}` : null;
             return (
               <div className="flex items-center gap-2 mb-1.5 sm:mb-2 text-xs">
                 <span className="text-blue-400 font-medium shrink-0">Ouvrir sur bible.com :</span>
                 <select
                   value=""
                   disabled={!passage}
-                  title={passage ? "Ouvre ce chapitre dans un nouvel onglet" : "Tape ou choisis d'abord un verset"}
+                  title={passage ? "Ouvre le chapitre sur bible.com, verset en surbrillance" : "Tape ou choisis d'abord un verset"}
                   onChange={(e) => {
                     const v = WEB_VERSIONS.find((x) => x.id === e.target.value);
-                    if (v && passage) window.open(`https://www.bible.com/bible/${v.web}/${passage}`, "_blank", "noopener,noreferrer");
+                    if (v && passage) window.open(`https://www.bible.com/bible/${v.web}/${passage}.${v.label}`, "_blank", "noopener,noreferrer");
                   }}
                   className="flex-1 min-w-0 rounded bg-neutral-800 border border-neutral-700 text-neutral-200 px-2 py-1 disabled:opacity-40">
                   <option value="">Choisir une version…</option>
