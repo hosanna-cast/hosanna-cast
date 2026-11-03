@@ -114,6 +114,7 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
   const analyze = async () => {
     if (!open) return;
     const id = open.id;
+    if ((open.text || "").trim().length < 40) { setAna({ status: "error", msg: "Cette note a trop peu de texte pour être analysée.", points: [], sel: [] }); return; }
     setAna({ status: "loading", points: [], sel: [] });
     try {
       const r = await fetch("/api/analyze-note", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text: open.text }) });
@@ -296,9 +297,11 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
 
         {kind === "notes" && canAnalyze && (
           <div className="mb-3">
-            {!ana ? (
-              <button disabled={open.text.trim().length < 40} onClick={analyze}
-                className="w-full rounded-lg bg-neutral-800 hover:bg-neutral-700 text-sky-300 py-2 text-sm transition duration-100 active:scale-95 disabled:opacity-40 disabled:pointer-events-none">
+            {!ana && !(open.text || "").trim() ? (
+              <p className="text-xs text-neutral-500">Cette note ne contient que des points clés gardés pendant la prédication : il n'y a pas de texte à analyser. Pour analyser une prédication, importe son fichier avec « + Ajouter une note ».</p>
+            ) : !ana ? (
+              <button onClick={analyze}
+                className="w-full rounded-lg bg-neutral-800 hover:bg-neutral-700 text-sky-300 py-2 text-sm transition duration-100 active:scale-95">
                 Analyser la note (points clés)
               </button>
             ) : ana.status === "loading" ? (
