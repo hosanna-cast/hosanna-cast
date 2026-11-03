@@ -84,6 +84,8 @@ export default function Control() {
   const selRef = useRef(null);                             // dernière sélection faite dans l'aperçu : { start, end }
   const previewTxt = useRef(null);                         // le texte affiché dans l'aperçu de l'écran
   // un profil « Aide écran » ne peut projeter que si l'administrateur l'a choisi
+  // le profil Orateur ne gère ni le texte rapide, ni la mise en page (plein écran / bandeau / réglages) : c'est l'administrateur qui s'en occupe
+  const isOrateur = church.role === "orateur";
   const canProject = !["assistant", "orateur"].includes(church.role) || helperIds.includes(church.userId);
   const mine = useRef(null);
   const stateRef = useRef({});
@@ -487,7 +489,7 @@ export default function Control() {
 
   // plein écran ↔ bandeau : change tout de suite, même avec un verset à l'écran
   const setLayoutMode = (mode) => {
-    if (!canProject || mode === layout) return;
+    if (!canProject || isOrateur || mode === layout) return;
     setLayout(mode);
     ch.current?.postMessage({ type: "layout", mode });
     setLastBy(null);
@@ -517,7 +519,7 @@ export default function Control() {
     else if (!q && e.key === "ArrowRight") step(1);
     else if (!q && e.key === "ArrowLeft") step(-1);
     else if (!q && !inField && k === "n") toggleBlank();
-    else if (!q && !inField && k === "b") setLayoutMode(layout === "band" ? "full" : "band");
+    else if (!q && !inField && k === "b" && !isOrateur) setLayoutMode(layout === "band" ? "full" : "band");
   };
 
   // les raccourcis écoutent toute la page (et plus seulement la zone où se trouve le curseur)
@@ -702,7 +704,7 @@ export default function Control() {
 
         {/* ───── centre : texte rapide (toujours en haut) puis contenu de l'onglet ───── */}
         <div className="order-2 min-w-0 space-y-3">
-          {church.role !== "annonces" && (
+          {church.role !== "annonces" && !isOrateur && (
           <QuickText
             onProject={projectFree}
             disabled={!canProject}
@@ -873,6 +875,7 @@ export default function Control() {
             <button className={btn + " lg:col-span-2"} disabled={!shown || !canProject} onClick={clearScreen}>Effacer</button>
           </div>
 
+          {!isOrateur && (<>
           <div className="mt-2 lg:mt-3 grid grid-cols-2 gap-1 rounded-lg bg-neutral-800 p-1" role="group" aria-label="Mise en page de l'écran">
             {[["full", "Plein écran"], ["band", "Bandeau"]].map(([k, l]) => (
               <button key={k} onClick={() => setLayoutMode(k)} disabled={!canProject} aria-pressed={layout === k}
@@ -881,6 +884,7 @@ export default function Control() {
           </div>
 
           <DisplaySettings settings={dset} logo={logo} onSettings={changeSettings} onLogo={changeLogo} disabled={!canProject} />
+          </>)}
 
           <div className="hidden lg:flex mt-4 flex-col items-center gap-2.5 text-xs xl:text-sm text-neutral-400">
             <div className="flex flex-wrap justify-center gap-x-4 gap-y-2">
@@ -893,7 +897,7 @@ export default function Control() {
               <span className="flex items-center gap-1.5"><Kbd>Ctrl+E</Kbd> écran noir</span>
               <span className="flex items-center gap-1.5"><Kbd>Ctrl+B</Kbd> gras</span>
               <span className="flex items-center gap-1.5"><Kbd>Ctrl+U</Kbd> souligné</span>
-              <span className="flex items-center gap-1.5"><Kbd>B</Kbd> bandeau</span>
+              {!isOrateur && <span className="flex items-center gap-1.5"><Kbd>B</Kbd> bandeau</span>}
             </div>
           </div>
 
