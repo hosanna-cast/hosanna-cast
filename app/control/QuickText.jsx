@@ -3,7 +3,7 @@ import { useState } from "react";
 
 // Texte rapide : toujours en haut de la colonne centrale (Bible, Notes, Chants).
 // Une ligne tapée = une ligne à l'écran. Le texte reste dans le champ après projection.
-export default function QuickText({ onProject, onAdd, addLabel, disabled }) {
+export default function QuickText({ onProject, onAdd, addLabel, onAddProject, addProjectLabel, disabled }) {
   const [text, setText] = useState("");
   const [open, setOpen] = useState(false);
   const t = text.trim();
@@ -26,6 +26,12 @@ export default function QuickText({ onProject, onAdd, addLabel, disabled }) {
           className="rounded-lg bg-amber-400 hover:bg-amber-300 text-black font-medium px-3 py-1.5 text-sm transition duration-100 active:scale-95 disabled:opacity-70 disabled:pointer-events-none">
           Projeter (Ctrl+Entrée)
         </button>
+        {onAddProject && (
+          <button disabled={!t || disabled} onClick={() => { onAddProject(t); setText(""); }}
+            className="px-3 py-1.5 rounded-lg bg-amber-400/20 border border-amber-400/50 text-amber-200 hover:bg-amber-400/30 text-sm transition duration-100 active:scale-95 disabled:opacity-40 disabled:pointer-events-none">
+            {addProjectLabel}
+          </button>
+        )}
         {onAdd && (
           <button disabled={!t} onClick={() => { onAdd(t); setText(""); }}
             className="px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-sm transition duration-100 active:scale-95 disabled:opacity-40 disabled:pointer-events-none">
