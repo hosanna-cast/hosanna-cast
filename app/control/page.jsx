@@ -14,7 +14,6 @@ import UserMenu from "./UserMenu";
 import HelpControl from "./HelpControl";
 import AnnoncesPanel from "./AnnoncesPanel";
 import AnnonceStage from "./AnnonceStage";
-import DisplaySettings from "./DisplaySettings";
 import { DEFAULT_SETTINGS, mergeSettings, loadSettings, saveSettings, loadLogo, saveLogo } from "@/lib/displaySettings";
 import { usePlaylists } from "@/lib/playlists";
 import { useAnnouncements } from "@/lib/announcements";
@@ -176,18 +175,8 @@ export default function Control() {
     });
     return () => ch.current.close();
   }, [church.token]);
-  // réglages gardés sur cet appareil, puis renvoyés à l'écran dès qu'il demande (bg?) ou qu'on les change
+  // réglages de l'écran : modifiés dans l'Administration (message « settings » / « logo »), gardés sur cet appareil, renvoyés à l'écran dès qu'il demande (bg?)
   useEffect(() => { setDset(loadSettings()); setLogo(loadLogo()); }, []);
-  const changeSettings = (c) => {
-    if (!canProject) return;
-    setDset(c); saveSettings(c);
-    ch.current?.postMessage({ type: "settings", settings: c });
-  };
-  const changeLogo = (l) => {
-    if (!canProject) return;
-    setLogo(l); saveLogo(l);
-    ch.current?.postMessage({ type: "logo", logo: l });
-  };
   const screenUrl = () => `${location.origin}/display?k=${church.token}`;
   const copyObs = () => navigator.clipboard?.writeText(`${screenUrl()}&transparent=1`).then(() => { setCopiedObs(true); setTimeout(() => setCopiedObs(false), 1500); });
   const copyScreen = () => navigator.clipboard?.writeText(screenUrl()).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); });
@@ -875,16 +864,14 @@ export default function Control() {
             <button className={btn + " lg:col-span-2"} disabled={!shown || !canProject} onClick={clearScreen}>Effacer</button>
           </div>
 
-          {!isOrateur && (<>
+          {!isOrateur && (
           <div className="mt-2 lg:mt-3 grid grid-cols-2 gap-1 rounded-lg bg-neutral-800 p-1" role="group" aria-label="Mise en page de l'écran">
             {[["full", "Plein écran"], ["band", "Bandeau"]].map(([k, l]) => (
               <button key={k} onClick={() => setLayoutMode(k)} disabled={!canProject} aria-pressed={layout === k}
                 className={`rounded-md py-1.5 text-sm transition duration-100 active:scale-95 disabled:opacity-40 disabled:pointer-events-none ${layout === k ? "bg-amber-400 text-black font-medium" : "text-neutral-300 hover:bg-neutral-700"}`}>{l}</button>
             ))}
           </div>
-
-          <DisplaySettings settings={dset} logo={logo} onSettings={changeSettings} onLogo={changeLogo} disabled={!canProject} />
-          </>)}
+          )}
 
           <div className="hidden lg:flex mt-4 flex-col items-center gap-2.5 text-xs xl:text-sm text-neutral-400">
             <div className="flex flex-wrap justify-center gap-x-4 gap-y-2">
