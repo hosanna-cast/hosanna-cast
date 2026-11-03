@@ -108,7 +108,7 @@ export default function Display() {
           <div ref={box} className="flex-1 flex items-center min-h-0">
             <p ref={txt} className={`leading-snug font-serif whitespace-pre-line ${v.kind === "slide" ? "w-full text-center" : ""}`}><RichText text={v.text} bold={v.bold} /></p>
           </div>
-          <div className="text-right text-[4vh] pt-[2vh]">{v.ref} <span className="opacity-60 text-[2.5vh]">{v.version}</span></div>
+          {!v.noRef && <div className="text-right text-[4vh] pt-[2vh]">{v.ref} <span className="opacity-60 text-[2.5vh]">{v.version}</span></div>}
         </>
       )}
     </div>
