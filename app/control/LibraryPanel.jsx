@@ -14,7 +14,7 @@ const COPY = {
 };
 const field = "w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-amber-400";
 
-export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUpdate, onPick, selectedId, bible, refOf, textOf, isLiveVerse, liveSlide, pausedSlide, onSlide, onVerse, playlists }) {
+export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUpdate, onPick, selectedId, bible, refOf, textOf, isLiveVerse, liveSlide, pausedSlide, onSlide, onVerse, playlists, onKeyPhrase, onOpen }) {
   const t = COPY[kind];
   const [openId, setOpenId] = useState(null);
   const [adding, setAdding] = useState(false);
@@ -27,6 +27,8 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
   const [vq, setVq] = useState("");                       // « aller au verset » (chants)
 
   const open = items.find((x) => x.id === openId) || null;
+  // la page sait quelle note est ouverte (le champ « Texte rapide » peut y garder des phrases clés)
+  useEffect(() => { onOpen?.(openId); return () => onOpen?.(null); }, [openId]); // eslint-disable-line react-hooks/exhaustive-deps
   const slides = useMemo(() => (open ? splitSlides(open.text) : []), [open]);
   const verses = useMemo(() => (open ? findRefs(open.text, bible) : []), [open, bible]);
 
@@ -222,6 +224,30 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
             <p className="text-xs text-neutral-500">Aucun verset repéré dans cette note.</p>
           ) : null}
         </div>
+
+        {kind === "notes" && (
+          <div className="mb-3">
+            <div className="text-xs text-neutral-500 mb-1.5">Phrases clés</div>
+            {!(open.keys || []).length ? (
+              <p className="text-xs text-neutral-500">Aucune pour l'instant. L'orateur dit une phrase importante ? Tape-la dans « Texte rapide » en haut, puis « Projeter et garder » : elle reste ici pour la reprojeter quand il y revient.</p>
+            ) : (
+              <ul className="space-y-1">
+                {open.keys.map((s, k) => {
+                  const live = liveSlide && liveSlide.id === open.id && liveSlide.key === k;
+                  return (
+                    <li key={k} onClick={() => onKeyPhrase(open, k)}
+                      className={`flex items-start gap-2 px-2.5 py-2 rounded-lg cursor-pointer select-none text-sm leading-snug border transition duration-100 active:scale-[0.98] ${live ? "bg-green-600 border-green-600 text-white" : "border-amber-400/30 bg-amber-400/5 text-neutral-200 hover:bg-amber-400/10"}`}>
+                      <span className="flex-1 whitespace-pre-line">{s}</span>
+                      <button aria-label="Retirer cette phrase" title="Retirer"
+                        onClick={(e) => { e.stopPropagation(); onUpdate(open.id, { keys: open.keys.filter((_, j) => j !== k) }); }}
+                        className={`px-1 text-base leading-none ${live ? "text-green-100 hover:text-white" : "text-neutral-500 hover:text-red-400"}`}>×</button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        )}
 
         <div className="text-xs text-neutral-500 mb-1.5">{kind === "notes" ? "Diapositives" : "Couplets et refrains"}</div>
         <ul className="space-y-1">
