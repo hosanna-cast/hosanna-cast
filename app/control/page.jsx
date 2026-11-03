@@ -284,13 +284,15 @@ export default function Control() {
     flash();
   };
 
-  // phrase clé d'une note : projetée comme une diapositive, mais gardée dans la note pour y revenir
-  const projectKey = (item, k, text) => {
+  // phrase clé (note) ou point clé (dit par l'orateur) : projeté comme une diapositive, mais gardé pour y revenir
+  // field "keys" = phrases clés de la note (gras, analyse) ; field "points" = points clés gardés en direct
+  const projectKey = (item, k, text, field = "keys") => {
     if (!canProject) return;
-    const t = text ?? item.keys?.[k];
+    const t = text ?? item[field]?.[k];
     if (t === undefined) return;
-    const msg = { type: "show", kind: "slide", ref: `${item.title} · phrase clé`, text: t, version: "", noRef: true, s: { kind: "notes", id: item.id, key: k }, next: null };
-    setSlideLive({ kind: "notes", id: item.id, key: k });
+    const tag = field === "points" ? "pt" : "key";
+    const msg = { type: "show", kind: "slide", ref: `${item.title} · ${field === "points" ? "point clé" : "phrase clé"}`, text: t, version: "", noRef: true, s: { kind: "notes", id: item.id, [tag]: k }, next: null };
+    setSlideLive({ kind: "notes", id: item.id, [tag]: k });
     setLiveKind("slide");
     setShown(msg);
     ch.current?.postMessage(msg);
@@ -299,34 +301,42 @@ export default function Control() {
   // note qui reçoit les points clés : la note ouverte, sinon celle du jour (créée au premier point clé)
   const keyTitle = `Points clés du ${new Date().toLocaleDateString("fr-FR")}`;
   const keyNote = library.lib.notes.find((x) => x.id === noteId) || library.lib.notes.find((x) => x.title === keyTitle) || null;
-  // garde une phrase dans la note (et la projette tout de suite si demandé)
-  const keepKey = (text, andProject) => {
+  // garde un point clé dans la note (et le projette tout de suite si demandé)
+  const keepKey = (text, andProject, field = "points") => {
     const note = keyNote;
     if (!note) {
-      const id = library.add("notes", { title: keyTitle, person: "", session: `Culte du ${new Date().toLocaleDateString("fr-FR")}`, text: "", keys: [text] });
-      if (andProject) projectKey({ id, title: keyTitle, keys: [text] }, 0, text);
+      const id = library.add("notes", { title: keyTitle, person: "", session: `Culte du ${new Date().toLocaleDateString("fr-FR")}`, text: "", keys: [], points: [text] });
+      if (andProject) projectKey({ id, title: keyTitle, points: [text] }, 0, text, "points");
       return;
     }
-    const keys = [...(note.keys || []), text];
-    library.update("notes", note.id, { keys });
-    if (andProject) projectKey(note, keys.length - 1, text);
+    const list = [...(note[field] || []), text];
+    library.update("notes", note.id, { [field]: list });
+    if (andProject) projectKey(note, list.length - 1, text, field);
   };
 
-  // modifier une phrase clé : si elle est à l'écran, l'écran se met à jour
+  // anciennes versions : les points clés gardés en direct étaient rangés avec les phrases de la note. On les déplace une fois.
+  useEffect(() => {
+    if (!library.ready) return;
+    library.lib.notes.forEach((n) => {
+      if (n.points === undefined && !(n.text || "").trim() && (n.keys || []).length) library.update("notes", n.id, { points: n.keys, keys: [] });
+    });
+  }, [library.ready]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // modifier un point clé : s'il est à l'écran, l'écran se met à jour
   const editKey = (k, text) => {
     const note = keyNote;
-    if (!note || (note.keys || [])[k] === undefined) return;
-    library.update("notes", note.id, { keys: note.keys.map((x, j) => (j === k ? text : x)) });
-    if (liveKind === "slide" && slideLive?.kind === "notes" && slideLive.id === note.id && slideLive.key === k) projectKey(note, k, text);
+    if (!note || (note.points || [])[k] === undefined) return;
+    library.update("notes", note.id, { points: note.points.map((x, j) => (j === k ? text : x)) });
+    if (liveKind === "slide" && slideLive?.kind === "notes" && slideLive.id === note.id && slideLive.pt === k) projectKey(note, k, text, "points");
   };
-  // supprimer une phrase clé : les numéros des suivantes reculent d'un cran (on garde la bonne en surbrillance)
+  // supprimer un point clé : les numéros des suivants reculent d'un cran (on garde le bon en surbrillance)
   const deleteKey = (k) => {
     const note = keyNote;
     if (!note) return;
-    library.update("notes", note.id, { keys: (note.keys || []).filter((_, j) => j !== k) });
-    if (slideLive?.kind === "notes" && slideLive.id === note.id && slideLive.key !== undefined) {
-      if (slideLive.key === k) setSlideLive(null);
-      else if (slideLive.key > k) setSlideLive({ ...slideLive, key: slideLive.key - 1 });
+    library.update("notes", note.id, { points: (note.points || []).filter((_, j) => j !== k) });
+    if (slideLive?.kind === "notes" && slideLive.id === note.id && slideLive.pt !== undefined) {
+      if (slideLive.pt === k) setSlideLive(null);
+      else if (slideLive.pt > k) setSlideLive({ ...slideLive, pt: slideLive.pt - 1 });
     }
   };
 
@@ -422,9 +432,10 @@ export default function Control() {
       if (!slideLive) return;
       const item = library.lib[slideLive.kind].find((x) => x.id === slideLive.id);
       if (!item) return;
-      if (slideLive.key !== undefined) {                 // phrases clés : ← → passent à la phrase gardée d'avant / d'après
-        const k = slideLive.key + d;
-        if (item.keys?.[k] !== undefined) projectKey(item, k);
+      if (slideLive.key !== undefined || slideLive.pt !== undefined) {   // phrases / points clés : ← → passent à celui d'avant / d'après
+        const field = slideLive.pt !== undefined ? "points" : "keys";
+        const k = (slideLive.pt ?? slideLive.key) + d;
+        if (item[field]?.[k] !== undefined) projectKey(item, k, undefined, field);
         return;
       }
       const slides = slidesOf(item);
@@ -616,7 +627,6 @@ export default function Control() {
                 onSlide={(item, i, slides) => projectSlide(tab, item, i, slides)}
                 onVerse={projectFirst}
                 onKeyPhrase={projectKey}
-                hideKeys={["admin", "assistant"].includes(church.role)}
                 canAnalyze={["admin", "assistant"].includes(church.role)}
                 onOpen={setNoteId}
               />
@@ -686,10 +696,10 @@ export default function Control() {
             <KeyPoint
               note={keyNote}
               autoTitle={keyTitle}
-              liveKey={liveKind === "slide" && slideLive?.kind === "notes" && slideLive.key !== undefined && slideLive.id === keyNote?.id ? slideLive.key : null}
+              liveKey={liveKind === "slide" && slideLive?.kind === "notes" && slideLive.pt !== undefined && slideLive.id === keyNote?.id ? slideLive.pt : null}
               canProject={canProject}
               onKeepProject={(t) => keepKey(t, true)}
-              onProjectKey={(k) => keyNote && projectKey(keyNote, k)}
+              onProjectKey={(k) => keyNote && projectKey(keyNote, k, undefined, "points")}
               onEdit={editKey}
               onDelete={deleteKey}
             />
@@ -703,7 +713,7 @@ export default function Control() {
             onProject={projectFree}
             disabled={!canProject}
             {...(tab === "notes" && noteId && library.lib.notes.some((x) => x.id === noteId)
-              ? { onAdd: (t) => keepKey(t, false), addLabel: "Garder dans la note", onAddProject: (t) => keepKey(t, true), addProjectLabel: "Projeter et garder" }
+              ? { onAdd: (t) => keepKey(t, false, "keys"), addLabel: "Garder dans la note", onAddProject: (t) => keepKey(t, true, "keys"), addProjectLabel: "Projeter et garder" }
               : {})}
           />
           )}
