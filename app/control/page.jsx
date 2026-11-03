@@ -8,6 +8,7 @@ import LibraryPanel from "./LibraryPanel";
 import ChantStage from "./ChantStage";
 import ChapterView from "./ChapterView";
 import QuickText from "./QuickText";
+import KeyPoint from "./KeyPoint";
 import { bgStyle } from "./Backgrounds";
 import { useChurch } from "@/lib/church";
 import UserMenu from "./UserMenu";
@@ -305,10 +306,10 @@ export default function Control() {
   };
 
   // texte rapide (disponible dans tous les onglets) : projeté tel quel, on reste dessus
-  const projectFree = (text) => {
+  const projectFree = (text, label) => {
     if (!canProject) return;
     const chant = tab === "chants" ? library.lib.chants.find((x) => x.id === chantId) : null;
-    const msg = { type: "show", kind: "chant", ref: chant ? `${chant.title} · texte libre` : "Texte rapide", text, version: "", free: true };
+    const msg = { type: "show", kind: "chant", ref: chant ? `${chant.title} · texte libre` : (label || "Texte rapide"), text, version: "", free: true };
     setLiveKind("free");
     setShown(msg);
     ch.current?.postMessage(msg);
@@ -654,6 +655,15 @@ export default function Control() {
               </>
             )}
           </div>
+          {tab === "notes" && ["admin", "assistant"].includes(church.role) && (
+            <KeyPoint
+              noteOpen={!!noteId && library.lib.notes.some((x) => x.id === noteId)}
+              canProject={canProject}
+              onKeep={(t) => keepKey(t, false)}
+              onKeepProject={(t) => keepKey(t, true)}
+              onProject={(t) => projectFree(t, "Point clé")}
+            />
+          )}
         </section>
 
         {/* ───── centre : texte rapide (toujours en haut) puis contenu de l'onglet ───── */}
