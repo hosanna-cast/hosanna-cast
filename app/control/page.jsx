@@ -131,7 +131,7 @@ export default function Control() {
       const who = m.by ? { name: m.by.name, device: m.by.device } : null;
       const noted = (what) => { if (who) { setLastBy({ ...who, what }); setRPulse(true); setTimeout(() => setRPulse(false), 700); } };
       if (m.type === "show" || m.type === "update") {
-        setShown({ type: m.type, kind: m.kind, ref: m.ref, text: m.text, version: m.version, bold: m.bold, next: m.next, mediaType: m.mediaType, url: m.url });
+        setShown({ type: m.type, kind: m.kind, ref: m.ref, text: m.text, version: m.version, noRef: m.noRef, bold: m.bold, next: m.next, mediaType: m.mediaType, url: m.url });
         if (m.r) {
           setLive(m.r); setLiveKind("verse");
           if (m.type === "show") setHistory((h) => [m.r, ...h.filter((x) => !(x.b === m.r.b && x.c === m.r.c && x.v === m.r.v && x.vEnd === m.r.vEnd))].slice(0, 15));
@@ -289,7 +289,7 @@ export default function Control() {
     if (!canProject) return;
     const t = text ?? item.keys?.[k];
     if (t === undefined) return;
-    const msg = { type: "show", kind: "slide", ref: `${item.title} · phrase clé`, text: t, version: "", s: { kind: "notes", id: item.id, key: k }, next: null };
+    const msg = { type: "show", kind: "slide", ref: `${item.title} · phrase clé`, text: t, version: "", noRef: true, s: { kind: "notes", id: item.id, key: k }, next: null };
     setSlideLive({ kind: "notes", id: item.id, key: k });
     setLiveKind("slide");
     setShown(msg);
@@ -812,7 +812,7 @@ export default function Control() {
                 ) : (
                   <>
                     <p ref={previewTxt} className={`font-serif leading-snug whitespace-pre-line cursor-text ${shown.kind === "slide" ? "text-center" : ""} ${size}`}><RichText text={shown.text} bold={shown.bold} /></p>
-                    <div className="mt-2 text-right text-sm">{shown.ref} <span className="text-xs opacity-60">{shown.version}</span></div>
+                    {!shown.noRef && <div className="mt-2 text-right text-sm">{shown.ref} <span className="text-xs opacity-60">{shown.version}</span></div>}
                   </>
                 )}
                 </div>
