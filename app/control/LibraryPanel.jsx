@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { splitSlides } from "@/lib/library";
-import { findRefs } from "@/lib/refs";
+import { findRefs, hasRef } from "@/lib/refs";
 import { readTextFile, readNoteFile } from "@/lib/readFile";
 import { fold } from "@/lib/textUtil";
 import { parseRef } from "@/lib/parseRef";
@@ -20,7 +20,7 @@ const Trash = () => (
 );
 const field = "w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-amber-400";
 
-export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUpdate, onPick, selectedId, bible, refOf, textOf, isLiveVerse, liveSlide, pausedSlide, onSlide, onVerse, playlists, onKeyPhrase, onOpen, hideKeys, canAnalyze }) {
+export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUpdate, onPick, selectedId, bible, refOf, textOf, isLiveVerse, liveSlide, pausedSlide, onSlide, onVerse, playlists, onKeyPhrase, onOpen, canAnalyze }) {
   const t = COPY[kind];
   const [openId, setOpenId] = useState(null);
   const [adding, setAdding] = useState(false);
@@ -121,7 +121,7 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error || "L'analyse a échoué.");
       const have = new Set((open.keys || []).map((k) => k.trim()));
-      const points = d.points.filter((p) => !have.has(p));
+      const points = d.points.filter((p) => !have.has(p) && !hasRef(p));   // un verset n'est pas une phrase clé
       setAna((cur) => (cur && openIdRef.current === id ? { status: "ready", points, sel: points.map((_, i) => i) } : cur));
     } catch (e) {
       setAna((cur) => (cur && openIdRef.current === id ? { status: "error", msg: e.message || "L'analyse a échoué.", points: [], sel: [] } : cur));
@@ -229,7 +229,7 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
         <div className="font-medium leading-snug">{open.title}</div>
         <div className="text-xs text-neutral-500 mb-3">
           {[open.person, open.session].filter(Boolean).join(" · ") || "\u00a0"}
-          {" · "}{isChant ? `${slides.length} diapositive${slides.length > 1 ? "s" : ""}` : `${(open.keys || []).length} point${(open.keys || []).length > 1 ? "s" : ""} clé${(open.keys || []).length > 1 ? "s" : ""}`}
+          {" · "}{isChant ? `${slides.length} diapositive${slides.length > 1 ? "s" : ""}` : `${(open.keys || []).length} phrase${(open.keys || []).length > 1 ? "s" : ""} clé${(open.keys || []).length > 1 ? "s" : ""}`}
         </div>
 
         {isChant && pausedSlide && pausedSlide.id === open.id && (
@@ -271,34 +271,46 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
           ) : null}
         </div>
 
-        {kind === "notes" && !hideKeys && (
-          <div className="mb-3">
-            <div className="text-xs text-neutral-500 mb-1.5">Phrases clés</div>
-            {!(open.keys || []).length ? (
-              <p className="text-xs text-neutral-500">Aucune pour l'instant. L'orateur dit une phrase importante ? Elle sera gardée ici pour la reprojeter quand il y revient.</p>
-            ) : (
-              <ul className="space-y-1">
-                {open.keys.map((s, k) => {
-                  const live = liveSlide && liveSlide.id === open.id && liveSlide.key === k;
-                  return (
-                    <li key={k} onClick={() => onKeyPhrase(open, k)}
-                      className={`flex items-start gap-2 px-2.5 py-2 rounded-lg cursor-pointer select-none text-sm leading-snug border transition duration-100 active:scale-[0.98] ${live ? "bg-green-600 border-green-600 text-white" : "border-amber-400/30 bg-amber-400/5 text-neutral-200 hover:bg-amber-400/10"}`}>
-                      <span className="flex-1 whitespace-pre-line">{s}</span>
-                      <button aria-label="Retirer cette phrase" title="Retirer"
-                        onClick={(e) => { e.stopPropagation(); onUpdate(open.id, { keys: open.keys.filter((_, j) => j !== k) }); }}
-                        className={`px-1 text-base leading-none ${live ? "text-green-100 hover:text-white" : "text-neutral-500 hover:text-red-400"}`}>×</button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
-        )}
+        {kind === "notes" && (() => {
+          const keys = open.keys || [];
+          const verseKeys = keys.filter((x) => hasRef(x)).length;
+          return (
+            <div className="mb-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="text-xs text-neutral-500">Phrases clés de la note{keys.length ? ` · ${keys.length}` : ""}</div>
+                {canAnalyze && verseKeys > 0 && (
+                  <button onClick={() => onUpdate(open.id, { keys: keys.filter((x) => !hasRef(x)) })}
+                    className="text-[11px] text-sky-300 hover:underline">Retirer les versets ({verseKeys})</button>
+                )}
+              </div>
+              {!keys.length ? (
+                <p className="text-xs text-neutral-500">Aucune phrase clé. Elles viennent du texte en gras du fichier importé, ou de « Analyser la note ».</p>
+              ) : (
+                <ul className="space-y-1">
+                  {keys.map((s, k) => {
+                    const live = liveSlide && liveSlide.id === open.id && liveSlide.key === k;
+                    return (
+                      <li key={k} onClick={() => onKeyPhrase(open, k)}
+                        className={`flex items-start gap-2 px-2.5 py-2 rounded-lg cursor-pointer select-none text-sm leading-snug border transition duration-100 active:scale-[0.98] ${live ? "bg-green-600 border-green-600 text-white" : "border-amber-400/30 bg-amber-400/5 text-neutral-200 hover:bg-amber-400/10"}`}>
+                        <span className="flex-1 whitespace-pre-line">{s}</span>
+                        {canAnalyze && (
+                          <button aria-label="Retirer cette phrase" title="Retirer"
+                            onClick={(e) => { e.stopPropagation(); onUpdate(open.id, { keys: keys.filter((_, j) => j !== k) }); }}
+                            className={`px-1 text-base leading-none ${live ? "text-green-100 hover:text-white" : "text-neutral-500 hover:text-red-400"}`}>×</button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          );
+        })()}
 
         {kind === "notes" && canAnalyze && (
           <div className="mb-3">
             {!ana && !(open.text || "").trim() ? (
-              <p className="text-xs text-neutral-500">Cette note ne contient que des points clés gardés pendant la prédication : il n'y a pas de texte à analyser. Pour analyser une prédication, importe son fichier avec « + Ajouter une note ».</p>
+              <p className="text-xs text-neutral-500">Cette note ne contient pas de texte à analyser.</p>
             ) : !ana ? (
               <button onClick={analyze}
                 className="w-full rounded-lg bg-neutral-800 hover:bg-neutral-700 text-sky-300 py-2 text-sm transition duration-100 active:scale-95">
