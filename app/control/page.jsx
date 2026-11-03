@@ -73,6 +73,7 @@ export default function Control() {
   const [rPulse, setRPulse] = useState(false);
   const [helperId, setHelperId] = useState(null);        // la personne (Aide écran) autorisée à projeter, une seule
   const [helpBusy, setHelpBusy] = useState(false);
+  const [noteId, setNoteId] = useState(null);                // note ouverte dans l'onglet Notes (pour y garder des phrases clés)
   const [hint, setHint] = useState(null);                  // petit message (ex. « sélectionne des mots pour le gras »)
   const selRef = useRef(null);                             // dernière sélection faite dans l'aperçu : { start, end }
   const previewTxt = useRef(null);                         // le texte affiché dans l'aperçu de l'écran
@@ -282,6 +283,27 @@ export default function Control() {
     flash();
   };
 
+  // phrase clé d'une note : projetée comme une diapositive, mais gardée dans la note pour y revenir
+  const projectKey = (item, k, text) => {
+    if (!canProject) return;
+    const t = text ?? item.keys?.[k];
+    if (t === undefined) return;
+    const msg = { type: "show", kind: "slide", ref: `${item.title} · phrase clé`, text: t, version: "", s: { kind: "notes", id: item.id, key: k }, next: null };
+    setSlideLive({ kind: "notes", id: item.id, key: k });
+    setLiveKind("slide");
+    setShown(msg);
+    ch.current?.postMessage(msg);
+    flash();
+  };
+  // garde une phrase dans la note ouverte (et la projette tout de suite si demandé)
+  const keepKey = (text, andProject) => {
+    const note = library.lib.notes.find((x) => x.id === noteId);
+    if (!note) return;
+    const keys = [...(note.keys || []), text];
+    library.update("notes", note.id, { keys });
+    if (andProject) projectKey(note, keys.length - 1, text);
+  };
+
   // texte rapide (disponible dans tous les onglets) : projeté tel quel, on reste dessus
   const projectFree = (text) => {
     if (!canProject) return;
@@ -374,6 +396,11 @@ export default function Control() {
       if (!slideLive) return;
       const item = library.lib[slideLive.kind].find((x) => x.id === slideLive.id);
       if (!item) return;
+      if (slideLive.key !== undefined) {                 // phrases clés : ← → passent à la phrase gardée d'avant / d'après
+        const k = slideLive.key + d;
+        if (item.keys?.[k] !== undefined) projectKey(item, k);
+        return;
+      }
       const slides = slidesOf(item);
       const i = slideLive.i + d;
       if (i >= 0 && i < slides.length) projectSlide(slideLive.kind, item, i, slides);
@@ -562,6 +589,8 @@ export default function Control() {
                 liveSlide={liveKind === "slide" ? slideLive : null}
                 onSlide={(item, i, slides) => projectSlide(tab, item, i, slides)}
                 onVerse={projectFirst}
+                onKeyPhrase={projectKey}
+                onOpen={setNoteId}
               />
             ) : !bible ? (
               <p className="text-sm text-neutral-500">Chargement de la Bible…</p>
@@ -633,6 +662,9 @@ export default function Control() {
           <QuickText
             onProject={projectFree}
             disabled={!canProject}
+            {...(tab === "notes" && noteId && library.lib.notes.some((x) => x.id === noteId)
+              ? { onAdd: (t) => keepKey(t, false), addLabel: "Garder dans la note", onAddProject: (t) => keepKey(t, true), addProjectLabel: "Projeter et garder" }
+              : {})}
           />
           )}
         {tab === "annonces" ? (
