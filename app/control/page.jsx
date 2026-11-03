@@ -436,11 +436,11 @@ export default function Control() {
     // le clavier agit sur une liste déroulante ou un bouton : on le laisse faire (Entrée / Espace / flèches)
     if (t.tagName === "SELECT") return;
     if ((t.tagName === "BUTTON" || t.tagName === "A") && (e.key === "Enter" || e.key === " ")) return;
-    // autres combinaisons (Ctrl+flèche, Alt+…) : ce ne sont pas nos raccourcis, sauf Ctrl+N (écran noir) et Ctrl+B (gras)
-    if ((e.ctrlKey || e.metaKey || e.altKey) && !((e.ctrlKey || e.metaKey) && ["b", "n"].includes(e.key.toLowerCase()))) return;
+    // autres combinaisons (Ctrl+flèche, Alt+…) : ce ne sont pas nos raccourcis, sauf Ctrl+E (écran noir) et Ctrl+B (gras)
+    if ((e.ctrlKey || e.metaKey || e.altKey) && !((e.ctrlKey || e.metaKey) && ["b", "e"].includes(e.key.toLowerCase()))) return;
     const inField = t === searchRef.current;
     const k = e.key.toLowerCase();
-    if ((e.ctrlKey || e.metaKey) && k === "n") { e.preventDefault(); toggleBlank(); }
+    if ((e.ctrlKey || e.metaKey) && k === "e") { e.preventDefault(); toggleBlank(); }
     else if ((e.ctrlKey || e.metaKey) && k === "b") { e.preventDefault(); applyBold(); }
     else if (e.key === "ArrowDown" && results.length) { e.preventDefault(); setSel((s) => Math.min(s + 1, results.length - 1)); }
     else if (e.key === "ArrowUp" && results.length) { e.preventDefault(); setSel((s) => Math.max(s - 1, 0)); }
@@ -780,7 +780,7 @@ export default function Control() {
             </div>
             <div className="flex flex-wrap justify-center gap-x-4 gap-y-2">
               <span className="flex items-center gap-1.5"><Kbd>Échap</Kbd> effacer</span>
-              <span className="flex items-center gap-1.5"><Kbd>Ctrl+N</Kbd> écran noir</span>
+              <span className="flex items-center gap-1.5"><Kbd>Ctrl+E</Kbd> écran noir</span>
               <span className="flex items-center gap-1.5"><Kbd>Ctrl+B</Kbd> gras</span>
             </div>
           </div>
