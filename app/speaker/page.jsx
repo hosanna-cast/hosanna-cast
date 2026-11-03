@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { openScreen } from "@/lib/screen";
+import { RichText } from "@/lib/bold";
 
 // Vue orateur (écran de la chaire / tablette) : /speaker?k=<jeton>
 // Montre ce qui est projeté, ce qui vient ensuite, et un chronomètre de prédication.
@@ -114,7 +115,7 @@ export default function Speaker() {
         ) : v ? (
           <>
             <div ref={box} className={`flex-1 min-h-0 flex ${chant ? "justify-center" : ""} items-center`}>
-              <p ref={txt} className={`${chant ? "w-full text-center font-sans font-bold leading-[1.25]" : "font-serif leading-snug"} ${v.kind === "slide" ? "w-full text-center" : ""} whitespace-pre-line ${blank ? "opacity-60" : ""}`}>{v.text}</p>
+              <p ref={txt} className={`${chant ? "w-full text-center font-sans font-bold leading-[1.25]" : "font-serif leading-snug"} ${v.kind === "slide" ? "w-full text-center" : ""} whitespace-pre-line ${blank ? "opacity-60" : ""}`}>{chant ? v.text : <RichText text={v.text} bold={v.bold} />}</p>
             </div>
             <div className="text-right text-[3vh] pt-[1vh] text-amber-300">{v.ref} <span className="opacity-60 text-[2.2vh]">{v.version}</span></div>
           </>
