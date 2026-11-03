@@ -2,6 +2,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { openScreen } from "@/lib/screen";
 import { bgStyle } from "../control/Backgrounds";
+import { RichText } from "@/lib/bold";
 
 export default function Display() {
   const [v, setV] = useState(null);
@@ -20,7 +21,7 @@ export default function Display() {
     const token = new URLSearchParams(window.location.search).get("k");
     const ch = openScreen(token, (m) => {
       if (m.type === "bg") { setBg(m.bg || null); setTextColor(m.textColor || "#ffffff"); return; }
-      if (m.type === "show") { resume.current = { url: null, t: 0 }; setV(m); }   // l'écran noir reste noir : seul « Noir » / Ctrl+B le désactive
+      if (m.type === "show") { resume.current = { url: null, t: 0 }; setV(m); }   // l'écran noir reste noir : seul « Noir » / Ctrl+N le désactive
       if (m.type === "update") setV(m);            // changement de version : l'écran noir reste noir
       if (m.type === "clear") setV(null);
       if (m.type === "blank") setBlank((b) => (m.on === undefined ? !b : m.on));   // « on » explicite : deux opérateurs ne se contredisent plus
@@ -105,7 +106,7 @@ export default function Display() {
       {!blank && v && v.kind !== "chant" && v.kind !== "media" && (
         <>
           <div ref={box} className="flex-1 flex items-center min-h-0">
-            <p ref={txt} className={`leading-snug font-serif whitespace-pre-line ${v.kind === "slide" ? "w-full text-center" : ""}`}>{v.text}</p>
+            <p ref={txt} className={`leading-snug font-serif whitespace-pre-line ${v.kind === "slide" ? "w-full text-center" : ""}`}><RichText text={v.text} bold={v.bold} /></p>
           </div>
           <div className="text-right text-[4vh] pt-[2vh]">{v.ref} <span className="opacity-60 text-[2.5vh]">{v.version}</span></div>
         </>
