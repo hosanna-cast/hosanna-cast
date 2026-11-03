@@ -305,6 +305,24 @@ export default function Control() {
     if (andProject) projectKey(note, keys.length - 1, text);
   };
 
+  // modifier une phrase clé : si elle est à l'écran, l'écran se met à jour
+  const editKey = (k, text) => {
+    const note = library.lib.notes.find((x) => x.id === noteId);
+    if (!note || (note.keys || [])[k] === undefined) return;
+    library.update("notes", note.id, { keys: note.keys.map((x, j) => (j === k ? text : x)) });
+    if (liveKind === "slide" && slideLive?.kind === "notes" && slideLive.id === note.id && slideLive.key === k) projectKey(note, k, text);
+  };
+  // supprimer une phrase clé : les numéros des suivantes reculent d'un cran (on garde la bonne en surbrillance)
+  const deleteKey = (k) => {
+    const note = library.lib.notes.find((x) => x.id === noteId);
+    if (!note) return;
+    library.update("notes", note.id, { keys: (note.keys || []).filter((_, j) => j !== k) });
+    if (slideLive?.kind === "notes" && slideLive.id === note.id && slideLive.key !== undefined) {
+      if (slideLive.key === k) setSlideLive(null);
+      else if (slideLive.key > k) setSlideLive({ ...slideLive, key: slideLive.key - 1 });
+    }
+  };
+
   // texte rapide (disponible dans tous les onglets) : projeté tel quel, on reste dessus
   const projectFree = (text, label) => {
     if (!canProject) return;
@@ -591,6 +609,7 @@ export default function Control() {
                 onSlide={(item, i, slides) => projectSlide(tab, item, i, slides)}
                 onVerse={projectFirst}
                 onKeyPhrase={projectKey}
+                hideKeys={["admin", "assistant"].includes(church.role)}
                 onOpen={setNoteId}
               />
             ) : !bible ? (
@@ -657,11 +676,13 @@ export default function Control() {
           </div>
           {tab === "notes" && ["admin", "assistant"].includes(church.role) && (
             <KeyPoint
-              noteOpen={!!noteId && library.lib.notes.some((x) => x.id === noteId)}
+              note={library.lib.notes.find((x) => x.id === noteId) || null}
+              liveKey={liveKind === "slide" && slideLive?.kind === "notes" && slideLive.key !== undefined && slideLive.id === noteId ? slideLive.key : null}
               canProject={canProject}
-              onKeep={(t) => keepKey(t, false)}
               onKeepProject={(t) => keepKey(t, true)}
-              onProject={(t) => projectFree(t, "Point clé")}
+              onProjectKey={(k) => { const n = library.lib.notes.find((x) => x.id === noteId); if (n) projectKey(n, k); }}
+              onEdit={editKey}
+              onDelete={deleteKey}
             />
           )}
         </section>
