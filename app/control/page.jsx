@@ -71,14 +71,14 @@ export default function Control() {
   const [peers, setPeers] = useState([]);                  // les autres opérateurs connectés
   const [lastBy, setLastBy] = useState(null);              // dernière action faite par quelqu'un d'autre { name, device, what }
   const [rPulse, setRPulse] = useState(false);
-  const [helperId, setHelperId] = useState(null);        // la personne (Aide écran) autorisée à projeter, une seule
+  const [helperIds, setHelperIds] = useState([]);        // les personnes autorisées à projeter avec l'admin : une Aide écran et un Orateur au maximum
   const [helpBusy, setHelpBusy] = useState(false);
   const [noteId, setNoteId] = useState(null);                // note ouverte dans l'onglet Notes (pour y garder des phrases clés)
   const [hint, setHint] = useState(null);                  // petit message (ex. « sélectionne des mots pour le gras »)
   const selRef = useRef(null);                             // dernière sélection faite dans l'aperçu : { start, end }
   const previewTxt = useRef(null);                         // le texte affiché dans l'aperçu de l'écran
   // un profil « Aide écran » ne peut projeter que si l'administrateur l'a choisi
-  const canProject = church.role !== "assistant" || helperId === church.userId;
+  const canProject = !["assistant", "orateur"].includes(church.role) || helperIds.includes(church.userId);
   const mine = useRef(null);
   const stateRef = useRef({});
   const [pulse, setPulse] = useState(false);
@@ -117,7 +117,7 @@ export default function Control() {
     const hide = (m) => chantsOnly && m.kind !== allowedKind;
     const OTHER = { type: "show", kind: "other", ref: "", text: "", version: "" };
     const onRemote = (m) => {
-      if (m.type === "helper") { if (m.by?.role === "admin") setHelperId(m.id || null); return; }
+      if (m.type === "helper") { if (m.by?.role === "admin") setHelperIds(m.ids || (m.id ? [m.id] : [])); return; }
       if (m.type === "bg") { setScreenBg(m.bg || null); setScreenText(m.textColor || null); return; }
       // l'écran vient de s'ouvrir : on lui renvoie son fond
       if (m.type === "mediaStatus") { setMediaStatus(m.status); return; }
@@ -153,7 +153,7 @@ export default function Control() {
     ch.current = openScreen(church.token, onRemote, {
       me,
       onPeers: (list) => setPeers(list.filter((p) => p.id !== me.id).filter((p, i, a) => a.findIndex((x) => x.id === p.id) === i)),
-      onReady: () => { ch.current?.postMessage({ type: "sync?" }); createClient().rpc("get_helper").then(({ data }) => setHelperId(data || null)); },
+      onReady: () => { ch.current?.postMessage({ type: "sync?" }); createClient().rpc("get_helpers").then(({ data }) => setHelperIds(data || [])); },
     });
     return () => ch.current.close();
   }, [church.token]);
@@ -337,14 +337,14 @@ export default function Control() {
     setShown(null);
   };
   // « noir » est explicite (on / off) : si deux personnes appuient, l'écran ne bascule pas dans le mauvais sens
-  // uid = la personne choisie, ou null pour arrêter l'aide (une seule aide à la fois)
-  const pickHelper = async (uid) => {
+  // ids = les personnes autorisées (une Aide écran et un Orateur au maximum), [] pour tout arrêter
+  const pickHelpers = async (ids) => {
     setHelpBusy(true);
-    const { error } = await createClient().rpc("set_helper", { target: uid });
+    const { error } = await createClient().rpc("set_helpers", { ids });
     setHelpBusy(false);
     if (error) return alert("Impossible de changer l'aide : " + error.message);
-    setHelperId(uid);
-    ch.current?.postMessage({ type: "helper", id: uid });
+    setHelperIds(ids);
+    ch.current?.postMessage({ type: "helper", ids });
   };
   const toggleBlank = () => { if (!canProject) return; const on = !blank; ch.current?.postMessage({ type: "blank", on }); setBlank(on); setLastBy(null); };
 
@@ -500,7 +500,7 @@ export default function Control() {
           <span className="text-xl sm:text-2xl font-semibold leading-none">Hosanna <span className="text-amber-400">Cast</span></span>
         </a>
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          {church.role === "admin" && <HelpControl helperId={helperId} peers={peers} busy={helpBusy} onPick={pickHelper} />}
+          {church.role === "admin" && <HelpControl helperIds={helperIds} peers={peers} busy={helpBusy} onChange={pickHelpers} />}
           {peers.length > 0 && (
             <div className="flex items-center gap-1.5 rounded-full bg-neutral-800 border border-neutral-700 pl-2 pr-1 py-1" title={peers.map((p) => `${p.name} (${p.device})`).join(", ") + " : connecté aussi"}>
               <span className="h-2 w-2 rounded-full bg-sky-400" />
@@ -786,10 +786,10 @@ export default function Control() {
             </p>
           )}
 
-          {church.role === "assistant" && (
+          {["assistant", "orateur"].includes(church.role) && (
             canProject
-              ? <p className="mt-2 text-xs rounded-lg px-2.5 py-2 bg-sky-500/15 text-sky-200">Vous aidez à projeter : l'administrateur vous a autorisé.</p>
-              : <p className="mt-2 text-xs rounded-lg px-2.5 py-2 bg-amber-400/10 text-amber-200">{helperId ? "Une autre personne aide en ce moment." : "L'aide n'est pas activée."} Vous pouvez suivre l'écran, mais pas projeter tant que l'administrateur ne vous a pas autorisé.</p>
+              ? <p className="mt-2 text-xs rounded-lg px-2.5 py-2 bg-sky-500/15 text-sky-200">Vous pouvez projeter : l'administrateur vous a autorisé. Il peut passer par-dessus à tout moment.</p>
+              : <p className="mt-2 text-xs rounded-lg px-2.5 py-2 bg-amber-400/10 text-amber-200">{helperIds.length ? "L'administrateur a autorisé d'autres personnes." : "L'aide n'est pas activée."} Vous pouvez suivre l'écran, mais pas projeter tant que l'administrateur ne vous a pas autorisé.</p>
           )}
 
           {hint && <p className="mt-2 text-xs rounded-lg px-2.5 py-2 bg-amber-400/10 text-amber-200">{hint}</p>}
