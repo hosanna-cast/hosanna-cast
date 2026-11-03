@@ -20,6 +20,7 @@ import { openScreen } from "@/lib/screen";
 import { createClient } from "@/lib/supabase/client";
 import { uuid } from "@/lib/uuid";
 import { tabsFor } from "@/lib/roles";
+import { RichText, toggleRange } from "@/lib/bold";
 import { USFM } from "@/lib/usfmBooks";
 import ONLINE from "@/config/online-versions.json";
 
@@ -72,6 +73,9 @@ export default function Control() {
   const [rPulse, setRPulse] = useState(false);
   const [helperId, setHelperId] = useState(null);        // la personne (Aide écran) autorisée à projeter, une seule
   const [helpBusy, setHelpBusy] = useState(false);
+  const [hint, setHint] = useState(null);                  // petit message (ex. « sélectionne des mots pour le gras »)
+  const selRef = useRef(null);                             // dernière sélection faite dans l'aperçu : { start, end }
+  const previewTxt = useRef(null);                         // le texte affiché dans l'aperçu de l'écran
   // un profil « Aide écran » ne peut projeter que si l'administrateur l'a choisi
   const canProject = church.role !== "assistant" || helperId === church.userId;
   const mine = useRef(null);
@@ -125,7 +129,7 @@ export default function Control() {
       const who = m.by ? { name: m.by.name, device: m.by.device } : null;
       const noted = (what) => { if (who) { setLastBy({ ...who, what }); setRPulse(true); setTimeout(() => setRPulse(false), 700); } };
       if (m.type === "show" || m.type === "update") {
-        setShown({ type: m.type, kind: m.kind, ref: m.ref, text: m.text, version: m.version, next: m.next, mediaType: m.mediaType, url: m.url });
+        setShown({ type: m.type, kind: m.kind, ref: m.ref, text: m.text, version: m.version, bold: m.bold, next: m.next, mediaType: m.mediaType, url: m.url });
         if (m.r) {
           setLive(m.r); setLiveKind("verse");
           if (m.type === "show") setHistory((h) => [m.r, ...h.filter((x) => !(x.b === m.r.b && x.c === m.r.c && x.v === m.r.v && x.vEnd === m.r.vEnd))].slice(0, 15));
@@ -382,6 +386,46 @@ export default function Control() {
     if (v >= 0 && v < vs.length) project({ b: live.b, c: live.c, v, vEnd: null });
   };
 
+  // la sélection faite dans l'aperçu est mémorisée : toucher le bouton « B » ne la perd pas (téléphone)
+  useEffect(() => {
+    const onSel = () => {
+      const sel = document.getSelection();
+      const el = previewTxt.current;
+      if (!sel || !sel.rangeCount || sel.isCollapsed) return;       // sélection vide : on garde la précédente
+      const rg = sel.getRangeAt(0);
+      if (!el || !el.contains(rg.commonAncestorContainer)) { selRef.current = null; return; }
+      const pre = rg.cloneRange();
+      pre.selectNodeContents(el);
+      pre.setEnd(rg.startContainer, rg.startOffset);
+      const start = pre.toString().length;
+      selRef.current = { start, end: start + rg.toString().length };
+    };
+    document.addEventListener("selectionchange", onSel);
+    return () => document.removeEventListener("selectionchange", onSel);
+  }, []);
+  useEffect(() => { selRef.current = null; }, [shown?.ref, shown?.text]);
+  useEffect(() => { if (!hint) return; const t = setTimeout(() => setHint(null), 3500); return () => clearTimeout(t); }, [hint]);
+
+  // gras sur la partie du verset sélectionnée dans l'aperçu (bouton B ou Ctrl+B)
+  const applyBold = () => {
+    if (!canProject) return;
+    if (!shown || shown.kind === "other" || shown.kind === "media") return setHint("Projette d'abord un verset ou un texte.");
+    if (shown.kind === "chant") return setHint("Les chants sont déjà en gras.");
+    const sel = selRef.current;
+    if (!sel) return setHint("Sélectionne des mots dans l'aperçu de l'écran, puis appuie sur B.");
+    let { start, end } = sel;
+    const tx = shown.text || "";
+    while (start < end && /\s/.test(tx[start])) start++;
+    while (end > start && /\s/.test(tx[end - 1])) end--;
+    if (end <= start) return setHint("Sélectionne des mots dans l'aperçu de l'écran, puis appuie sur B.");
+    const msg = { ...shown, type: "update", bold: toggleRange(shown.bold || [], start, end) };
+    ch.current?.postMessage(msg);
+    setShown(msg);
+    setLastBy(null);
+    selRef.current = null;
+    document.getSelection()?.removeAllRanges();
+  };
+
   const onKey = (e) => {
     const t = e.target;
     // on tape dans le formulaire d'une note : les raccourcis ne s'appliquent pas
@@ -392,18 +436,19 @@ export default function Control() {
     // le clavier agit sur une liste déroulante ou un bouton : on le laisse faire (Entrée / Espace / flèches)
     if (t.tagName === "SELECT") return;
     if ((t.tagName === "BUTTON" || t.tagName === "A") && (e.key === "Enter" || e.key === " ")) return;
-    // autres combinaisons (Ctrl+flèche, Alt+…) : ce ne sont pas nos raccourcis, sauf Ctrl+B
-    if ((e.ctrlKey || e.metaKey || e.altKey) && !((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b")) return;
+    // autres combinaisons (Ctrl+flèche, Alt+…) : ce ne sont pas nos raccourcis, sauf Ctrl+N (écran noir) et Ctrl+B (gras)
+    if ((e.ctrlKey || e.metaKey || e.altKey) && !((e.ctrlKey || e.metaKey) && ["b", "n"].includes(e.key.toLowerCase()))) return;
     const inField = t === searchRef.current;
     const k = e.key.toLowerCase();
-    if ((e.ctrlKey || e.metaKey) && k === "b") { e.preventDefault(); toggleBlank(); }
+    if ((e.ctrlKey || e.metaKey) && k === "n") { e.preventDefault(); toggleBlank(); }
+    else if ((e.ctrlKey || e.metaKey) && k === "b") { e.preventDefault(); applyBold(); }
     else if (e.key === "ArrowDown" && results.length) { e.preventDefault(); setSel((s) => Math.min(s + 1, results.length - 1)); }
     else if (e.key === "ArrowUp" && results.length) { e.preventDefault(); setSel((s) => Math.max(s - 1, 0)); }
     else if (e.key === "Enter" && results[sel]) { project(results[sel]); setQ(""); }
     else if (e.key === "Escape") clearScreen();
     else if (!q && e.key === "ArrowRight") step(1);
     else if (!q && e.key === "ArrowLeft") step(-1);
-    else if (!q && !inField && k === "b") toggleBlank();
+    else if (!q && !inField && k === "n") toggleBlank();
   };
 
   // les raccourcis écoutent toute la page (et plus seulement la zone où se trouve le curseur)
@@ -694,7 +739,7 @@ export default function Control() {
                   </>
                 ) : (
                   <>
-                    <p className={`font-serif leading-snug whitespace-pre-line ${shown.kind === "slide" ? "text-center" : ""} ${size}`}>{shown.text}</p>
+                    <p ref={previewTxt} className={`font-serif leading-snug whitespace-pre-line cursor-text ${shown.kind === "slide" ? "text-center" : ""} ${size}`}><RichText text={shown.text} bold={shown.bold} /></p>
                     <div className="mt-2 text-right text-sm">{shown.ref} <span className="text-xs opacity-60">{shown.version}</span></div>
                   </>
                 )}
@@ -715,12 +760,16 @@ export default function Control() {
               : <p className="mt-2 text-xs rounded-lg px-2.5 py-2 bg-amber-400/10 text-amber-200">{helperId ? "Une autre personne aide en ce moment." : "L'aide n'est pas activée."} Vous pouvez suivre l'écran, mais pas projeter tant que l'administrateur ne vous a pas autorisé.</p>
           )}
 
-          <div className="grid grid-cols-4 lg:grid-cols-2 gap-1.5 lg:gap-2 mt-2 lg:mt-3">
-            <button className={btn} disabled={!canStep} onClick={() => step(-1)}>← Préc.</button>
-            <button className={btn} disabled={!canStep} onClick={() => step(1)}>Suiv. →</button>
+          {hint && <p className="mt-2 text-xs rounded-lg px-2.5 py-2 bg-amber-400/10 text-amber-200">{hint}</p>}
+
+          <div className="grid grid-cols-[1.4fr_1.4fr_1fr_0.7fr_1.2fr] lg:grid-cols-6 gap-1.5 lg:gap-2 mt-2 lg:mt-3">
+            <button className={btn + " lg:col-span-3"} disabled={!canStep} onClick={() => step(-1)}>← Préc.</button>
+            <button className={btn + " lg:col-span-3"} disabled={!canStep} onClick={() => step(1)}>Suiv. →</button>
             <button onClick={toggleBlank} disabled={!canProject}
-              className={`rounded-lg py-2 text-sm transition duration-100 active:scale-95 ${blank ? "bg-amber-400 text-black font-medium" : "bg-neutral-800 hover:bg-neutral-700"}`}>Noir</button>
-            <button className={btn} disabled={!shown || !canProject} onClick={clearScreen}>Effacer</button>
+              className={`lg:col-span-2 rounded-lg py-2 text-sm transition duration-100 active:scale-95 ${blank ? "bg-amber-400 text-black font-medium" : "bg-neutral-800 hover:bg-neutral-700"}`}>Noir</button>
+            <button onMouseDown={(e) => e.preventDefault()} onClick={applyBold} disabled={!canProject} title="Gras sur les mots sélectionnés dans l'aperçu (Ctrl+B)" aria-label="Gras"
+              className={btn + " lg:col-span-2 font-bold"}>B</button>
+            <button className={btn + " lg:col-span-2"} disabled={!shown || !canProject} onClick={clearScreen}>Effacer</button>
           </div>
 
           <div className="hidden lg:flex mt-4 flex-col items-center gap-2.5 text-xs xl:text-sm text-neutral-400">
@@ -731,7 +780,8 @@ export default function Control() {
             </div>
             <div className="flex flex-wrap justify-center gap-x-4 gap-y-2">
               <span className="flex items-center gap-1.5"><Kbd>Échap</Kbd> effacer</span>
-              <span className="flex items-center gap-1.5"><Kbd>Ctrl+B</Kbd> écran noir</span>
+              <span className="flex items-center gap-1.5"><Kbd>Ctrl+N</Kbd> écran noir</span>
+              <span className="flex items-center gap-1.5"><Kbd>Ctrl+B</Kbd> gras</span>
             </div>
           </div>
 
