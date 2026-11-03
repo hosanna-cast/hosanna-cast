@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/client";
 import { ROLES, ROLE_IDS } from "@/lib/roles";
 import { openScreen } from "@/lib/screen";
 import Backgrounds, { MAX_BG, DEFAULT_TEXT } from "../control/Backgrounds";
+import DisplaySettings from "../control/DisplaySettings";
+import { DEFAULT_SETTINGS, mergeSettings, loadSettings, saveSettings, loadLogo, saveLogo } from "@/lib/displaySettings";
 
 const card = "rounded-xl bg-neutral-800/60 border border-neutral-700 p-4";
 const field = "rounded-lg bg-neutral-900 border border-neutral-600 px-3 py-2 text-sm outline-none focus:border-amber-400 w-full";
@@ -12,13 +14,18 @@ const select = "rounded-lg bg-neutral-800 border border-neutral-600 px-2 py-1.5 
 export default function AdminPanel({ churchName, churchId, token }) {
   const [members, setMembers] = useState(null);
   const [msg, setMsg] = useState(null);
-  const [section, setSection] = useState("profils");     // section affichée à droite : "profils" | "fond"
+  const [section, setSection] = useState("profils");     // section affichée à droite : "profils" | "fond" | "affichage"
   const db = () => createClient();
 
   // fond de l'écran : 3 maximum, un seul actif ; gardé dans ce navigateur et envoyé à l'écran
   const [bgs, setBgs] = useState(() => Array(MAX_BG).fill(null));
   const [bgActive, setBgActive] = useState(-1);
   const [textColor, setTextColor] = useState(DEFAULT_TEXT);          // couleur du texte projeté
+  // réglages du bandeau / plein écran et logo : gardés dans ce navigateur et envoyés à l'écran
+  const [dset, setDset] = useState(DEFAULT_SETTINGS);
+  const [logo, setLogo] = useState(null);
+  const dsetRef = useRef(DEFAULT_SETTINGS);
+  const logoRef = useRef(null);
   const scr = useRef(null);
   const activeRef = useRef(null);
   const textRef = useRef(DEFAULT_TEXT);
@@ -31,9 +38,15 @@ export default function AdminPanel({ churchName, churchId, token }) {
       textRef.current = saved?.textColor || DEFAULT_TEXT;
       setTextColor(textRef.current);
     } catch {}
+    dsetRef.current = loadSettings(); setDset(dsetRef.current);
+    logoRef.current = loadLogo(); setLogo(logoRef.current);
     scr.current = openScreen(token, (m) => {
-      // l'écran vient de s'ouvrir et demande son fond et la couleur du texte
-      if (m.type === "bg?") scr.current?.postMessage({ type: "bg", bg: activeRef.current, textColor: textRef.current });
+      // l'écran vient de s'ouvrir et demande son fond, la couleur du texte et ses réglages
+      if (m.type === "bg?") {
+        scr.current?.postMessage({ type: "bg", bg: activeRef.current, textColor: textRef.current });
+        scr.current?.postMessage({ type: "settings", settings: dsetRef.current });
+        if (logoRef.current) scr.current?.postMessage({ type: "logo", logo: logoRef.current });
+      }
     });
     return () => scr.current?.close();
   }, [churchId, token]);
@@ -52,6 +65,16 @@ export default function AdminPanel({ churchName, churchId, token }) {
     if (was) sendBg(null);
   };
   const pickText = (c) => { saveBgs(bgs, bgActive, c); sendBg(activeRef.current, c); };
+
+  // réglages d'affichage : enregistrés tout de suite, envoyés à l'écran et aux consoles
+  const changeSettings = (c) => {
+    dsetRef.current = c; setDset(c); saveSettings(c);
+    scr.current?.postMessage({ type: "settings", settings: c });
+  };
+  const changeLogo = (l) => {
+    logoRef.current = l; setLogo(l); saveLogo(l);
+    scr.current?.postMessage({ type: "logo", logo: l });
+  };
 
   // création directe d'un profil (email + mot de passe provisoire)
   const EMPTY = { first: "", last: "", email: "", password: "", role: "standard" };
@@ -147,7 +170,7 @@ export default function AdminPanel({ churchName, churchId, token }) {
         <div className="grid gap-4 md:grid-cols-[200px_minmax(0,1fr)] items-start">
           {/* menu : titres à gauche (onglets en haut sur téléphone) */}
           <nav className="flex md:flex-col gap-1 rounded-xl bg-neutral-800/60 border border-neutral-700 p-2">
-            {[["profils", "Profils"], ["fond", "Fond de l'écran"]].map(([k, l]) => (
+            {[["profils", "Profils"], ["fond", "Fond de l'écran"], ["affichage", "Réglages affichage"]].map(([k, l]) => (
               <button key={k} onClick={() => setSection(k)}
                 className={`flex-1 md:flex-none text-left px-3 py-2 rounded-lg text-sm transition duration-100 active:scale-95 ${section === k ? "bg-amber-400 text-white font-medium" : "text-neutral-300 hover:bg-neutral-700"}`}>{l}</button>
             ))}
@@ -252,6 +275,15 @@ export default function AdminPanel({ churchName, churchId, token }) {
           <p className="text-sm text-neutral-400 mb-3">Image ou couleur. Clique un fond pour l'afficher sur tout l'écran, clique-le encore pour l'enlever. Un écran noir (Ctrl+E) reste noir tant que tu ne le désactives pas.</p>
           <Backgrounds slots={bgs} active={bgActive} onPick={pickBg} onSet={setBgSlot} onRemove={removeBg} textColor={textColor} onText={pickText} />
           <p className="text-xs text-neutral-500 mt-3">Les fonds sont gardés sur cet appareil : fais ce réglage depuis l'ordinateur de la régie.</p>
+        </section>
+          )}
+
+          {section === "affichage" && (
+        <section className={card}>
+          <h2 className="font-medium mb-1">Réglages affichage</h2>
+          <p className="text-sm text-neutral-400 mb-3">Bandeau et plein écran ont chacun leurs réglages. Les changements arrivent tout de suite sur l'écran de projection (<a href={`/display?k=${token}`} target="_blank" className="text-amber-400 hover:underline">ouvrir l'écran</a>) et dans l'aperçu de la console.</p>
+          <DisplaySettings standalone settings={dset} logo={logo} onSettings={changeSettings} onLogo={changeLogo} />
+          <p className="text-xs text-neutral-500 mt-4">Les réglages sont gardés sur cet appareil : fais-les depuis l'ordinateur de la régie.</p>
         </section>
           )}
           </div>
