@@ -296,10 +296,17 @@ export default function Control() {
     ch.current?.postMessage(msg);
     flash();
   };
-  // garde une phrase dans la note ouverte (et la projette tout de suite si demandé)
+  // note qui reçoit les points clés : la note ouverte, sinon celle du jour (créée au premier point clé)
+  const keyTitle = `Points clés du ${new Date().toLocaleDateString("fr-FR")}`;
+  const keyNote = library.lib.notes.find((x) => x.id === noteId) || library.lib.notes.find((x) => x.title === keyTitle) || null;
+  // garde une phrase dans la note (et la projette tout de suite si demandé)
   const keepKey = (text, andProject) => {
-    const note = library.lib.notes.find((x) => x.id === noteId);
-    if (!note) return;
+    const note = keyNote;
+    if (!note) {
+      const id = library.add("notes", { title: keyTitle, person: "", session: `Culte du ${new Date().toLocaleDateString("fr-FR")}`, text: "", keys: [text] });
+      if (andProject) projectKey({ id, title: keyTitle, keys: [text] }, 0, text);
+      return;
+    }
     const keys = [...(note.keys || []), text];
     library.update("notes", note.id, { keys });
     if (andProject) projectKey(note, keys.length - 1, text);
@@ -307,14 +314,14 @@ export default function Control() {
 
   // modifier une phrase clé : si elle est à l'écran, l'écran se met à jour
   const editKey = (k, text) => {
-    const note = library.lib.notes.find((x) => x.id === noteId);
+    const note = keyNote;
     if (!note || (note.keys || [])[k] === undefined) return;
     library.update("notes", note.id, { keys: note.keys.map((x, j) => (j === k ? text : x)) });
     if (liveKind === "slide" && slideLive?.kind === "notes" && slideLive.id === note.id && slideLive.key === k) projectKey(note, k, text);
   };
   // supprimer une phrase clé : les numéros des suivantes reculent d'un cran (on garde la bonne en surbrillance)
   const deleteKey = (k) => {
-    const note = library.lib.notes.find((x) => x.id === noteId);
+    const note = keyNote;
     if (!note) return;
     library.update("notes", note.id, { keys: (note.keys || []).filter((_, j) => j !== k) });
     if (slideLive?.kind === "notes" && slideLive.id === note.id && slideLive.key !== undefined) {
@@ -676,11 +683,12 @@ export default function Control() {
           </div>
           {tab === "notes" && ["admin", "assistant"].includes(church.role) && (
             <KeyPoint
-              note={library.lib.notes.find((x) => x.id === noteId) || null}
-              liveKey={liveKind === "slide" && slideLive?.kind === "notes" && slideLive.key !== undefined && slideLive.id === noteId ? slideLive.key : null}
+              note={keyNote}
+              autoTitle={keyTitle}
+              liveKey={liveKind === "slide" && slideLive?.kind === "notes" && slideLive.key !== undefined && slideLive.id === keyNote?.id ? slideLive.key : null}
               canProject={canProject}
               onKeepProject={(t) => keepKey(t, true)}
-              onProjectKey={(k) => { const n = library.lib.notes.find((x) => x.id === noteId); if (n) projectKey(n, k); }}
+              onProjectKey={(k) => keyNote && projectKey(keyNote, k)}
               onEdit={editKey}
               onDelete={deleteKey}
             />
