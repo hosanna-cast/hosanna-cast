@@ -12,6 +12,12 @@ const COPY = {
   notes: { list: "Mes notes", search: "Chercher une note", empty: "Aucune note pour l'instant.", person: "Orateur (facultatif)", add: "Ajouter une note", paste: "Ou colle le texte de la prédication ici…" },
   chants: { list: "Mes chants", search: "Chercher un chant", empty: "Aucun chant pour l'instant.", person: "Auteur (facultatif)", add: "Ajouter un chant", paste: "Ou colle les paroles ici. Laisse une ligne vide entre les couplets…" },
 };
+const Pencil = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3z" /><path d="M13.5 6.5l3 3" /></svg>
+);
+const Trash = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 7h16" /><path d="M10 11v6M14 11v6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12" /><path d="M9 7V4h6v3" /></svg>
+);
 const field = "w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-amber-400";
 
 export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUpdate, onPick, selectedId, bible, refOf, textOf, isLiveVerse, liveSlide, pausedSlide, onSlide, onVerse, playlists, onKeyPhrase, onOpen, hideKeys, canAnalyze }) {
@@ -19,7 +25,8 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
   const [openId, setOpenId] = useState(null);
   const [adding, setAdding] = useState(false);
   const [q, setQ] = useState("");
-  const [f, setF] = useState({ title: "", person: "", session: "", text: "", manual: false, keys: [] });
+  const [f, setF] = useState({ title: "", person: "", session: "", text: "", manual: false, keys: [], fromFile: false });
+  const autoRef = useRef(null);                    // note qui vient d'être importée sans gras : on lance l'analyse tout de suite
   const [showText, setShowText] = useState(false);   // notes : le texte complet est caché, on ne montre que versets et points clés
   const openIdRef = useRef(null);
   const [ana, setAna] = useState(null);                // analyse IA : { status, msg, points, sel }
@@ -70,7 +77,7 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
   }, [liveSlide]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const startAdd = () => {
-    setF({ title: "", person: "", session: kind === "notes" ? items[0]?.session || `Culte du ${new Date().toLocaleDateString("fr-FR")}` : "", text: "", manual: false, keys: [] });
+    setF({ title: "", person: "", session: kind === "notes" ? items[0]?.session || `Culte du ${new Date().toLocaleDateString("fr-FR")}` : "", text: "", manual: false, keys: [], fromFile: false });
     setCutLines(null);
     setError("");
     setAdding(true);
@@ -83,7 +90,7 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
     setBusy(true);
     try {
       const { text, keys } = kind === "notes" ? await readNoteFile(file) : { text: await readTextFile(file, kind), keys: [] };
-      setF((cur) => ({ ...cur, text, keys, title: cur.title || file.name.replace(/\.[^.]+$/, "") }));
+      setF((cur) => ({ ...cur, text, keys, fromFile: kind === "notes", title: cur.title || file.name.replace(/\.[^.]+$/, "") }));
       setError("");
     } catch (err) {
       setError(err.message || "Impossible de lire ce fichier.");
@@ -96,7 +103,11 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
     const title = f.title.trim() || text.split("\n")[0].slice(0, 60);
     const id = onAdd({ title, person: f.person.trim(), session: kind === "notes" ? f.session.trim() : "", text, ...(kind === "notes" && f.keys?.length ? { keys: f.keys } : {}), ...(kind === "chants" ? { slides: splitSlides(text, f.manual ? Infinity : undefined) } : {}) });
     setAdding(false);
-    if (kind === "chants") onPick?.(id); else setOpenId(id);
+    if (kind === "chants") onPick?.(id);
+    else {
+      setOpenId(id);
+      if (canAnalyze && !f.keys?.length && text.length >= 40) autoRef.current = id;   // pas de gras : on propose des points clés
+    }
   };
 
   // analyse IA d'une note : propose des points clés, l'équipe coche ceux à garder
@@ -120,6 +131,12 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
     onUpdate(open.id, { keys: [...(open.keys || []), ...ana.sel.slice().sort((a, b) => a - b).map((i) => ana.points[i])] });
     setAna(null);
   };
+
+  useEffect(() => { if (open && autoRef.current === open.id) { autoRef.current = null; analyze(); } }, [open?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // crayon / poubelle dans la liste des notes
+  const editItem = (x) => { setF({ title: x.title, person: x.person || "", session: x.session || "", text: x.text || "", manual: false, keys: [], fromFile: false }); setError(""); setOpenId(x.id); setEditing(true); };
+  const deleteItem = (x) => { if (window.confirm(`Supprimer « ${x.title} » ?`)) { onRemove(x.id); if (openId === x.id) setOpenId(null); } };
 
   /* ───── formulaire d'ajout ───── */
   if (adding && cutLines) {
@@ -152,6 +169,7 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
           {busy ? "Lecture du fichier…" : "Choisir un fichier .txt, .md ou .docx"}
           <input type="file" accept=".txt,.md,.docx" onChange={onFile} className="hidden" />
         </label>
+        {kind === "notes" && f.fromFile && !f.keys?.length && f.text.trim() && <p className="text-xs text-amber-300">Aucun texte en gras trouvé dans ce fichier.{canAnalyze ? " Après l'ajout, la note sera analysée pour te proposer des points clés." : ""}</p>}
         {kind === "notes" && f.keys?.length > 0 && <p className="text-xs text-sky-300">{f.keys.length} point{f.keys.length > 1 ? "s" : ""} clé{f.keys.length > 1 ? "s" : ""} repéré{f.keys.length > 1 ? "s" : ""} en gras : {f.keys.length > 1 ? "ils seront gardés" : "il sera gardé"} dans la note.</p>}
         <textarea value={f.text} onChange={(e) => setF({ ...f, text: e.target.value })} rows={7} placeholder={t.paste} className={`${field} resize-y`} />
         {kind === "chants" && (
@@ -173,8 +191,8 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
   if (open && editing) {
     const save = () => {
       const text = f.text.trim();
-      if (!text) { setError("Le texte ne peut pas être vide."); return; }
-      onUpdate(open.id, { title: f.title.trim() || text.split("\n")[0].slice(0, 60), person: f.person.trim(), session: kind === "notes" ? f.session.trim() : "", text });
+      if (!text && !(open.keys || []).length) { setError("Le texte ne peut pas être vide."); return; }
+      onUpdate(open.id, { title: f.title.trim() || text.split("\n")[0].slice(0, 60) || open.title, person: f.person.trim(), session: kind === "notes" ? f.session.trim() : "", text });
       setEditing(false);
     };
     return (
@@ -333,7 +351,14 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
               <li key={i} id={`s-${open.id}-${i}`} onClick={() => onSlide(open, i, slides)} title={s}
                 className={`flex gap-2 px-2.5 py-2 rounded-lg cursor-pointer select-none text-sm leading-snug transition duration-100 active:scale-[0.98] ${isChant ? "border " + (live ? "border-green-600 " : "border-neutral-700 ") : ""}${live ? "bg-green-600 text-white" : "text-neutral-300 hover:bg-neutral-700"}`}>
                 <b className={`font-medium min-w-4 ${live ? "text-green-100" : "text-neutral-500"}`}>{i + 1}</b>
-                <span className={isChant ? "whitespace-pre-line text-center flex-1 font-medium" : "line-clamp-2 whitespace-pre-line"}>{s}</span>
+                <span className={isChant ? "whitespace-pre-line text-center flex-1 font-medium" : "line-clamp-2 whitespace-pre-line flex-1"}>{s}</span>
+                {kind === "notes" && canAnalyze && (
+                  <button title="Garder ce passage comme point clé"
+                    onClick={(e) => { e.stopPropagation(); if (!(open.keys || []).includes(s)) onUpdate(open.id, { keys: [...(open.keys || []), s] }); }}
+                    className={`shrink-0 self-start text-[11px] px-1.5 py-0.5 rounded border ${live ? "border-green-200 text-green-100" : "border-sky-400/50 text-sky-300 hover:bg-sky-400/10"}`}>
+                    {(open.keys || []).includes(s) ? "✓ clé" : "+ clé"}
+                  </button>
+                )}
               </li>
             );
           })}
@@ -362,8 +387,20 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
         groups.map(([g, list]) => (
           <div key={g || "all"}>
             {g && <div className="text-[11px] text-neutral-500 mt-3 mb-1.5">{g}</div>}
-            {list.map((x) => (
-              <button key={x.id} onClick={() => (kind === "chants" ? onPick?.(x.id) : setOpenId(x.id))}
+            {list.map((x) => kind === "notes" ? (
+              <div key={x.id} className="flex items-stretch gap-1 mb-1">
+                <button onClick={() => setOpenId(x.id)}
+                  className="flex-1 min-w-0 text-left px-3 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 transition duration-100 active:scale-[0.98]">
+                  <span className="block text-sm font-medium truncate">{x.title}</span>
+                  {x.person && <span className="block text-xs truncate text-neutral-500">{x.person}</span>}
+                </button>
+                <button aria-label="Modifier la note" title="Modifier" onClick={() => editItem(x)}
+                  className="px-2 rounded-lg bg-neutral-800 text-neutral-400 hover:text-white hover:bg-neutral-700 transition duration-100 active:scale-90"><Pencil /></button>
+                <button aria-label="Supprimer la note" title="Supprimer" onClick={() => deleteItem(x)}
+                  className="px-2 rounded-lg bg-neutral-800 text-neutral-400 hover:text-red-400 hover:bg-neutral-700 transition duration-100 active:scale-90"><Trash /></button>
+              </div>
+            ) : (
+              <button key={x.id} onClick={() => onPick?.(x.id)}
                 className={`block w-full text-left px-3 py-2 rounded-lg mb-1 transition duration-100 active:scale-[0.98] ${selectedId === x.id ? "bg-amber-400 text-black" : "bg-neutral-800 hover:bg-neutral-700"}`}>
                 <span className="block text-sm font-medium truncate">{x.title}</span>
                 {x.person && <span className={`block text-xs truncate ${selectedId === x.id ? "text-black/60" : "text-neutral-500"}`}>{x.person}</span>}
