@@ -658,7 +658,7 @@ export default function Control() {
 
         {/* ───── centre : texte rapide (toujours en haut) puis contenu de l'onglet ───── */}
         <div className="order-2 min-w-0 space-y-3">
-          {church.role !== "annonces" && (
+          {church.role !== "annonces" && church.role !== "orateur" && (   // pas de texte rapide pour l'orateur
           <QuickText
             onProject={projectFree}
             disabled={!canProject}
