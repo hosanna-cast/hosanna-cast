@@ -6,9 +6,9 @@ import { normalizeRole } from "@/lib/roles";
 
 // `roles` : profils qui voient la carte. `row` : "top" = grande rangée en haut (pleine largeur), "bottom" = rangée du dessous.
 const cards = [
-  { href: "/control", title: "Console", desc: "Bible, notes et chants : pilotez la projection (connexion requise).", row: "top", roles: ["admin", "assistant"] },
+  { href: "/control", title: "Console", desc: "Bible, notes et chants : pilotez la projection (connexion requise).", row: "top", roles: ["admin", "assistant", "orateur"] },
   { href: "/admin", title: "Administration", desc: "Équipe, profils et invitations.", row: "top", roles: ["admin"] },
-  { href: "/control?tab=notes", title: "Notes", desc: "Ouvrir vos notes de prédication (.docx).", row: "bottom", roles: ["admin", "assistant"] },
+  { href: "/control?tab=notes", title: "Notes", desc: "Ouvrir vos notes de prédication (.docx).", row: "bottom", roles: ["admin", "assistant", "orateur"] },
   { href: "/control?tab=chants", title: "Chants", desc: "Parcourir et projeter les paroles de chants.", row: "bottom", roles: ["admin", "assistant", "standard"] },
   { href: "/control?tab=annonces", title: "Annonces", desc: "Photos et vidéos à projeter : régulières, temps spéciaux, ponctuelles.", row: "bottom", roles: ["admin", "assistant", "annonces"] },
 ];
