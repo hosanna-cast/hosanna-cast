@@ -3,7 +3,7 @@ import { useState } from "react";
 
 // Point clé : l'orateur dit une phrase importante, l'admin ou l'aide écran la tape ici.
 // Un seul bouton : « Projeter et garder » → la phrase est projetée et gardée dans la note ouverte.
-// Les phrases gardées sont listées dessous : clic = reprojeter, crayon = modifier, poubelle = supprimer.
+// Les points gardés sont listés dessous : clic = reprojeter, crayon = modifier, poubelle = supprimer.
 // Différent du « Texte rapide » (texte libre, jamais gardé).
 const Pencil = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3z" /><path d="M13.5 6.5l3 3" /></svg>
@@ -17,7 +17,7 @@ export default function KeyPoint({ note, autoTitle, liveKey, canProject, onKeepP
   const [editing, setEditing] = useState(null);   // index de la phrase en cours de modification
   const [draft, setDraft] = useState("");
   const t = text.trim();
-  const keys = note?.keys || [];
+  const keys = note?.points || [];
   const go = () => { if (!t || !canProject) return; onKeepProject(t); setText(""); };
   const startEdit = (k) => { setEditing(k); setDraft(keys[k]); };
   const saveEdit = () => { const d = draft.trim(); if (d) onEdit(editing, d); setEditing(null); };
