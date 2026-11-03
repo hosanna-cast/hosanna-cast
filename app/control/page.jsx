@@ -14,6 +14,8 @@ import UserMenu from "./UserMenu";
 import HelpControl from "./HelpControl";
 import AnnoncesPanel from "./AnnoncesPanel";
 import AnnonceStage from "./AnnonceStage";
+import DisplaySettings from "./DisplaySettings";
+import { DEFAULT_SETTINGS, mergeSettings, loadSettings, saveSettings, loadLogo, saveLogo } from "@/lib/displaySettings";
 import { usePlaylists } from "@/lib/playlists";
 import { useAnnouncements } from "@/lib/announcements";
 import { openScreen } from "@/lib/screen";
@@ -67,6 +69,8 @@ export default function Control() {
   const [shown, setShown] = useState(null);               // exactement ce qui est envoyé à l'écran
   const [blank, setBlank] = useState(false);
   const [layout, setLayout] = useState("full");            // « full » = plein écran, « band » = bandeau en bas (temps de prière, direct)
+  const [dset, setDset] = useState(DEFAULT_SETTINGS);                 // réglages de l'écran (bandeau / plein écran)
+  const [logo, setLogo] = useState(null);                              // logo PNG de l'écran
   const [history, setHistory] = useState([]);
   const [screenBg, setScreenBg] = useState(null);                       // fond réellement affiché à l'écran
   const [screenText, setScreenText] = useState(null);                   // couleur du texte à l'écran (null = blanc)
@@ -96,7 +100,7 @@ export default function Control() {
     if (window.matchMedia("(min-width: 1024px)").matches) searchRef.current?.focus();
   }, [tab]);
 
-  stateRef.current = { shown, live, slideLive, liveKind, blank, screenBg, screenText, mediaLive, layout };
+  stateRef.current = { shown, live, slideLive, liveKind, blank, screenBg, screenText, mediaLive, layout, dset, logo };
 
   // Plusieurs personnes peuvent piloter le même écran : chaque console reçoit ce que les autres projettent,
   // donc tout le monde voit la même chose à l'écran et ← → repartent du bon endroit.
@@ -122,12 +126,16 @@ export default function Control() {
     const onRemote = (m) => {
       if (m.type === "helper") { if (m.by?.role === "admin") setHelperIds(m.ids || (m.id ? [m.id] : [])); return; }
       if (m.type === "bg") { setScreenBg(m.bg || null); setScreenText(m.textColor || null); return; }
+      if (m.type === "settings") { const c = mergeSettings(m.settings); setDset(c); saveSettings(c); return; }
+      if (m.type === "logo") { setLogo(m.logo || null); saveLogo(m.logo || null); return; }
       // l'écran vient de s'ouvrir : on lui renvoie son fond
       if (m.type === "mediaStatus") { setMediaStatus(m.status); return; }
       if (m.type === "speaker?") { const st = stateRef.current; if (st.shown || st.blank) ch.current?.postMessage({ type: "speakerState", shown: st.shown, blank: st.blank }); return; }
       if (m.type === "bg?") {
-        const { screenBg: b, screenText: t, layout: l } = stateRef.current;
+        const { screenBg: b, screenText: t, layout: l, dset: ds, logo: lg } = stateRef.current;
         if (b || t) ch.current?.postMessage({ type: "bg", bg: b, textColor: t });
+        ch.current?.postMessage({ type: "settings", settings: ds });
+        if (lg) ch.current?.postMessage({ type: "logo", logo: lg });
         if (l && l !== "full") ch.current?.postMessage({ type: "layout", mode: l });
         return;
       }
@@ -166,6 +174,18 @@ export default function Control() {
     });
     return () => ch.current.close();
   }, [church.token]);
+  // réglages gardés sur cet appareil, puis renvoyés à l'écran dès qu'il demande (bg?) ou qu'on les change
+  useEffect(() => { setDset(loadSettings()); setLogo(loadLogo()); }, []);
+  const changeSettings = (c) => {
+    if (!canProject) return;
+    setDset(c); saveSettings(c);
+    ch.current?.postMessage({ type: "settings", settings: c });
+  };
+  const changeLogo = (l) => {
+    if (!canProject) return;
+    setLogo(l); saveLogo(l);
+    ch.current?.postMessage({ type: "logo", logo: l });
+  };
   const screenUrl = () => `${location.origin}/display?k=${church.token}`;
   const copyObs = () => navigator.clipboard?.writeText(`${screenUrl()}&transparent=1`).then(() => { setCopiedObs(true); setTimeout(() => setCopiedObs(false), 1500); });
   const copyScreen = () => navigator.clipboard?.writeText(screenUrl()).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); });
@@ -510,6 +530,8 @@ export default function Control() {
   }, []);
 
   const btn = "rounded-lg bg-neutral-800 hover:bg-neutral-700 py-2 text-sm transition duration-100 active:scale-95 disabled:opacity-40 disabled:pointer-events-none";
+  const PB = dset.band, PF = dset.full;                  // l'aperçu suit les mêmes réglages que l'écran
+  const bandPreview = layout === "band" && shown && shown.kind !== "media";
   const size = shown ? (shown.text.length < 110 ? "text-sm sm:text-lg" : shown.text.length < 220 ? "text-xs sm:text-base" : "text-xs sm:text-sm") : "";
   const chapters = nav.b !== null ? bible?.[nav.b] : null;
 
@@ -772,16 +794,39 @@ export default function Control() {
 
         {/* ───── droite : l'écran (en premier sur mobile) ───── */}
         <aside className="order-1 lg:order-3 lg:sticky lg:top-6">
-          <div className={`relative h-28 sm:h-auto sm:aspect-video rounded-xl bg-black border transition-all duration-300 ${pulse ? "border-green-400 shadow-[0_0_0_3px_rgba(74,222,128,0.35)]" : rPulse ? "border-sky-400 shadow-[0_0_0_3px_rgba(56,189,248,0.4)]" : "border-neutral-700"}`} style={{ ...bgStyle(blank ? null : screenBg), color: screenText || undefined }}>
+          <div className={`relative h-28 sm:h-auto sm:aspect-video rounded-xl bg-black border transition-all duration-300 ${pulse ? "border-green-400 shadow-[0_0_0_3px_rgba(74,222,128,0.35)]" : rPulse ? "border-sky-400 shadow-[0_0_0_3px_rgba(56,189,248,0.4)]" : "border-neutral-700"}`} style={{ ...bgStyle(blank ? null : screenBg), color: screenText || undefined, containerType: "size" }}>
             <span className={`hidden sm:block absolute top-2 left-3 text-xs ${blank ? "text-neutral-400" : shown ? "text-green-400" : "text-neutral-500"}`}>
               {blank ? "● Écran noir" : shown ? "● À l'écran" : "○ Rien à l'écran"}
             </span>
             {shown && shown.kind === "other" && !blank && (
               <div className="absolute inset-0 flex items-center justify-center px-4 text-center text-xs sm:text-sm text-neutral-400">Un autre opérateur utilise l'écran</div>
             )}
-            {shown && shown.kind !== "other" && !blank && (
-              <div className="absolute inset-0 flex flex-col px-3 sm:px-5 pt-2 sm:pt-8 pb-2 sm:pb-3 overflow-y-auto">
-                <div className={layout === "band" && shown.kind !== "media" ? "mt-auto rounded-md bg-black/80 border border-neutral-600 px-2 py-1.5" : "my-auto"}>
+            {shown && shown.kind !== "other" && !blank && bandPreview && (
+              <div className="absolute inset-0 flex flex-col justify-end" style={{ padding: "4cqh 6cqw" }}>
+                <div className={`flex mb-[1cqh] ${logo && PB.logoOn && PB.logoSide === "right" ? "justify-start" : "justify-end"}`}>
+                  <span className="rounded px-1.5 py-0.5 text-[10px] sm:text-xs bg-black/80 border border-neutral-600">{shown.ref} <span className="opacity-60">{shown.version}</span></span>
+                </div>
+                <div className={`relative flex items-stretch gap-[2cqw] rounded-md bg-black/80 border border-neutral-600 px-[2.5cqw] ${PB.logoSide === "left" ? "flex-row-reverse" : ""}`} style={{ height: `${PB.height}cqh` }}>
+                  {logo && PB.logoOn && (
+                    <img src={logo} alt="" draggable={false} className="shrink-0 w-auto object-contain self-start pointer-events-none select-none" style={{ height: `${PB.logoSize}cqh`, marginTop: `${-PB.logoRise}cqh` }} />
+                  )}
+                  <div className="flex-1 min-w-0 h-full overflow-hidden flex items-center">
+                    <p ref={shown.kind === "chant" ? undefined : previewTxt}
+                       className={`w-full leading-tight whitespace-pre-line ${shown.kind === "chant" ? "font-sans font-bold text-center" : `font-serif cursor-text ${shown.kind === "slide" ? "text-center" : ""}`}`}
+                       style={{ fontSize: "clamp(9px, 4.6cqh, 20px)" }}>
+                      {shown.kind === "chant" ? shown.text : <RichText text={shown.text} bold={shown.bold} under={shown.under} />}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+            {shown && shown.kind !== "other" && !blank && !bandPreview && (
+              <div className={`absolute inset-0 flex flex-col overflow-y-auto ${shown.kind === "media" ? "justify-center" : { top: "justify-start", center: "justify-center", bottom: "justify-end" }[PF.valign]}`}
+                   style={{ padding: `max(${PF.padTop}cqh, 1.4rem) ${PF.padX}cqw ${PF.padBottom}cqh` }}>
+                {logo && PF.logoOn && shown.kind !== "media" && (
+                  <img src={logo} alt="" draggable={false} className="absolute w-auto object-contain pointer-events-none select-none" style={{ top: "2cqh", right: "2cqw", height: `${PF.logoSize}cqh` }} />
+                )}
+                <div className="w-full">
                 {shown.kind === "media" ? (
                   <div className="flex flex-col items-center gap-1">
                     {shown.mediaType === "image" ? <img src={shown.url} alt="" className="max-h-20 sm:max-h-40 object-contain rounded" /> : <span className="text-3xl">🎬</span>}
@@ -834,6 +879,8 @@ export default function Control() {
                 className={`rounded-md py-1.5 text-sm transition duration-100 active:scale-95 disabled:opacity-40 disabled:pointer-events-none ${layout === k ? "bg-amber-400 text-black font-medium" : "text-neutral-300 hover:bg-neutral-700"}`}>{l}</button>
             ))}
           </div>
+
+          <DisplaySettings settings={dset} logo={logo} onSettings={changeSettings} onLogo={changeLogo} disabled={!canProject} />
 
           <div className="hidden lg:flex mt-4 flex-col items-center gap-2.5 text-xs xl:text-sm text-neutral-400">
             <div className="flex flex-wrap justify-center gap-x-4 gap-y-2">
