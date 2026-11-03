@@ -617,6 +617,7 @@ export default function Control() {
                 onVerse={projectFirst}
                 onKeyPhrase={projectKey}
                 hideKeys={["admin", "assistant"].includes(church.role)}
+                canAnalyze={["admin", "assistant"].includes(church.role)}
                 onOpen={setNoteId}
               />
             ) : !bible ? (
