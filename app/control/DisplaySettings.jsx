@@ -21,8 +21,22 @@ const Seg = ({ options, value, onChange, disabled, label }) => (
   </div>
 );
 
+// Dans l'Administration : le panneau est toujours ouvert. Ailleurs : ligne repliable.
+function Wrap({ standalone, children }) {
+  if (standalone) return <div>{children}</div>;
+  return (
+    <details className="mt-2 lg:mt-3 rounded-lg bg-neutral-800 group">
+      <summary className="cursor-pointer select-none list-none px-3 py-2 text-sm flex items-center justify-between text-neutral-200">
+        <span>Réglages de l'écran</span>
+        <span className="text-neutral-500 text-xs group-open:rotate-180 transition-transform">▾</span>
+      </summary>
+      {children}
+    </details>
+  );
+}
+
 // Panneau « Réglages de l'écran » : valeurs séparées pour le bandeau et le plein écran, logo PNG, réinitialisation.
-export default function DisplaySettings({ settings, logo, onSettings, onLogo, disabled }) {
+export default function DisplaySettings({ settings, logo, onSettings, onLogo, disabled, standalone = false }) {
   const [mode, setMode] = useState("band");
   const [err, setErr] = useState("");
   const file = useRef(null);
@@ -40,12 +54,8 @@ export default function DisplaySettings({ settings, logo, onSettings, onLogo, di
   };
 
   return (
-    <details className="mt-2 lg:mt-3 rounded-lg bg-neutral-800 group">
-      <summary className="cursor-pointer select-none list-none px-3 py-2 text-sm flex items-center justify-between text-neutral-200">
-        <span>Réglages de l'écran</span>
-        <span className="text-neutral-500 text-xs group-open:rotate-180 transition-transform">▾</span>
-      </summary>
-      <div className="px-3 pb-3 space-y-3">
+    <Wrap standalone={standalone}>
+      <div className={standalone ? "space-y-3 max-w-md" : "px-3 pb-3 space-y-3"}>
         <Seg label="Réglages pour" value={mode} onChange={setMode} options={[["band", "Bandeau"], ["full", "Plein écran"]]} />
 
         {mode === "band" ? (
@@ -99,6 +109,6 @@ export default function DisplaySettings({ settings, logo, onSettings, onLogo, di
         <button type="button" disabled={disabled} onClick={() => onSettings(mergeSettings(DEFAULT_SETTINGS))}
           className="w-full rounded-md bg-neutral-700 hover:bg-neutral-600 py-1.5 text-xs disabled:opacity-40">Réinitialiser les réglages</button>
       </div>
-    </details>
+    </Wrap>
   );
 }
