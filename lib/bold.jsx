@@ -26,16 +26,21 @@ export function toggleRange(ranges, s, e) {
   return mergeRanges([...r, [s, e]]);
 }
 
-export function RichText({ text, bold }) {
-  if (!bold?.length) return text;
-  const r = mergeRanges(bold).map(([a, b]) => [Math.max(0, a), Math.min(text.length, b)]).filter(([a, b]) => b > a);
+// gras et/ou souligné : les deux listes de plages peuvent se chevaucher
+export function RichText({ text, bold, under }) {
+  const b = mergeRanges(bold);
+  const u = mergeRanges(under);
+  if (!b.length && !u.length) return text;
+  const inR = (r, p) => r.some(([x, y]) => p >= x && p < y);
+  const pts = [...new Set([0, text.length, ...b.flat(), ...u.flat()])].filter((p) => p >= 0 && p <= text.length).sort((x, y) => x - y);
   const out = [];
-  let i = 0;
-  r.forEach(([a, b], k) => {
-    if (a > i) out.push(text.slice(i, a));
-    out.push(<strong key={k} className="font-bold">{text.slice(a, b)}</strong>);
-    i = b;
-  });
-  if (i < text.length) out.push(text.slice(i));
+  for (let k = 0; k < pts.length - 1; k++) {
+    const part = text.slice(pts[k], pts[k + 1]);
+    const isB = inR(b, pts[k]);
+    const isU = inR(u, pts[k]);
+    out.push(isB || isU
+      ? <span key={k} className={`${isB ? "font-bold" : ""} ${isU ? "underline underline-offset-[0.12em] decoration-[0.06em]" : ""}`}>{part}</span>
+      : part);
+  }
   return <>{out}</>;
 }
