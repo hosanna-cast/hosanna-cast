@@ -14,7 +14,7 @@ const COPY = {
 };
 const field = "w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-amber-400";
 
-export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUpdate, onPick, selectedId, bible, refOf, textOf, isLiveVerse, liveSlide, pausedSlide, onSlide, onVerse, playlists, onKeyPhrase, onOpen }) {
+export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUpdate, onPick, selectedId, bible, refOf, textOf, isLiveVerse, liveSlide, pausedSlide, onSlide, onVerse, playlists, onKeyPhrase, onOpen, hideKeys }) {
   const t = COPY[kind];
   const [openId, setOpenId] = useState(null);
   const [adding, setAdding] = useState(false);
@@ -225,11 +225,11 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
           ) : null}
         </div>
 
-        {kind === "notes" && (
+        {kind === "notes" && !hideKeys && (
           <div className="mb-3">
             <div className="text-xs text-neutral-500 mb-1.5">Phrases clés</div>
             {!(open.keys || []).length ? (
-              <p className="text-xs text-neutral-500">Aucune pour l'instant. L'orateur dit une phrase importante ? Tape-la dans « Texte rapide » en haut, puis « Projeter et garder » : elle reste ici pour la reprojeter quand il y revient.</p>
+              <p className="text-xs text-neutral-500">Aucune pour l'instant. L'orateur dit une phrase importante ? Elle sera gardée ici pour la reprojeter quand il y revient.</p>
             ) : (
               <ul className="space-y-1">
                 {open.keys.map((s, k) => {
