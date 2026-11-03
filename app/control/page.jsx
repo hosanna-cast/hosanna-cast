@@ -8,7 +8,6 @@ import LibraryPanel from "./LibraryPanel";
 import ChantStage from "./ChantStage";
 import ChapterView from "./ChapterView";
 import QuickText from "./QuickText";
-import KeyPoint from "./KeyPoint";
 import { bgStyle } from "./Backgrounds";
 import { useChurch } from "@/lib/church";
 import UserMenu from "./UserMenu";
@@ -35,6 +34,7 @@ const Kbd = ({ children }) => (
 export default function Control() {
   const church = useChurch();
   const [copied, setCopied] = useState(false);
+  const [copiedObs, setCopiedObs] = useState(false);
   const [versions, setVersions] = useState([{ id: "lsg", label: "LSG", full: "Louis Segond 1910" }]);
   const [version, setVersion] = useState("lsg");
   const online = !!versions.find((v) => v.id === version)?.online;   // version servie par l'API YouVersion
@@ -66,6 +66,7 @@ export default function Control() {
   const [liveKind, setLiveKind] = useState("verse");      // "verse" | "slide" : ce que ← → font avancer
   const [shown, setShown] = useState(null);               // exactement ce qui est envoyé à l'écran
   const [blank, setBlank] = useState(false);
+  const [layout, setLayout] = useState("full");            // « full » = plein écran, « band » = bandeau en bas (temps de prière, direct)
   const [history, setHistory] = useState([]);
   const [screenBg, setScreenBg] = useState(null);                       // fond réellement affiché à l'écran
   const [screenText, setScreenText] = useState(null);                   // couleur du texte à l'écran (null = blanc)
@@ -95,7 +96,7 @@ export default function Control() {
     if (window.matchMedia("(min-width: 1024px)").matches) searchRef.current?.focus();
   }, [tab]);
 
-  stateRef.current = { shown, live, slideLive, liveKind, blank, screenBg, screenText, mediaLive };
+  stateRef.current = { shown, live, slideLive, liveKind, blank, screenBg, screenText, mediaLive, layout };
 
   // Plusieurs personnes peuvent piloter le même écran : chaque console reçoit ce que les autres projettent,
   // donc tout le monde voit la même chose à l'écran et ← → repartent du bon endroit.
@@ -110,6 +111,7 @@ export default function Control() {
       setSlideLive(m.s || null);
       if (m.liveKind) setLiveKind(m.liveKind);
       if (m.blank !== undefined) setBlank(m.blank);
+      if (m.layout) setLayout(m.layout);
       setMediaLive(m.media || null);
     };
     // profils « Chants » et « Annonces » : ils ne voient que leur propre contenu (chants / annonces), le reste s'affiche « écran utilisé »
@@ -123,7 +125,13 @@ export default function Control() {
       // l'écran vient de s'ouvrir : on lui renvoie son fond
       if (m.type === "mediaStatus") { setMediaStatus(m.status); return; }
       if (m.type === "speaker?") { const st = stateRef.current; if (st.shown || st.blank) ch.current?.postMessage({ type: "speakerState", shown: st.shown, blank: st.blank }); return; }
-      if (m.type === "bg?") { const { screenBg: b, screenText: t } = stateRef.current; if (b || t) ch.current?.postMessage({ type: "bg", bg: b, textColor: t }); return; }
+      if (m.type === "bg?") {
+        const { screenBg: b, screenText: t, layout: l } = stateRef.current;
+        if (b || t) ch.current?.postMessage({ type: "bg", bg: b, textColor: t });
+        if (l && l !== "full") ch.current?.postMessage({ type: "layout", mode: l });
+        return;
+      }
+      if (m.type === "layout") { setLayout(m.mode === "band" ? "band" : "full"); return; }
       if (chantsOnly && (m.type === "show" || m.type === "update") && hide(m)) {
         setShown(OTHER); setLive(null); setSlideLive(null);
         return;
@@ -131,7 +139,7 @@ export default function Control() {
       const who = m.by ? { name: m.by.name, device: m.by.device } : null;
       const noted = (what) => { if (who) { setLastBy({ ...who, what }); setRPulse(true); setTimeout(() => setRPulse(false), 700); } };
       if (m.type === "show" || m.type === "update") {
-        setShown({ type: m.type, kind: m.kind, ref: m.ref, text: m.text, version: m.version, noRef: m.noRef, bold: m.bold, next: m.next, mediaType: m.mediaType, url: m.url });
+        setShown({ type: m.type, kind: m.kind, ref: m.ref, text: m.text, version: m.version, bold: m.bold, under: m.under, next: m.next, mediaType: m.mediaType, url: m.url });
         if (m.r) {
           setLive(m.r); setLiveKind("verse");
           if (m.type === "show") setHistory((h) => [m.r, ...h.filter((x) => !(x.b === m.r.b && x.c === m.r.c && x.v === m.r.v && x.vEnd === m.r.vEnd))].slice(0, 15));
@@ -148,7 +156,7 @@ export default function Control() {
       } else if (m.type === "sync?") {
         // quelqu'un vient d'ouvrir la console : on lui dit ce qui est à l'écran
         const st = stateRef.current;
-        if (st.shown || st.blank) ch.current?.postMessage({ type: "state", to: m.by?.id, shown: st.shown, r: st.live, s: st.slideLive, media: st.mediaLive, liveKind: st.liveKind, blank: st.blank });
+        if (st.shown || st.blank) ch.current?.postMessage({ type: "state", to: m.by?.id, shown: st.shown, r: st.live, s: st.slideLive, media: st.mediaLive, liveKind: st.liveKind, blank: st.blank, layout: st.layout });
       } else if (m.type === "state" && m.to === me.id) applyState(m);
     };
     ch.current = openScreen(church.token, onRemote, {
@@ -159,6 +167,7 @@ export default function Control() {
     return () => ch.current.close();
   }, [church.token]);
   const screenUrl = () => `${location.origin}/display?k=${church.token}`;
+  const copyObs = () => navigator.clipboard?.writeText(`${screenUrl()}&transparent=1`).then(() => { setCopiedObs(true); setTimeout(() => setCopiedObs(false), 1500); });
   const copyScreen = () => navigator.clipboard?.writeText(screenUrl()).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); });
   const logout = async () => { await createClient().auth.signOut(); location.href = "/login"; };
 
@@ -284,67 +293,32 @@ export default function Control() {
     flash();
   };
 
-  // phrase clé (note) ou point clé (dit par l'orateur) : projeté comme une diapositive, mais gardé pour y revenir
-  // field "keys" = phrases clés de la note (gras, analyse) ; field "points" = points clés gardés en direct
-  const projectKey = (item, k, text, field = "keys") => {
+  // phrase clé d'une note : projetée comme une diapositive, mais gardée dans la note pour y revenir
+  const projectKey = (item, k, text) => {
     if (!canProject) return;
-    const t = text ?? item[field]?.[k];
+    const t = text ?? item.keys?.[k];
     if (t === undefined) return;
-    const tag = field === "points" ? "pt" : "key";
-    const msg = { type: "show", kind: "slide", ref: `${item.title} · ${field === "points" ? "point clé" : "phrase clé"}`, text: t, version: "", noRef: true, s: { kind: "notes", id: item.id, [tag]: k }, next: null };
-    setSlideLive({ kind: "notes", id: item.id, [tag]: k });
+    const msg = { type: "show", kind: "slide", ref: `${item.title} · phrase clé`, text: t, version: "", s: { kind: "notes", id: item.id, key: k }, next: null };
+    setSlideLive({ kind: "notes", id: item.id, key: k });
     setLiveKind("slide");
     setShown(msg);
     ch.current?.postMessage(msg);
     flash();
   };
-  // note qui reçoit les points clés : la note ouverte, sinon celle du jour (créée au premier point clé)
-  const keyTitle = `Points clés du ${new Date().toLocaleDateString("fr-FR")}`;
-  const keyNote = library.lib.notes.find((x) => x.id === noteId) || library.lib.notes.find((x) => x.title === keyTitle) || null;
-  // garde un point clé dans la note (et le projette tout de suite si demandé)
-  const keepKey = (text, andProject, field = "points") => {
-    const note = keyNote;
-    if (!note) {
-      const id = library.add("notes", { title: keyTitle, person: "", session: `Culte du ${new Date().toLocaleDateString("fr-FR")}`, text: "", keys: [], points: [text] });
-      if (andProject) projectKey({ id, title: keyTitle, points: [text] }, 0, text, "points");
-      return;
-    }
-    const list = [...(note[field] || []), text];
-    library.update("notes", note.id, { [field]: list });
-    if (andProject) projectKey(note, list.length - 1, text, field);
-  };
-
-  // anciennes versions : les points clés gardés en direct étaient rangés avec les phrases de la note. On les déplace une fois.
-  useEffect(() => {
-    if (!library.ready) return;
-    library.lib.notes.forEach((n) => {
-      if (n.points === undefined && !(n.text || "").trim() && (n.keys || []).length) library.update("notes", n.id, { points: n.keys, keys: [] });
-    });
-  }, [library.ready]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // modifier un point clé : s'il est à l'écran, l'écran se met à jour
-  const editKey = (k, text) => {
-    const note = keyNote;
-    if (!note || (note.points || [])[k] === undefined) return;
-    library.update("notes", note.id, { points: note.points.map((x, j) => (j === k ? text : x)) });
-    if (liveKind === "slide" && slideLive?.kind === "notes" && slideLive.id === note.id && slideLive.pt === k) projectKey(note, k, text, "points");
-  };
-  // supprimer un point clé : les numéros des suivants reculent d'un cran (on garde le bon en surbrillance)
-  const deleteKey = (k) => {
-    const note = keyNote;
+  // garde une phrase dans la note ouverte (et la projette tout de suite si demandé)
+  const keepKey = (text, andProject) => {
+    const note = library.lib.notes.find((x) => x.id === noteId);
     if (!note) return;
-    library.update("notes", note.id, { points: (note.points || []).filter((_, j) => j !== k) });
-    if (slideLive?.kind === "notes" && slideLive.id === note.id && slideLive.pt !== undefined) {
-      if (slideLive.pt === k) setSlideLive(null);
-      else if (slideLive.pt > k) setSlideLive({ ...slideLive, pt: slideLive.pt - 1 });
-    }
+    const keys = [...(note.keys || []), text];
+    library.update("notes", note.id, { keys });
+    if (andProject) projectKey(note, keys.length - 1, text);
   };
 
   // texte rapide (disponible dans tous les onglets) : projeté tel quel, on reste dessus
-  const projectFree = (text, label) => {
+  const projectFree = (text) => {
     if (!canProject) return;
     const chant = tab === "chants" ? library.lib.chants.find((x) => x.id === chantId) : null;
-    const msg = { type: "show", kind: "chant", ref: chant ? `${chant.title} · texte libre` : (label || "Texte rapide"), text, version: "", free: true };
+    const msg = { type: "show", kind: "chant", ref: chant ? `${chant.title} · texte libre` : "Texte rapide", text, version: "", free: true };
     setLiveKind("free");
     setShown(msg);
     ch.current?.postMessage(msg);
@@ -432,10 +406,9 @@ export default function Control() {
       if (!slideLive) return;
       const item = library.lib[slideLive.kind].find((x) => x.id === slideLive.id);
       if (!item) return;
-      if (slideLive.key !== undefined || slideLive.pt !== undefined) {   // phrases / points clés : ← → passent à celui d'avant / d'après
-        const field = slideLive.pt !== undefined ? "points" : "keys";
-        const k = (slideLive.pt ?? slideLive.key) + d;
-        if (item[field]?.[k] !== undefined) projectKey(item, k, undefined, field);
+      if (slideLive.key !== undefined) {                 // phrases clés : ← → passent à la phrase gardée d'avant / d'après
+        const k = slideLive.key + d;
+        if (item.keys?.[k] !== undefined) projectKey(item, k);
         return;
       }
       const slides = slidesOf(item);
@@ -470,24 +443,34 @@ export default function Control() {
   useEffect(() => { selRef.current = null; }, [shown?.ref, shown?.text]);
   useEffect(() => { if (!hint) return; const t = setTimeout(() => setHint(null), 3500); return () => clearTimeout(t); }, [hint]);
 
-  // gras sur la partie du verset sélectionnée dans l'aperçu (bouton B ou Ctrl+B)
-  const applyBold = () => {
+  // gras (B, Ctrl+B) ou souligné (U, Ctrl+U) sur la partie du verset sélectionnée dans l'aperçu
+  const applyFormat = (field) => {
     if (!canProject) return;
     if (!shown || shown.kind === "other" || shown.kind === "media") return setHint("Projette d'abord un verset ou un texte.");
-    if (shown.kind === "chant") return setHint("Les chants sont déjà en gras.");
+    if (shown.kind === "chant") return setHint("Le gras et le souligné ne s'appliquent pas aux chants.");
     const sel = selRef.current;
-    if (!sel) return setHint("Sélectionne des mots dans l'aperçu de l'écran, puis appuie sur B.");
+    if (!sel) return setHint("Sélectionne des mots dans l'aperçu de l'écran, puis appuie sur B (gras) ou U (souligné).");
     let { start, end } = sel;
     const tx = shown.text || "";
     while (start < end && /\s/.test(tx[start])) start++;
     while (end > start && /\s/.test(tx[end - 1])) end--;
-    if (end <= start) return setHint("Sélectionne des mots dans l'aperçu de l'écran, puis appuie sur B.");
-    const msg = { ...shown, type: "update", bold: toggleRange(shown.bold || [], start, end) };
+    if (end <= start) return setHint("Sélectionne des mots dans l'aperçu de l'écran, puis appuie sur B (gras) ou U (souligné).");
+    const msg = { ...shown, type: "update", [field]: toggleRange(shown[field] || [], start, end) };
     ch.current?.postMessage(msg);
     setShown(msg);
     setLastBy(null);
     selRef.current = null;
     document.getSelection()?.removeAllRanges();
+  };
+  const applyBold = () => applyFormat("bold");
+  const applyUnder = () => applyFormat("under");
+
+  // plein écran ↔ bandeau : change tout de suite, même avec un verset à l'écran
+  const setLayoutMode = (mode) => {
+    if (!canProject || mode === layout) return;
+    setLayout(mode);
+    ch.current?.postMessage({ type: "layout", mode });
+    setLastBy(null);
   };
 
   const onKey = (e) => {
@@ -500,12 +483,13 @@ export default function Control() {
     // le clavier agit sur une liste déroulante ou un bouton : on le laisse faire (Entrée / Espace / flèches)
     if (t.tagName === "SELECT") return;
     if ((t.tagName === "BUTTON" || t.tagName === "A") && (e.key === "Enter" || e.key === " ")) return;
-    // autres combinaisons (Ctrl+flèche, Alt+…) : ce ne sont pas nos raccourcis, sauf Ctrl+E (écran noir) et Ctrl+B (gras)
-    if ((e.ctrlKey || e.metaKey || e.altKey) && !((e.ctrlKey || e.metaKey) && ["b", "e"].includes(e.key.toLowerCase()))) return;
+    // autres combinaisons (Ctrl+flèche, Alt+…) : ce ne sont pas nos raccourcis, sauf Ctrl+E (écran noir), Ctrl+B (gras) et Ctrl+U (souligné)
+    if ((e.ctrlKey || e.metaKey || e.altKey) && !((e.ctrlKey || e.metaKey) && ["b", "e", "u"].includes(e.key.toLowerCase()))) return;
     const inField = t === searchRef.current;
     const k = e.key.toLowerCase();
     if ((e.ctrlKey || e.metaKey) && k === "e") { e.preventDefault(); toggleBlank(); }
     else if ((e.ctrlKey || e.metaKey) && k === "b") { e.preventDefault(); applyBold(); }
+    else if ((e.ctrlKey || e.metaKey) && k === "u") { e.preventDefault(); applyUnder(); }
     else if (e.key === "ArrowDown" && results.length) { e.preventDefault(); setSel((s) => Math.min(s + 1, results.length - 1)); }
     else if (e.key === "ArrowUp" && results.length) { e.preventDefault(); setSel((s) => Math.max(s - 1, 0)); }
     else if (e.key === "Enter" && results[sel]) { project(results[sel]); setQ(""); }
@@ -513,6 +497,7 @@ export default function Control() {
     else if (!q && e.key === "ArrowRight") step(1);
     else if (!q && e.key === "ArrowLeft") step(-1);
     else if (!q && !inField && k === "n") toggleBlank();
+    else if (!q && !inField && k === "b") setLayoutMode(layout === "band" ? "full" : "band");
   };
 
   // les raccourcis écoutent toute la page (et plus seulement la zone où se trouve le curseur)
@@ -547,7 +532,7 @@ export default function Control() {
               ))}
             </div>
           )}
-          <UserMenu church={church} copied={copied} onCopy={copyScreen} onLogout={logout} />
+          <UserMenu church={church} copied={copied} onCopy={copyScreen} copiedObs={copiedObs} onCopyObs={copyObs} onLogout={logout} />
         </div>
       </header>
 
@@ -627,7 +612,6 @@ export default function Control() {
                 onSlide={(item, i, slides) => projectSlide(tab, item, i, slides)}
                 onVerse={projectFirst}
                 onKeyPhrase={projectKey}
-                canAnalyze={["admin", "assistant"].includes(church.role)}
                 onOpen={setNoteId}
               />
             ) : !bible ? (
@@ -692,28 +676,16 @@ export default function Control() {
               </>
             )}
           </div>
-          {tab === "notes" && ["admin", "assistant"].includes(church.role) && (
-            <KeyPoint
-              note={keyNote}
-              autoTitle={keyTitle}
-              liveKey={liveKind === "slide" && slideLive?.kind === "notes" && slideLive.pt !== undefined && slideLive.id === keyNote?.id ? slideLive.pt : null}
-              canProject={canProject}
-              onKeepProject={(t) => keepKey(t, true)}
-              onProjectKey={(k) => keyNote && projectKey(keyNote, k, undefined, "points")}
-              onEdit={editKey}
-              onDelete={deleteKey}
-            />
-          )}
         </section>
 
         {/* ───── centre : texte rapide (toujours en haut) puis contenu de l'onglet ───── */}
         <div className="order-2 min-w-0 space-y-3">
-          {church.role !== "annonces" && church.role !== "orateur" && (   // pas de texte rapide pour l'orateur
+          {church.role !== "annonces" && (
           <QuickText
             onProject={projectFree}
             disabled={!canProject}
             {...(tab === "notes" && noteId && library.lib.notes.some((x) => x.id === noteId)
-              ? { onAdd: (t) => keepKey(t, false, "keys"), addLabel: "Garder dans la note", onAddProject: (t) => keepKey(t, true, "keys"), addProjectLabel: "Projeter et garder" }
+              ? { onAdd: (t) => keepKey(t, false), addLabel: "Garder dans la note", onAddProject: (t) => keepKey(t, true), addProjectLabel: "Projeter et garder" }
               : {})}
           />
           )}
@@ -809,7 +781,7 @@ export default function Control() {
             )}
             {shown && shown.kind !== "other" && !blank && (
               <div className="absolute inset-0 flex flex-col px-3 sm:px-5 pt-2 sm:pt-8 pb-2 sm:pb-3 overflow-y-auto">
-                <div className="my-auto">
+                <div className={layout === "band" && shown.kind !== "media" ? "mt-auto rounded-md bg-black/80 border border-neutral-600 px-2 py-1.5" : "my-auto"}>
                 {shown.kind === "media" ? (
                   <div className="flex flex-col items-center gap-1">
                     {shown.mediaType === "image" ? <img src={shown.url} alt="" className="max-h-20 sm:max-h-40 object-contain rounded" /> : <span className="text-3xl">🎬</span>}
@@ -821,8 +793,8 @@ export default function Control() {
                   </>
                 ) : (
                   <>
-                    <p ref={previewTxt} className={`font-serif leading-snug whitespace-pre-line cursor-text ${shown.kind === "slide" ? "text-center" : ""} ${size}`}><RichText text={shown.text} bold={shown.bold} /></p>
-                    {!shown.noRef && <div className="mt-2 text-right text-sm">{shown.ref} <span className="text-xs opacity-60">{shown.version}</span></div>}
+                    <p ref={previewTxt} className={`font-serif leading-snug whitespace-pre-line cursor-text ${shown.kind === "slide" ? "text-center" : ""} ${size}`}><RichText text={shown.text} bold={shown.bold} under={shown.under} /></p>
+                    <div className="mt-2 text-right text-sm">{shown.ref} <span className="text-xs opacity-60">{shown.version}</span></div>
                   </>
                 )}
                 </div>
@@ -844,14 +816,23 @@ export default function Control() {
 
           {hint && <p className="mt-2 text-xs rounded-lg px-2.5 py-2 bg-amber-400/10 text-amber-200">{hint}</p>}
 
-          <div className="grid grid-cols-[1.4fr_1.4fr_1fr_0.7fr_1.2fr] lg:grid-cols-6 gap-1.5 lg:gap-2 mt-2 lg:mt-3">
+          <div className="grid grid-cols-[1.4fr_1.4fr_1fr_0.6fr_0.6fr_1.2fr] lg:grid-cols-6 gap-1.5 lg:gap-2 mt-2 lg:mt-3">
             <button className={btn + " lg:col-span-3"} disabled={!canStep} onClick={() => step(-1)}>← Préc.</button>
             <button className={btn + " lg:col-span-3"} disabled={!canStep} onClick={() => step(1)}>Suiv. →</button>
             <button onClick={toggleBlank} disabled={!canProject}
               className={`lg:col-span-2 rounded-lg py-2 text-sm transition duration-100 active:scale-95 ${blank ? "bg-amber-400 text-black font-medium" : "bg-neutral-800 hover:bg-neutral-700"}`}>Noir</button>
             <button onMouseDown={(e) => e.preventDefault()} onClick={applyBold} disabled={!canProject} title="Gras sur les mots sélectionnés dans l'aperçu (Ctrl+B)" aria-label="Gras"
-              className={btn + " lg:col-span-2 font-bold"}>B</button>
+              className={btn + " lg:col-span-1 font-bold"}>B</button>
+            <button onMouseDown={(e) => e.preventDefault()} onClick={applyUnder} disabled={!canProject} title="Souligné sur les mots sélectionnés dans l'aperçu (Ctrl+U)" aria-label="Souligné"
+              className={btn + " lg:col-span-1 underline"}>U</button>
             <button className={btn + " lg:col-span-2"} disabled={!shown || !canProject} onClick={clearScreen}>Effacer</button>
+          </div>
+
+          <div className="mt-2 lg:mt-3 grid grid-cols-2 gap-1 rounded-lg bg-neutral-800 p-1" role="group" aria-label="Mise en page de l'écran">
+            {[["full", "Plein écran"], ["band", "Bandeau"]].map(([k, l]) => (
+              <button key={k} onClick={() => setLayoutMode(k)} disabled={!canProject} aria-pressed={layout === k}
+                className={`rounded-md py-1.5 text-sm transition duration-100 active:scale-95 disabled:opacity-40 disabled:pointer-events-none ${layout === k ? "bg-amber-400 text-black font-medium" : "text-neutral-300 hover:bg-neutral-700"}`}>{l}</button>
+            ))}
           </div>
 
           <div className="hidden lg:flex mt-4 flex-col items-center gap-2.5 text-xs xl:text-sm text-neutral-400">
@@ -864,6 +845,8 @@ export default function Control() {
               <span className="flex items-center gap-1.5"><Kbd>Échap</Kbd> effacer</span>
               <span className="flex items-center gap-1.5"><Kbd>Ctrl+E</Kbd> écran noir</span>
               <span className="flex items-center gap-1.5"><Kbd>Ctrl+B</Kbd> gras</span>
+              <span className="flex items-center gap-1.5"><Kbd>Ctrl+U</Kbd> souligné</span>
+              <span className="flex items-center gap-1.5"><Kbd>B</Kbd> bandeau</span>
             </div>
           </div>
 
