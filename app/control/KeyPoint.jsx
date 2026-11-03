@@ -12,13 +12,13 @@ const Trash = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 7h16" /><path d="M10 11v6M14 11v6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12" /><path d="M9 7V4h6v3" /></svg>
 );
 
-export default function KeyPoint({ note, liveKey, canProject, onKeepProject, onProjectKey, onEdit, onDelete }) {
+export default function KeyPoint({ note, autoTitle, liveKey, canProject, onKeepProject, onProjectKey, onEdit, onDelete }) {
   const [text, setText] = useState("");
   const [editing, setEditing] = useState(null);   // index de la phrase en cours de modification
   const [draft, setDraft] = useState("");
   const t = text.trim();
   const keys = note?.keys || [];
-  const go = () => { if (!t || !note || !canProject) return; onKeepProject(t); setText(""); };
+  const go = () => { if (!t || !canProject) return; onKeepProject(t); setText(""); };
   const startEdit = (k) => { setEditing(k); setDraft(keys[k]); };
   const saveEdit = () => { const d = draft.trim(); if (d) onEdit(editing, d); setEditing(null); };
   const icon = "p-1.5 rounded-md transition duration-100 active:scale-90";
@@ -34,14 +34,14 @@ export default function KeyPoint({ note, liveKey, canProject, onKeepProject, onP
         placeholder="Phrase dite par l'orateur : à garder dans la note et à projeter"
         className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-sky-400 resize-y" />
       <div className="flex items-center gap-2 mt-1.5">
-        <button disabled={!t || !note || !canProject} onClick={go} title="Ctrl+Entrée"
+        <button disabled={!t || !canProject} onClick={go} title="Ctrl+Entrée"
           className="px-3 py-1.5 rounded-lg text-sm bg-sky-400 hover:bg-sky-300 text-black font-medium transition duration-100 active:scale-95 disabled:opacity-40 disabled:pointer-events-none">
           Projeter et garder
         </button>
         {text && <button onClick={() => setText("")} className="ml-auto text-xs text-neutral-500 hover:text-white">Vider</button>}
       </div>
-      {!note && <p className="mt-1.5 text-[11px] text-neutral-500">Ouvre une note pour pouvoir y garder les points clés.</p>}
-      {note && !canProject && <p className="mt-1.5 text-[11px] text-neutral-500">L'administrateur doit t'autoriser pour projeter.</p>}
+      {!note && <p className="mt-1.5 text-[11px] text-neutral-500">Aucune note ouverte : les points clés seront gardés dans « {autoTitle} », créée automatiquement.</p>}
+      {!canProject && <p className="mt-1.5 text-[11px] text-neutral-500">L'administrateur doit t'autoriser pour projeter.</p>}
 
       {note && (
         <div className="border-t border-neutral-700 mt-3 pt-2.5">
