@@ -18,7 +18,7 @@ const I = {
 };
 
 // En-tête : bouton Écran + pastille utilisateur avec menu
-export default function UserMenu({ church, copied, onCopy, copiedObs, onCopyObs, onLogout }) {
+export default function UserMenu({ church, copied, onCopy, copiedObs, onCopyObs, onLogout, onRotate }) {
   const [open, setOpen] = useState(false);
   const box = useRef(null);
 
@@ -79,6 +79,12 @@ export default function UserMenu({ church, copied, onCopy, copiedObs, onCopyObs,
                 <span className="block text-xs text-neutral-400">Fond transparent, pour OBS ou vMix</span>
               </span>
             </button>
+            {onRotate && (
+              <button role="menuitem" onClick={() => { setOpen(false); onRotate(); }} className="w-full flex items-start gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-neutral-700">
+                <Icon d={I.key} className="h-[18px] w-[18px] mt-0.5 text-neutral-400" />
+                <span>Régénérer le lien écran<span className="block text-xs text-neutral-400">Si le lien a été partagé à tort</span></span>
+              </button>
+            )}
             {church.role !== "standard" && church.role !== "annonces" && (
               <a role="menuitem" href={`/speaker?k=${church.token}`} target="_blank" className="w-full flex items-start gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-neutral-700">
                 <Icon d={I.out} className="h-[18px] w-[18px] mt-0.5 text-neutral-400" />

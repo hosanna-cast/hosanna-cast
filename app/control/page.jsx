@@ -21,6 +21,7 @@ import { uuid } from "@/lib/uuid";
 import { tabsFor } from "@/lib/roles";
 import { RichText, toggleRange } from "@/lib/bold";
 import { USFM } from "@/lib/usfmBooks";
+import { buildSnapshot } from "@/lib/screenProtocol";
 import ONLINE from "@/config/online-versions.json";
 
 // versions à ouvrir sur bible.com (champ "web" = numéro dans l'adresse bible.com/bible/NUMÉRO/...)
@@ -79,6 +80,10 @@ export default function Control() {
   const [history, setHistory] = useState([]);
   const [screenBg, setScreenBg] = useState(null);                       // fond réellement affiché à l'écran
   const [screenText, setScreenText] = useState(null);                   // couleur du texte à l'écran (null = blanc)
+  const [screens, setScreens] = useState([]);              // écrans de projection connectés (présence)
+  const [screenOk, setScreenOk] = useState(null);          // l'écran confirme-t-il ce qu'on lui envoie ? null = pas encore su
+  const [net, setNet] = useState("connecting");            // connexion internet du canal d'écran : online | connecting | offline
+  const synced = useRef(false);                            // cette console connaît-elle l'état de l'écran ? (sinon elle ne répond pas aux demandes d'état)
   const [peers, setPeers] = useState([]);                  // les autres opérateurs connectés
   const [lastBy, setLastBy] = useState(null);              // dernière action faite par quelqu'un d'autre { name, device, what }
   const [rPulse, setRPulse] = useState(false);
@@ -116,6 +121,7 @@ export default function Control() {
     const me = { id: uuid(), name: church.firstName || church.email.split("@")[0], device: window.matchMedia("(min-width: 1024px)").matches ? "ordinateur" : "mobile", role: church.role, uid: church.userId };
     mine.current = me;
     const applyState = (m) => {
+      synced.current = true;
       if (chantsOnly && m.shown && m.shown.kind !== allowedKind) { setShown(OTHER); setLive(null); setSlideLive(null); if (m.blank !== undefined) setBlank(m.blank); return; }
       if (m.shown !== undefined) setShown(m.shown);
       setLive(m.r || null);
@@ -130,6 +136,14 @@ export default function Control() {
     const allowedKind = church.role === "annonces" ? "media" : "chant";
     const hide = (m) => chantsOnly && m.kind !== allowedKind;
     const OTHER = { type: "show", kind: "other", ref: "", text: "", version: "" };
+    // état complet envoyé à l'écran (ouverture, reconnexion, confirmation manquante).
+    // Une console qui vient de s'ouvrir et ne connaît pas encore l'état ne répond pas : elle effacerait l'écran à tort.
+    const sendSnapshot = (extra) => {
+      const st = stateRef.current;
+      if (!synced.current || st.shown?.kind === "other") return;
+      ch.current?.postMessage(buildSnapshot(st, extra));
+    };
+    let knownScreens = new Set();
     const onRemote = (m) => {
       if (m.type === "helper") { if (m.by?.role === "admin") setHelperIds(m.ids || (m.id ? [m.id] : [])); return; }
       if (m.type === "bg") { setScreenBg(m.bg || null); setScreenText(m.textColor || null); return; }
@@ -138,12 +152,13 @@ export default function Control() {
       // l'écran vient de s'ouvrir : on lui renvoie son fond
       if (m.type === "mediaStatus") { setMediaStatus(m.status); return; }
       if (m.type === "speaker?") { const st = stateRef.current; if (st.shown || st.blank) ch.current?.postMessage({ type: "speakerState", shown: st.shown, blank: st.blank }); return; }
-      if (m.type === "bg?") {
+      if (m.type === "bg?" || m.type === "display?") {
         const { screenBg: b, screenText: t, layout: l, dset: ds, logo: lg } = stateRef.current;
         if (b || t) ch.current?.postMessage({ type: "bg", bg: b, textColor: t });
         ch.current?.postMessage({ type: "settings", settings: ds });
         if (lg) ch.current?.postMessage({ type: "logo", logo: lg });
         if (l && l !== "full") ch.current?.postMessage({ type: "layout", mode: l });
+        if (m.type === "display?") sendSnapshot();      // l'écran vient de s'ouvrir ou de se reconnecter : état complet
         return;
       }
       if (m.type === "layout") { setLayout(m.mode === "band" ? "band" : "full"); return; }
@@ -153,6 +168,7 @@ export default function Control() {
       }
       const who = m.by ? { name: m.by.name, device: m.by.device } : null;
       const noted = (what) => { if (who) { setLastBy({ ...who, what }); setRPulse(true); setTimeout(() => setRPulse(false), 700); } };
+      if (["show", "update", "clear", "blank"].includes(m.type)) synced.current = true;
       if (m.type === "show" || m.type === "update") {
         setShown({ type: m.type, kind: m.kind, ref: m.ref, text: m.text, version: m.version, bold: m.bold, under: m.under, next: m.next, mediaType: m.mediaType, url: m.url });
         if (m.r) {
@@ -176,8 +192,18 @@ export default function Control() {
     };
     ch.current = openScreen(church.token, onRemote, {
       me,
+      role: "console",
+      onStatus: setNet,
+      onConfirm: setScreenOk,
+      onResync: () => sendSnapshot({ resync: true }),      // l'écran n'a pas confirmé : on lui renvoie l'état complet
+      onScreens: (list) => {
+        setScreens(list);
+        if (list.some((s) => !knownScreens.has(s.id))) sendSnapshot();   // un écran arrive ou revient : on lui donne l'état complet
+        knownScreens = new Set(list.map((s) => s.id));
+      },
       onPeers: (list) => setPeers(list.filter((p) => p.id !== me.id).filter((p, i, a) => a.findIndex((x) => x.id === p.id) === i)),
-      onReady: () => { ch.current?.postMessage({ type: "sync?" }); createClient().rpc("get_helpers").then(({ data }) => setHelperIds(data || [])); },
+      onReady: () => { setTimeout(() => { synced.current = true; }, 1500);   // personne n'a répondu : on est seul, on connaît l'état
+        ch.current?.postMessage({ type: "sync?" }); createClient().rpc("get_helpers").then(({ data }) => setHelperIds(data || [])); },
     });
     return () => ch.current.close();
   }, [church.token]);
@@ -186,6 +212,13 @@ export default function Control() {
   const screenUrl = () => `${location.origin}/display?k=${church.token}`;
   const copyObs = () => navigator.clipboard?.writeText(`${screenUrl()}&transparent=1`).then(() => { setCopiedObs(true); setTimeout(() => setCopiedObs(false), 1500); });
   const copyScreen = () => navigator.clipboard?.writeText(screenUrl()).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); });
+  // jeton d'écran compromis ou lien partagé trop largement : on en génère un nouveau (les anciens liens cessent de marcher)
+  const rotateToken = async () => {
+    if (!confirm("Régénérer le lien de l'écran ?\n\nLes écrans et vues orateur déjà ouverts seront déconnectés : il faudra les rouvrir avec le nouveau lien.")) return;
+    const { error } = await createClient().rpc("rotate_screen_token");
+    if (error) return alert("Impossible de régénérer le lien : " + error.message);
+    location.reload();
+  };
   const logout = async () => { await createClient().auth.signOut(); location.href = "/login"; };
 
   // /control?tab=notes, chants ou annonces (liens de la page d'accueil)
@@ -282,7 +315,7 @@ export default function Control() {
     return { ref: refOf(n), text: textOf(n) };
   };
 
-  const flash = () => { setLastBy(null); setPulse(true); setTimeout(() => setPulse(false), 250); };
+  const flash = () => { synced.current = true; setLastBy(null); setPulse(true); setTimeout(() => setPulse(false), 250); };
 
   const project = (r, citeRange) => {
     if (!canProject) return;
@@ -544,6 +577,12 @@ export default function Control() {
   const size = shown ? (shown.text.length < 110 ? "text-sm sm:text-lg" : shown.text.length < 220 ? "text-xs sm:text-base" : "text-xs sm:text-sm") : "";
   const chapters = nav.b !== null ? bible?.[nav.b] : null;
 
+  // voyant de l'écran : la console dit clairement si ce qu'elle envoie arrive
+  const scr = screenOk === false ? { c: "bg-red-500", t: "L'écran ne confirme pas", tip: "Aucune confirmation de l'écran : vérifie qu'il est ouvert et connecté. L'état complet lui a été renvoyé." }
+    : screenOk || screens.length ? { c: "bg-green-400", t: "Écran connecté", tip: "L'écran est ouvert et confirme ce que tu projettes." }
+    : net === "offline" ? { c: "bg-amber-400", t: "Connexion perdue", tip: "Connexion internet perdue : seul un écran ouvert dans ce même navigateur reçoit encore." }
+    : { c: "bg-neutral-500", t: "Aucun écran ouvert", tip: "Ouvre l'écran avec le bouton « Écran » (ou le lien copié) sur le PC du vidéoprojecteur." };
+
   return (
     <main className={`min-h-screen bg-neutral-900 text-white p-3 sm:p-6 2xl:px-10 ${typing ? "pb-[55vh] lg:pb-6" : ""}`}>
       {/* barre du haut */}
@@ -554,6 +593,10 @@ export default function Control() {
         </a>
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           {church.role === "admin" && <HelpControl helperIds={helperIds} peers={peers} busy={helpBusy} onChange={pickHelpers} />}
+          <span className="flex items-center gap-1.5 rounded-full bg-neutral-800 border border-neutral-700 px-2.5 py-1 text-xs text-neutral-300" title={scr.tip} role="status">
+            <span className={`h-2 w-2 rounded-full ${scr.c}`} />
+            <span className={screenOk === false ? "" : "hidden sm:inline"}>{scr.t}</span>
+          </span>
           {peers.length > 0 && (
             <div className="flex items-center gap-1.5 rounded-full bg-neutral-800 border border-neutral-700 pl-2 pr-1 py-1" title={peers.map((p) => `${p.name} (${p.device})`).join(", ") + " : connecté aussi"}>
               <span className="h-2 w-2 rounded-full bg-sky-400" />
@@ -563,7 +606,7 @@ export default function Control() {
               ))}
             </div>
           )}
-          <UserMenu church={church} copied={copied} onCopy={copyScreen} copiedObs={copiedObs} onCopyObs={copyObs} onLogout={logout} />
+          <UserMenu church={church} onRotate={church.role === "admin" ? rotateToken : null} copied={copied} onCopy={copyScreen} copiedObs={copiedObs} onCopyObs={copyObs} onLogout={logout} />
         </div>
       </header>
 

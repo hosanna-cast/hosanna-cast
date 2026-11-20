@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { openScreen } from "@/lib/screen";
+import { uuid } from "@/lib/uuid";
 import { RichText } from "@/lib/bold";
 
 // Vue orateur (écran de la chaire / tablette) : /speaker?k=<jeton>
@@ -44,7 +45,7 @@ export default function Speaker() {
       else if (m.type === "clear") setV(null);
       else if (m.type === "blank") setBlank((b) => (m.on === undefined ? !b : m.on));
       else if (m.type === "speakerState") { setV(m.shown || null); setBlank(!!m.blank); }
-    }, { onReady: () => { setOnline(true); ch.postMessage({ type: "speaker?" }); } });
+    }, { role: "speaker", me: { id: uuid(), name: "Orateur", role: "speaker" }, onReady: () => { setOnline(true); ch.postMessage({ type: "speaker?" }); } });
     ch.postMessage({ type: "speaker?" });   // même navigateur (BroadcastChannel)
     return () => ch.close();
   }, []);

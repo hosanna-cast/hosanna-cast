@@ -42,7 +42,7 @@ export default function AdminPanel({ churchName, churchId, token }) {
     logoRef.current = loadLogo(); setLogo(logoRef.current);
     scr.current = openScreen(token, (m) => {
       // l'écran vient de s'ouvrir et demande son fond, la couleur du texte et ses réglages
-      if (m.type === "bg?") {
+      if (m.type === "bg?" || m.type === "display?") {
         scr.current?.postMessage({ type: "bg", bg: activeRef.current, textColor: textRef.current });
         scr.current?.postMessage({ type: "settings", settings: dsetRef.current });
         if (logoRef.current) scr.current?.postMessage({ type: "logo", logo: logoRef.current });

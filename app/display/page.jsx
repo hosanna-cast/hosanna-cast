@@ -1,9 +1,13 @@
 "use client";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { openScreen } from "@/lib/screen";
+import { uuid } from "@/lib/uuid";
 import { bgStyle } from "../control/Backgrounds";
 import { RichText } from "@/lib/bold";
 import { DEFAULT_SETTINGS, mergeSettings, loadSettings, saveSettings, loadLogo, saveLogo } from "@/lib/displaySettings";
+
+// messages dont l'écran confirme la réception à la console (sans confirmation, elle renvoie l'état complet)
+const ACKED = new Set(["show", "update", "clear", "blank", "snapshot"]);
 
 export default function Display() {
   const [v, setV] = useState(null);
@@ -33,6 +37,18 @@ export default function Display() {
     setCfg(loadSettings());                          // dernière version reçue, gardée sur cet appareil (avant que la console réponde)
     setLogo(loadLogo());
     const ch = openScreen(token, (m) => {
+      if (ACKED.has(m.type)) requestAnimationFrame(() => chRef.current?.postMessage({ type: "ack", ref: m.mid }));
+      // état complet : à l'ouverture, après une coupure internet, ou quand la console n'a pas eu de confirmation.
+      // L'écran ne dépend donc plus d'un message passé : recharger la page ne le laisse plus vide.
+      if (m.type === "snapshot") {
+        setBg(m.bg || null);
+        setTextColor(m.textColor || "#ffffff");
+        if (m.settings) { const c = mergeSettings(m.settings); setCfg(c); saveSettings(c); }
+        setLayout(m.layout === "band" ? "band" : "full");
+        setBlank(!!m.blank);
+        setV(m.shown || null);
+        return;
+      }
       if (m.type === "settings") { const c = mergeSettings(m.settings); setCfg(c); saveSettings(c); return; }
       if (m.type === "logo") { setLogo(m.logo || null); saveLogo(m.logo || null); return; }
       if (m.type === "layout") { setLayout(m.mode === "band" ? "band" : "full"); return; }
@@ -49,9 +65,13 @@ export default function Display() {
         else if (m.cmd === "mute") el.muted = true;
         else if (m.cmd === "unmute") { el.muted = false; setForcedMute(false); }
       }
+    }, {
+      role: "display",
+      me: { id: uuid(), name: "Écran", role: "display" },          // présence : la console sait qu'un écran est connecté
+      onReady: () => chRef.current?.postMessage({ type: "display?" }),   // (re)connexion internet : on redemande l'état complet
     });
     chRef.current = ch;
-    ch.postMessage({ type: "bg?" });                // l'écran vient de s'ouvrir : on demande le fond et la couleur du texte
+    ch.postMessage({ type: "display?" });            // l'écran vient de s'ouvrir : on demande l'état complet (verset, noir, fond, réglages)
     return () => ch.close();
   }, []);
 

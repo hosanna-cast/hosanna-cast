@@ -34,3 +34,8 @@ Pour chercher aussi dans Google Images (optionnel, 100 recherches gratuites par 
 3. Vercel → Settings → Environment Variables : `GOOGLE_CSE_KEY` = la clé, `GOOGLE_CSE_CX` = l'identifiant du moteur (puis redéployer).
 
 Dans tous les cas on peut aussi coller directement l'adresse d'une image dans le même champ.
+
+## Sécurité de l'écran (canal privé)
+
+Variable optionnelle `NEXT_PUBLIC_SCREEN_PRIVATE=1` (Vercel) : active les canaux Realtime privés. Prérequis : `supabase/realtime-security.sql`.
+Procédure complète et retour arrière : voir `supabase/README.md`. Un administrateur peut régénérer le lien d'écran depuis le menu de la console.
