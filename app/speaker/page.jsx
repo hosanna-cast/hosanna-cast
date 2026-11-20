@@ -108,7 +108,7 @@ export default function Speaker() {
         {v && v.kind === "media" ? (
           <div className="flex-1 min-h-0 flex flex-col items-center justify-center gap-3">
             {v.mediaType === "image"
-              ? <img src={v.url} alt="" className={`max-h-[70%] max-w-full object-contain rounded ${blank ? "opacity-50" : ""}`} />
+              ? <img src={v.url} referrerPolicy="no-referrer" alt="" className={`max-h-[70%] max-w-full object-contain rounded ${blank ? "opacity-50" : ""}`} />
               : <span className="text-7xl">🎬</span>}
             <div className="text-amber-300 text-[3vh]">{v.mediaType === "video" ? "Vidéo : " : ""}{v.ref}</div>
           </div>

@@ -22,3 +22,15 @@ Les versions en ligne apparaissent à côté de LSG/OST/… ; leurs chapitres so
 ### Menu « Ouvrir sur bible.com »
 Pour une version sans accès API : mettre son numéro bible.com dans le champ `web` de `config/online-versions.json`
 (le numéro est dans l'adresse : bible.com/bible/**63**/JHN.3.16 → 63). Un menu déroulant ouvre alors le chapitre du verset visé dans un nouvel onglet.
+
+## Recherche d'images sur internet (régie technique)
+
+Le champ « Image depuis internet » de la console cherche des images sans quitter l'appli : on tape un mot, on clique une vignette, elle est projetée.
+Sans aucune configuration, il interroge Wikimedia Commons et Openverse (images libres de droits, gratuites, sans clé).
+
+Pour chercher aussi dans Google Images (optionnel, 100 recherches gratuites par jour) :
+1. https://programmablesearchengine.google.com → créer un moteur « Rechercher sur tout le Web », activer « Recherche d'images » → copier l'identifiant du moteur (cx).
+2. https://console.cloud.google.com → activer « Custom Search API » → créer une clé API.
+3. Vercel → Settings → Environment Variables : `GOOGLE_CSE_KEY` = la clé, `GOOGLE_CSE_CX` = l'identifiant du moteur (puis redéployer).
+
+Dans tous les cas on peut aussi coller directement l'adresse d'une image dans le même champ.

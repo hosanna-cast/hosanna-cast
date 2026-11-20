@@ -1,19 +1,16 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { BOOKS } from "@/lib/books";
 import { parseRef } from "@/lib/parseRef";
 import { useBible } from "@/lib/useBible";
 import { useLibrary, slidesOf } from "@/lib/library";
-import LibraryPanel from "./LibraryPanel";
-import ChantStage from "./ChantStage";
 import ChapterView from "./ChapterView";
 import QuickText from "./QuickText";
+import WebImage from "./WebImage";
 import { bgStyle } from "./Backgrounds";
 import { useChurch } from "@/lib/church";
 import UserMenu from "./UserMenu";
-import HelpControl from "./HelpControl";
-import AnnoncesPanel from "./AnnoncesPanel";
-import AnnonceStage from "./AnnonceStage";
 import { DEFAULT_SETTINGS, mergeSettings, loadSettings, saveSettings, loadLogo, saveLogo } from "@/lib/displaySettings";
 import { usePlaylists } from "@/lib/playlists";
 import { useAnnouncements } from "@/lib/announcements";
@@ -27,6 +24,13 @@ import ONLINE from "@/config/online-versions.json";
 
 // versions à ouvrir sur bible.com (champ "web" = numéro dans l'adresse bible.com/bible/NUMÉRO/...)
 const WEB_VERSIONS = ONLINE.filter((v) => v.web);
+
+// panneaux chargés seulement quand on en a besoin (onglet ouvert, profil admin) : le premier affichage de la console est plus léger
+const LibraryPanel = dynamic(() => import("./LibraryPanel"));
+const ChantStage = dynamic(() => import("./ChantStage"));
+const AnnoncesPanel = dynamic(() => import("./AnnoncesPanel"));
+const AnnonceStage = dynamic(() => import("./AnnonceStage"));
+const HelpControl = dynamic(() => import("./HelpControl"));
 
 const Kbd = ({ children }) => (
   <kbd className="px-2 py-0.5 rounded-md border border-blue-400/60 text-blue-300 text-xs font-sans whitespace-nowrap">{children}</kbd>
@@ -346,6 +350,8 @@ export default function Control() {
     ch.current?.postMessage(msg);
     flash();
   };
+  // image trouvée sur internet : on envoie seulement le lien, l'écran la charge directement (rien n'est enregistré)
+  const projectWebImage = (url, name) => projectMedia({ id: "web:" + url, kind: "image", url, name });
   const mediaCmd = (cmd) => { if (canProject) ch.current?.postMessage({ type: "media", cmd }); };
   const clearScreen = () => {
     if (!canProject) return;
@@ -531,7 +537,7 @@ export default function Control() {
       {/* barre du haut */}
       <header className="flex items-center justify-between gap-3 mb-3 sm:mb-5">
         <a href="/" title="Accueil" className="inline-flex items-center gap-2.5 transition duration-100 active:scale-95">
-          <img src="/logo.png" alt="" width={40} height={40} className="h-9 w-9 sm:h-10 sm:w-10" />
+          <img src="/logo-96.png" alt="" width={40} height={40} className="h-9 w-9 sm:h-10 sm:w-10" />
           <span className="text-xl sm:text-2xl font-semibold leading-none">Hosanna <span className="text-amber-400">Cast</span></span>
         </a>
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
@@ -702,6 +708,14 @@ export default function Control() {
               : {})}
           />
           )}
+          {church.role !== "standard" && (
+            <WebImage
+              onProject={projectWebImage}
+              disabled={!canProject}
+              liveUrl={liveKind === "media" && typeof mediaLive?.id === "string" && mediaLive.id.startsWith("web:") ? mediaLive.id.slice(4) : null}
+              status={mediaStatus}
+            />
+          )}
         {tab === "annonces" ? (
         <section className="min-w-0">
           <AnnonceStage
@@ -820,7 +834,7 @@ export default function Control() {
                 <div className="w-full">
                 {shown.kind === "media" ? (
                   <div className="flex flex-col items-center gap-1">
-                    {shown.mediaType === "image" ? <img src={shown.url} alt="" className="max-h-20 sm:max-h-40 object-contain rounded" /> : <span className="text-3xl">🎬</span>}
+                    {shown.mediaType === "image" ? <img src={shown.url} referrerPolicy="no-referrer" alt="" className="max-h-20 sm:max-h-40 object-contain rounded" /> : <span className="text-3xl">🎬</span>}
                     <span className="text-xs sm:text-sm text-neutral-300 truncate max-w-full">{shown.ref}</span>
                   </div>
                 ) : shown.kind === "chant" ? (

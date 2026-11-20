@@ -63,10 +63,17 @@ export default function Display() {
     txt.current.style.fontSize = size + "px";
     const cs = getComputedStyle(box.current);
     const room = box.current.clientHeight - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0);   // place réelle pour le texte
-    while (size > 18 && txt.current.scrollHeight > room) {
-      size -= 3;
-      txt.current.style.fontSize = size + "px";
+    // mêmes tailles qu'avant (start, start-3, start-6… jusqu'à 18 px), mais trouvées par dichotomie :
+    // ~6 mesures au lieu d'une trentaine, donc le texte apparaît plus vite à l'écran
+    const start = size;
+    const kMax = start <= 18 ? 0 : Math.ceil((start - 18) / 3);
+    let lo = 0, hi = kMax;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      txt.current.style.fontSize = start - 3 * mid + "px";
+      if (txt.current.scrollHeight <= room) hi = mid; else lo = mid + 1;
     }
+    txt.current.style.fontSize = start - 3 * lo + "px";
   }, [v, blank, layout, cfg, logo]);
 
   // vidéo : démarre toute seule ; si le navigateur refuse le son, elle démarre sans son (un clic le réactive)
@@ -119,7 +126,7 @@ export default function Display() {
               onLoadedMetadata={(e) => { if (resume.current.url === v.url) e.currentTarget.currentTime = resume.current.t; }}
               onTimeUpdate={(e) => { resume.current = { url: v.url, t: e.currentTarget.currentTime }; }} />
           ) : (
-            <img key={v.url} src={v.url} alt="" className="max-w-full max-h-full object-contain" />
+            <img key={v.url} src={v.url} alt="" referrerPolicy="no-referrer" onError={() => report("error")} className="max-w-full max-h-full object-contain" />
           )}
           {forcedMute && v.mediaType === "video" && (
             <span className="absolute bottom-3 right-4 rounded-full bg-black/60 text-white/80 text-xs px-3 py-1">🔇 Clique pour activer le son</span>

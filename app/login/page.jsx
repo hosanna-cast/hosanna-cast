@@ -47,7 +47,7 @@ export default function Login() {
   return (
     <main className="min-h-screen bg-neutral-900 text-white flex flex-col items-center justify-center p-6">
       <a href="/" className="flex items-center gap-3 mb-8">
-        <img src="/logo.png" alt="" className="h-12 w-12" />
+        <img src="/logo-96.png" alt="" className="h-12 w-12" />
         <span className="text-3xl font-semibold">Hosanna <span className="text-amber-400">Cast</span></span>
       </a>
       <form onSubmit={submit} className="w-full max-w-sm space-y-3">
