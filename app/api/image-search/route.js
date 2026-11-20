@@ -127,14 +127,16 @@ export async function GET(req) {
     { name: "Openverse", web: false, run: () => openverse(q, page) },
   ];
   const settled = await Promise.allSettled(jobs.map((j) => j.run()));
-  const used = [], web = [], free = [];
+  const used = [], web = [], free = [], notes = [];
+  if (!process.env.SERPER_API_KEY && !process.env.BRAVE_API_KEY) notes.push("Aucune clé SERPER_API_KEY / BRAVE_API_KEY reçue par le serveur : variable absente, mal orthographiée, ou pas de redéploiement après l'avoir ajoutée.");
   settled.forEach((s, i) => {
-    if (s.status === "rejected") console.warn("image-search:", jobs[i].name, s.reason?.message);
+    if (s.status === "rejected") { console.warn("image-search:", jobs[i].name, s.reason?.message); if (jobs[i].web) notes.push(`${jobs[i].name} a échoué : ${s.reason?.message}`); }
+    if (s.status === "fulfilled" && jobs[i].web && s.value && !s.value.length) notes.push(`${jobs[i].name} répond mais ne renvoie aucune image.`);
     if (s.status === "fulfilled" && s.value) { used.push(jobs[i].name); (jobs[i].web ? web : free).push(s.value); }
   });
   if (!used.length) return fail("La recherche d'images est indisponible pour le moment. Réessaie, ou colle le lien d'une image.", 502);
 
   const results = merge(web, free);
   const hasWeb = web.length > 0;
-  return NextResponse.json(remember(key, { results, sources: used, web: hasWeb, google: hasWeb }));
+  return NextResponse.json(remember(key, { results, sources: used, web: hasWeb, google: hasWeb, notes }));
 }
