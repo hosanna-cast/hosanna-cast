@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 //   - Openverse         : gratuit, sans clé, images sous licence libre (Creative Commons / domaine public)
 //   - Serper (= vrais résultats Google Images) : OPTIONNEL, si SERPER_API_KEY est défini (voir README)
 //   - Brave Search (images du web)             : OPTIONNEL, si BRAVE_API_KEY est défini (voir README)
+//   - Pexels / Pixabay : OPTIONNELS, photos de stock gratuites (PEXELS_API_KEY, PIXABAY_API_KEY)
 //   (l'ancienne API « Google Custom Search » est fermée aux nouveaux comptes et s'arrête le 1er janvier 2027)
 const UA = "HosannaCast/1.0 (projection d'eglise)";
 const fail = (error, status = 400) => NextResponse.json({ error }, { status });
@@ -68,7 +69,7 @@ async function serper(q, page) {
   const r = await fetch("https://google.serper.dev/images", {
     method: "POST",
     headers: { "X-API-KEY": key, "Content-Type": "application/json", "User-Agent": UA },
-    body: JSON.stringify({ q, gl: "fr", hl: "fr", num: 20, page }),
+    body: JSON.stringify({ q, gl: "fr", hl: "fr", num: 10, page }),
     signal: AbortSignal.timeout(7000), cache: "no-store",
   });
   if (!r.ok) throw new Error(`Serper HTTP ${r.status}`);
@@ -93,6 +94,36 @@ async function brave(q, page) {
     id: "br:" + (x.properties?.url || x.url), thumb: https(x.thumbnail?.src) || https(x.properties?.url), url: https(x.properties?.url),
     title: strip(x.title), credit: "", license: "", source: strip(x.source) || "Brave",
     w: x.properties?.width, h: x.properties?.height, page: https(x.url),
+  })).filter((x) => x.thumb && x.url);
+}
+
+// Photos de stock gratuites (clé gratuite, sans limite pratique) : https://www.pexels.com/api
+async function pexels(q, page) {
+  const key = process.env.PEXELS_API_KEY;
+  if (!key) return null;
+  const u = new URL("https://api.pexels.com/v1/search");
+  u.search = new URLSearchParams({ query: q, per_page: "20", page: String(page), locale: "fr-FR" });
+  const r = await fetch(u, { headers: { Authorization: key, "User-Agent": UA }, signal: AbortSignal.timeout(7000), cache: "no-store" });
+  if (!r.ok) throw new Error(`Pexels HTTP ${r.status}`);
+  const j = await r.json();
+  return (j.photos || []).map((x) => ({
+    id: "px:" + x.id, thumb: https(x.src?.medium), url: https(x.src?.large2x) || https(x.src?.original),
+    title: strip(x.alt) || "Photo Pexels", credit: strip(x.photographer), license: "Pexels",
+    source: "Pexels", w: x.width, h: x.height, page: https(x.url),
+  })).filter((x) => x.thumb && x.url);
+}
+
+// https://pixabay.com/api/docs/ (clé gratuite)
+async function pixabay(q, page) {
+  const key = process.env.PIXABAY_API_KEY;
+  if (!key) return null;
+  const u = new URL("https://pixabay.com/api/");
+  u.search = new URLSearchParams({ key, q, image_type: "photo", per_page: "20", page: String(page), lang: "fr", safesearch: "true" });
+  const j = await getJson(u);
+  return (j.hits || []).map((x) => ({
+    id: "pb:" + x.id, thumb: https(x.webformatURL), url: https(x.largeImageURL) || https(x.webformatURL),
+    title: strip(x.tags), credit: strip(x.user), license: "Pixabay",
+    source: "Pixabay", w: x.imageWidth, h: x.imageHeight, page: https(x.pageURL),
   })).filter((x) => x.thumb && x.url);
 }
 
@@ -123,6 +154,8 @@ export async function GET(req) {
   const jobs = [
     { name: "Google Images", web: true, run: () => serper(q, page) },
     { name: "Brave", web: true, run: () => brave(q, page) },
+    { name: "Pexels", web: false, run: () => pexels(q, page) },
+    { name: "Pixabay", web: false, run: () => pixabay(q, page) },
     { name: "Wikimedia Commons", web: false, run: () => commons(q, page) },
     { name: "Openverse", web: false, run: () => openverse(q, page) },
   ];
