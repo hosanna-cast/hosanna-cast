@@ -126,7 +126,7 @@ export default function WebImage({ onProject, disabled, liveUrl, status }) {
           {!items.length && !searching ? (
             <p className="text-xs text-neutral-300 leading-5">Aucune image trouvée pour « {res.q} ». Essaie un autre mot (en français ou en anglais).</p>
           ) : (
-            <ul className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 max-h-72 overflow-y-auto">
+            <ul className="grid grid-cols-3 sm:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2 max-h-[calc(100vh-17rem)] min-h-72 overflow-y-auto">
               {items.map((r) => {
                 const on = liveUrl === r.url;
                 return (
