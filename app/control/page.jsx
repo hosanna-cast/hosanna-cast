@@ -570,12 +570,12 @@ export default function Control() {
       <div className="grid gap-3 lg:gap-5 lg:grid-cols-[240px_minmax(0,1fr)_300px] xl:grid-cols-[300px_minmax(0,1fr)_380px] 2xl:grid-cols-[380px_minmax(0,1fr)_480px] items-start">
 
         {/* ───── gauche : Bible, notes, chants ───── */}
-        <section className="order-3 lg:order-1 lg:sticky lg:top-6">
+        <section className={`order-3 lg:order-1 lg:sticky lg:top-6 ${showWeb ? "lg:col-span-2" : ""}`}>
           {(tabs.length > 1 || church.role !== "standard") && (
           <div className="flex gap-1 bg-neutral-800 rounded-lg p-1 mb-1.5 sm:mb-2">
             {[["bible", "Bible"], ["notes", "Notes"], ["chants", "Chants"], ["annonces", "Annonces"]].filter(([k]) => tabs.includes(k)).map(([k, l]) => (
               <button key={k} onClick={() => { setTab(k); setShowWeb(false); }}
-                className={`flex-1 px-3 py-1.5 rounded-md text-sm transition duration-100 active:scale-95 ${tab === k ? "bg-neutral-600 text-white font-medium" : "text-neutral-400 hover:text-white"}`}>{l}</button>
+                className={`flex-1 px-3 py-1.5 rounded-md text-sm transition duration-100 active:scale-95 ${tab === k && !showWeb ? "bg-neutral-600 text-white font-medium" : "text-neutral-400 hover:text-white"}`}>{l}</button>
             ))}
             {church.role !== "standard" && (
               <button onClick={() => setShowWeb((v) => !v)} title="Image depuis internet" aria-label="Image depuis internet" aria-pressed={showWeb}
@@ -584,7 +584,9 @@ export default function Control() {
           </div>
           )}
 
-          {tabs.includes("bible") && tab !== "annonces" && (
+          {webImageEl}
+
+          {tabs.includes("bible") && tab !== "annonces" && !showWeb && (
           <div className="flex gap-0.5 bg-neutral-800 rounded-md p-0.5 mb-1.5 sm:mb-2">
             {versions.map((v) => (
               <button key={v.id} onClick={() => setVersion(v.id)} title={v.full}
@@ -594,7 +596,7 @@ export default function Control() {
             ))}
           </div>
           )}
-          {tabs.includes("bible") && tab !== "annonces" && WEB_VERSIONS.length > 0 && (() => {
+          {tabs.includes("bible") && tab !== "annonces" && !showWeb && WEB_VERSIONS.length > 0 && (() => {
             // le chapitre visé : résultat sélectionné, sinon verset à l'écran, sinon chapitre affiché
             const t = q.trim() ? results[sel] : liveKind === "verse" && live ? live : view ? { b: view.b, c: view.c, v: null } : null;
             // chapitre + verset(s) visé(s) : bible.com ouvre le chapitre et met le verset en surbrillance
@@ -617,13 +619,13 @@ export default function Control() {
               </div>
             );
           })()}
-          {tabs.includes("bible") && tab !== "annonces" && online && (
+          {tabs.includes("bible") && tab !== "annonces" && !showWeb && online && (
             <p className="text-[10px] leading-snug text-neutral-500 mb-1.5">
               {bibleError ? <span className="text-red-400">Version en ligne indisponible : {bibleError}</span> : versions.find((v) => v.id === version)?.copyright}
             </p>
           )}
 
-          <div ref={panel} className="relative bg-neutral-800/60 border border-neutral-700 rounded-xl p-2 sm:p-3 max-h-[55vh] lg:max-h-[calc(100vh-7.5rem)] overflow-y-auto">
+          <div ref={panel} className={`${showWeb ? "hidden " : ""}relative bg-neutral-800/60 border border-neutral-700 rounded-xl p-2 sm:p-3 max-h-[55vh] lg:max-h-[calc(100vh-7.5rem)] overflow-y-auto`}>
             {tab === "annonces" ? (
               <AnnoncesAdd ann={ann} ui={annUi} />
             ) : tab !== "bible" ? (
@@ -714,7 +716,7 @@ export default function Control() {
         </section>
 
         {/* ───── centre : texte rapide (toujours en haut) puis contenu de l'onglet ───── */}
-        <div className="order-2 min-w-0 space-y-3">
+        <div className={`order-2 min-w-0 space-y-3 ${showWeb ? "hidden" : ""}`}>
           {church.role !== "annonces" && !isOrateur && (
           <QuickText
             onProject={projectFree}
@@ -724,8 +726,7 @@ export default function Control() {
               : {})}
           />
           )}
-        {webImageEl}
-        <div className={showWeb ? "hidden" : "space-y-3"}>
+        <div className="space-y-3">
         {tab === "annonces" ? (
         <section className="min-w-0 space-y-3">
           <AnnonceStage
