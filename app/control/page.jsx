@@ -353,6 +353,16 @@ export default function Control() {
   };
   // image trouvée sur internet : on envoie seulement le lien, l'écran la charge directement (rien n'est enregistré)
   const projectWebImage = (url, name) => projectMedia({ id: "web:" + url, kind: "image", url, name });
+  const webImageEl = church.role !== "standard" && (
+    <div className={showWeb ? "" : "hidden"}>
+      <WebImage
+        onProject={projectWebImage}
+        disabled={!canProject}
+        liveUrl={liveKind === "media" && typeof mediaLive?.id === "string" && mediaLive.id.startsWith("web:") ? mediaLive.id.slice(4) : null}
+        status={mediaStatus}
+      />
+    </div>
+  );
   const mediaCmd = (cmd) => { if (canProject) ch.current?.postMessage({ type: "media", cmd }); };
   const clearScreen = () => {
     if (!canProject) return;
@@ -563,7 +573,7 @@ export default function Control() {
           {(tabs.length > 1 || church.role !== "standard") && (
           <div className="flex gap-1 bg-neutral-800 rounded-lg p-1 mb-1.5 sm:mb-2">
             {[["bible", "Bible"], ["notes", "Notes"], ["chants", "Chants"], ["annonces", "Annonces"]].filter(([k]) => tabs.includes(k)).map(([k, l]) => (
-              <button key={k} onClick={() => setTab(k)}
+              <button key={k} onClick={() => { setTab(k); setShowWeb(false); }}
                 className={`flex-1 px-3 py-1.5 rounded-md text-sm transition duration-100 active:scale-95 ${tab === k ? "bg-neutral-600 text-white font-medium" : "text-neutral-400 hover:text-white"}`}>{l}</button>
             ))}
             {church.role !== "standard" && (
@@ -571,16 +581,6 @@ export default function Control() {
                 className={`shrink-0 px-3 py-1.5 rounded-md text-sm transition duration-100 active:scale-95 ${showWeb ? "bg-sky-400 text-black font-medium" : "text-sky-300 hover:text-white"}`}>🌐 Image</button>
             )}
           </div>
-          )}
-          {church.role !== "standard" && (
-            <div className={showWeb ? "mb-1.5 sm:mb-2" : "hidden"}>
-              <WebImage
-                onProject={projectWebImage}
-                disabled={!canProject}
-                liveUrl={liveKind === "media" && typeof mediaLive?.id === "string" && mediaLive.id.startsWith("web:") ? mediaLive.id.slice(4) : null}
-                status={mediaStatus}
-              />
-            </div>
           )}
 
           {tabs.includes("bible") && (
@@ -723,6 +723,8 @@ export default function Control() {
               : {})}
           />
           )}
+        {webImageEl}
+        <div className={showWeb ? "hidden" : "space-y-3"}>
         {tab === "annonces" ? (
         <section className="min-w-0">
           <AnnonceStage
@@ -802,6 +804,7 @@ export default function Control() {
           )}
         </section>
         )}
+        </div>
         </div>
 
         {/* ───── droite : l'écran (en premier sur mobile) ───── */}
