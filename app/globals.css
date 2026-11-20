@@ -4,3 +4,8 @@ html, body { margin: 0; background: #171717; }
 
 /* barres de défilement discrètes (sinon la Bible de gauche affiche une barre blanche) */
 * { scrollbar-width: thin; scrollbar-color: #525252 transparent; }
+
+/* transition douce à l'écran de projection : le texte apparaît en fondu (durée réglable dans l'Administration) */
+@keyframes hc-fade { from { opacity: 0; } to { opacity: 1; } }
+.hc-fade { animation-name: hc-fade; animation-timing-function: ease-out; animation-fill-mode: both; }
+@media (prefers-reduced-motion: reduce) { .hc-fade { animation: none; } }

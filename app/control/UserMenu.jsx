@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { ROLES } from "@/lib/roles";
+import { canPlaceWindows, openOnSecondScreen } from "@/lib/secondScreen";
 
 const Icon = ({ d, className = "h-4 w-4" }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
@@ -38,6 +39,14 @@ export default function UserMenu({ church, copied, onCopy, copiedObs, onCopyObs,
   return (
     <div className="flex items-center gap-2 sm:gap-3 shrink-0">
       <a href={`/display?k=${church.token}`} target="_blank" aria-label="Ouvrir l'écran de projection"
+        title={canPlaceWindows() ? "Ouvre l'écran sur le 2ᵉ écran (vidéoprojecteur) s'il est branché" : "Ouvrir l'écran de projection"}
+        onClick={(e) => {
+          // ordinateur avec 2ᵉ écran : la fenêtre s'ouvre directement dessus ; sinon le lien s'ouvre normalement dans un nouvel onglet
+          if (!canPlaceWindows() || e.ctrlKey || e.metaKey || e.shiftKey) return;
+          e.preventDefault();
+          const url = `${location.origin}/display?k=${church.token}`;
+          openOnSecondScreen(url).then((w) => { if (!w) window.open(url, "_blank"); }).catch(() => window.open(url, "_blank"));
+        }}
         className="inline-flex items-center gap-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-black font-medium text-sm px-2.5 sm:px-3.5 py-1.5 transition duration-100 active:scale-95">
         <span className="hidden sm:inline">Écran</span>
         <Icon d={I.out} className="h-4 w-4 sm:h-3.5 sm:w-3.5" />

@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { openScreen } from "@/lib/screen";
 import { uuid } from "@/lib/uuid";
 import { RichText } from "@/lib/bold";
+import { useWakeLock } from "@/lib/useWakeLock";
 
 // Vue orateur (écran de la chaire / tablette) : /speaker?k=<jeton>
 // Montre ce qui est projeté, ce qui vient ensuite, et un chronomètre de prédication.
@@ -25,6 +26,7 @@ export default function Speaker() {
   const box = useRef(null);
   const txt = useRef(null);
   const last = useRef(0);
+  useWakeLock(true);                        // la tablette de chaire ne se met pas en veille pendant la prédication
 
   // réglages gardés sur cet appareil
   useEffect(() => {
@@ -118,7 +120,7 @@ export default function Speaker() {
             <div ref={box} className={`flex-1 min-h-0 flex ${chant ? "justify-center" : ""} items-center`}>
               <p ref={txt} className={`${chant ? "w-full text-center font-sans font-bold leading-[1.25]" : "font-serif leading-snug"} ${v.kind === "slide" ? "w-full text-center" : ""} whitespace-pre-line ${blank ? "opacity-60" : ""}`}>{chant ? v.text : <RichText text={v.text} bold={v.bold} under={v.under} />}</p>
             </div>
-            <div className="text-right text-[3vh] pt-[1vh] text-amber-300">{v.ref} <span className="opacity-60 text-[2.2vh]">{v.version}</span></div>
+            <div className="text-right text-[3vh] pt-[1vh] text-amber-300">{v.ref} <span className="opacity-60 text-[2.2vh]">{v.version}</span>{v.page && <span className="ml-2 text-[2.2vh]">{v.page.i + 1}/{v.page.n}</span>}</div>
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center text-neutral-600 text-xl">En attente d'un verset…</div>

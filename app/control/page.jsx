@@ -22,6 +22,9 @@ import { tabsFor } from "@/lib/roles";
 import { RichText, toggleRange } from "@/lib/bold";
 import { USFM } from "@/lib/usfmBooks";
 import { buildSnapshot } from "@/lib/screenProtocol";
+import { pagesOfRange } from "@/lib/paginate";
+import { useServicePlans } from "@/lib/servicePlan";
+import PlanCulte from "./PlanCulte";
 import ONLINE from "@/config/online-versions.json";
 
 // versions à ouvrir sur bible.com (champ "web" = numéro dans l'adresse bible.com/bible/NUMÉRO/...)
@@ -72,6 +75,8 @@ export default function Control() {
   const [live, setLive] = useState(null);                 // dernier verset projeté (indices)
   const [slideLive, setSlideLive] = useState(null);       // dernière diapositive projetée { kind, id, i }
   const [liveKind, setLiveKind] = useState("verse");      // "verse" | "slide" : ce que ← → font avancer
+  const [livePage, setLivePage] = useState(0);            // page du passage projeté (passage long découpé en pages, voir lib/paginate.js)
+  const [planActive, setPlanActive] = useState(null);      // élément du plan de culte en cours
   const [shown, setShown] = useState(null);               // exactement ce qui est envoyé à l'écran
   const [blank, setBlank] = useState(false);
   const [layout, setLayout] = useState("full");            // « full » = plein écran, « band » = bandeau en bas (temps de prière, direct)
@@ -112,7 +117,7 @@ export default function Control() {
     if (window.matchMedia("(min-width: 1024px)").matches) searchRef.current?.focus();
   }, [tab]);
 
-  stateRef.current = { shown, live, slideLive, liveKind, blank, screenBg, screenText, mediaLive, layout, dset, logo };
+  stateRef.current = { shown, live, livePage, slideLive, liveKind, blank, screenBg, screenText, mediaLive, layout, dset, logo };
 
   // Plusieurs personnes peuvent piloter le même écran : chaque console reçoit ce que les autres projettent,
   // donc tout le monde voit la même chose à l'écran et ← → repartent du bon endroit.
@@ -125,6 +130,7 @@ export default function Control() {
       if (chantsOnly && m.shown && m.shown.kind !== allowedKind) { setShown(OTHER); setLive(null); setSlideLive(null); if (m.blank !== undefined) setBlank(m.blank); return; }
       if (m.shown !== undefined) setShown(m.shown);
       setLive(m.r || null);
+      setLivePage(m.page ?? 0);
       setSlideLive(m.s || null);
       if (m.liveKind) setLiveKind(m.liveKind);
       if (m.blank !== undefined) setBlank(m.blank);
@@ -170,9 +176,9 @@ export default function Control() {
       const noted = (what) => { if (who) { setLastBy({ ...who, what }); setRPulse(true); setTimeout(() => setRPulse(false), 700); } };
       if (["show", "update", "clear", "blank"].includes(m.type)) synced.current = true;
       if (m.type === "show" || m.type === "update") {
-        setShown({ type: m.type, kind: m.kind, ref: m.ref, text: m.text, version: m.version, bold: m.bold, under: m.under, next: m.next, mediaType: m.mediaType, url: m.url });
+        setShown({ type: m.type, kind: m.kind, ref: m.ref, text: m.text, version: m.version, bold: m.bold, under: m.under, next: m.next, page: m.page, mediaType: m.mediaType, url: m.url });
         if (m.r) {
-          setLive(m.r); setLiveKind("verse");
+          setLive(m.r); setLivePage(m.page?.i ?? 0); setLiveKind("verse");
           if (m.type === "show") setHistory((h) => [m.r, ...h.filter((x) => !(x.b === m.r.b && x.c === m.r.c && x.v === m.r.v && x.vEnd === m.r.vEnd))].slice(0, 15));
         } else if (m.media) { setMediaLive(m.media); setLiveKind("media");
         } else if (m.s) { setSlideLive(m.s); setLiveKind("slide"); }
@@ -187,7 +193,7 @@ export default function Control() {
       } else if (m.type === "sync?") {
         // quelqu'un vient d'ouvrir la console : on lui dit ce qui est à l'écran
         const st = stateRef.current;
-        if (st.shown || st.blank) ch.current?.postMessage({ type: "state", to: m.by?.id, shown: st.shown, r: st.live, s: st.slideLive, media: st.mediaLive, liveKind: st.liveKind, blank: st.blank, layout: st.layout });
+        if (st.shown || st.blank) ch.current?.postMessage({ type: "state", to: m.by?.id, shown: st.shown, r: st.live, page: st.livePage, s: st.slideLive, media: st.mediaLive, liveKind: st.liveKind, blank: st.blank, layout: st.layout });
       } else if (m.type === "state" && m.to === me.id) applyState(m);
     };
     ch.current = openScreen(church.token, onRemote, {
@@ -256,7 +262,7 @@ export default function Control() {
   // le chapitre demandé vient d'arriver : on termine la projection / la re-projection en attente
   useEffect(() => {
     const p = pendingProject.current;
-    if (p && chapterReady(p.r.b, p.r.c)) { pendingProject.current = null; project(p.r, p.citeRange); }
+    if (p && chapterReady(p.r.b, p.r.c)) { pendingProject.current = null; project(p.r, p.citeRange, p.page); }
     const r = pendingReproject.current;
     if (r && chapterReady(r.b, r.c)) { pendingReproject.current = null; reproject(r); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -317,13 +323,28 @@ export default function Control() {
 
   const flash = () => { synced.current = true; setLastBy(null); setPulse(true); setTimeout(() => setPulse(false), 250); };
 
-  const project = (r, citeRange) => {
+  // pages d'un passage (un passage long est découpé : voir lib/paginate.js). La longueur d'une page se règle dans l'Administration.
+  const pagesOf = (r) => {
+    const vs = bible?.[r.b]?.[r.c];
+    if (!vs) return [textOf(r)];
+    return pagesOfRange(vs, r.v, r.vEnd, layout === "band" ? dset.band.pageChars : dset.full.pageChars);
+  };
+  // message « verset / passage » pour la page demandée (clampée) : texte de la page, repère « 2/5 », et « à venir » pour la vue orateur
+  const verseMsg = (type, r, page) => {
+    const pages = pagesOf(r);
+    const i = Math.min(Math.max(page, 0), pages.length - 1);
+    const next = i < pages.length - 1 ? { ref: `${refOf(r)} · suite`, text: pages[i + 1] } : nextVerse(r);
+    return { msg: { type, ref: refOf(r), text: pages[i], version: label, r, page: pages.length > 1 ? { i, n: pages.length } : null, next }, i };
+  };
+
+  const project = (r, citeRange, page = 0) => {
     if (!canProject) return;
-    if (!chapterReady(r.b, r.c)) { pendingProject.current = { r, citeRange }; ensureChapter(r.b, r.c); return; }
+    if (!chapterReady(r.b, r.c)) { pendingProject.current = { r, citeRange, page }; ensureChapter(r.b, r.c); return; }
     setView({ b: r.b, c: r.c });
     setCite((prev) => (citeRange !== undefined ? citeRange : prev && prev.b === r.b && prev.c === r.c ? prev : null));
-    const msg = { type: "show", ref: refOf(r), text: textOf(r), version: label, r, next: nextVerse(r) };
+    const { msg, i } = verseMsg("show", r, page);
     setLive(r);
+    setLivePage(i);
     setLiveKind("verse");
     setShown(msg);
     setNav({ b: r.b, c: r.c });
@@ -404,6 +425,7 @@ export default function Control() {
     ch.current?.postMessage({ type: "clear" });
     setLastBy(null);
     setLive(null);
+    setLivePage(0);
     setSlideLive(null);
     setMediaLive(null);
     setShown(null);
@@ -425,7 +447,8 @@ export default function Control() {
     if (!canProject) return;
     if (!chapterReady(r.b, r.c)) { pendingReproject.current = r; ensureChapter(r.b, r.c); return; }
     if (!bible?.[r.b]?.[r.c]?.[r.v]) return;           // verset absent de cette version : l'écran reste tel quel
-    const msg = { type: "update", ref: refOf(r), text: textOf(r), version: label, r, next: nextVerse(r) };
+    const { msg, i } = verseMsg("update", r, livePage);     // même page qu'avant (ou la dernière si la nouvelle version est plus courte)
+    setLivePage(i);
     setShown(msg);
     ch.current?.postMessage(msg);
     flash();
@@ -479,10 +502,14 @@ export default function Control() {
       return;
     }
     if (!live || !bible) return;
+    // passage long : ← → tournent d'abord les pages, puis passent au verset d'avant / d'après
+    const pages = pagesOf(live);
+    const pi = livePage + d;
+    if (pi >= 0 && pi < pages.length) { project(live, undefined, pi); return; }
     const vs = bible[live.b]?.[live.c];
     if (!vs) return;
-    const v = (live.vEnd ?? live.v) + d;
-    if (v >= 0 && v < vs.length) project({ b: live.b, c: live.c, v, vEnd: null });
+    const v = d > 0 ? (live.vEnd ?? live.v) + 1 : live.v - 1;
+    if (v >= 0 && v < vs.length) project({ b: live.b, c: live.c, v, vEnd: null }, undefined, d < 0 ? Infinity : 0);   // en reculant : dernière page du verset précédent
   };
 
   // la sélection faite dans l'aperçu est mémorisée : toucher le bouton « B » ne la perd pas (téléphone)
@@ -535,6 +562,55 @@ export default function Control() {
     setLastBy(null);
   };
 
+  // ───── plan de culte (Supabase, partagé entre appareils) ─────
+  const planOn = ["admin", "assistant", "orateur"].includes(church.role);      // « Chants » et « Annonces » n'y ont pas accès
+  const planReadOnly = !["admin", "assistant"].includes(church.role);          // écriture réservée à l'admin et à l'aide écran (comme les règles SQL)
+  const plan = useServicePlans(planOn);
+  const planMissing = (it) => (it.k === "chants" || it.k === "notes") ? !library.lib[it.k].some((x) => x.id === it.itemId)
+    : it.k === "media" ? ann.ready && !ann.list.some((x) => x.id === it.itemId) : false;
+  const playPlanItem = (it) => {
+    if (!canProject) return;
+    setPlanActive(it.id);
+    if (it.k === "verse" && it.r) { if (tabs.includes("bible")) { setTab("bible"); setShowWeb(false); } project(it.r); }
+    else if (it.k === "chants" || it.k === "notes") {
+      const item = library.lib[it.k].find((x) => x.id === it.itemId);
+      if (!item) return setHint("Cet élément n'existe plus dans la bibliothèque.");
+      if (tabs.includes(it.k)) { setTab(it.k); setShowWeb(false); }
+      if (it.k === "chants") setChantId(item.id); else setNoteId(item.id);
+      projectSlide(it.k, item, 0, slidesOf(item));
+    }
+    else if (it.k === "media") {
+      const a = ann.list.find((x) => x.id === it.itemId);
+      if (!a) return setHint("Cette annonce n'existe plus (ou a expiré).");
+      projectMedia(a);
+    }
+    else if (it.k === "text") projectFree(it.text || it.title);
+  };
+  const planStep = (d) => {
+    const i = plan.items.findIndex((x) => x.id === planActive);
+    const t = plan.items[i < 0 ? (d > 0 ? 0 : -1) : i + d];
+    if (t) playPlanItem(t);
+  };
+  const planAddRef = (str) => {
+    const ref = parseRef(str);
+    if (!ref) return false;
+    const b = ref.books[0], c = ref.chapter ? ref.chapter - 1 : 0, v = ref.verse ? ref.verse - 1 : 0;
+    if (bible && !bible[b]?.[c]) return false;
+    const r = { b, c, v, vEnd: ref.verseEnd && ref.verseEnd - 1 > v ? ref.verseEnd - 1 : null };
+    return plan.add({ k: "verse", title: refOf(r), r });
+  };
+  const planAddLib = (kind, id) => {
+    if (kind === "media") { const a = ann.list.find((x) => x.id === id); if (a) plan.add({ k: "media", title: a.name, itemId: a.id }); return; }
+    const item = library.lib[kind]?.find((x) => x.id === id);
+    if (item) plan.add({ k: kind, title: item.title, itemId: item.id });
+  };
+  const planAddCurrent = () => {
+    if (liveKind === "verse" && live) return plan.add({ k: "verse", title: refOf(live), r: { b: live.b, c: live.c, v: live.v, vEnd: live.vEnd ?? null } });
+    if (liveKind === "slide" && slideLive) { const item = library.lib[slideLive.kind]?.find((x) => x.id === slideLive.id); if (item) plan.add({ k: slideLive.kind, title: item.title, itemId: item.id }); return; }
+    if (liveKind === "media" && mediaLive && !String(mediaLive.id).startsWith("web:")) { const a = ann.list.find((x) => x.id === mediaLive.id); if (a) plan.add({ k: "media", title: a.name, itemId: a.id }); return; }
+    if (liveKind === "free" && shown?.text) plan.add({ k: "text", title: shown.text.split("\n")[0].slice(0, 60), text: shown.text });
+  };
+
   const onKey = (e) => {
     const t = e.target;
     // on tape dans le formulaire d'une note : les raccourcis ne s'appliquent pas
@@ -556,6 +632,8 @@ export default function Control() {
     else if (e.key === "ArrowUp" && results.length) { e.preventDefault(); setSel((s) => Math.max(s - 1, 0)); }
     else if (e.key === "Enter" && results[sel]) { project(results[sel]); setQ(""); }
     else if (e.key === "Escape") clearScreen();
+    else if (!q && planOn && e.key === "PageDown") { e.preventDefault(); planStep(1); }
+    else if (!q && planOn && e.key === "PageUp") { e.preventDefault(); planStep(-1); }
     else if (!q && e.key === "ArrowRight") step(1);
     else if (!q && e.key === "ArrowLeft") step(-1);
     else if (!q && !inField && k === "n") toggleBlank();
@@ -863,7 +941,7 @@ export default function Control() {
             {shown && shown.kind !== "other" && !blank && bandPreview && (
               <div className="absolute inset-0 flex flex-col justify-end" style={{ padding: "4cqh 6cqw" }}>
                 <div className={`flex mb-[1cqh] ${logo && PB.logoOn && PB.logoSide === "right" ? "justify-start" : "justify-end"}`}>
-                  <span className="rounded px-1.5 py-0.5 text-[10px] sm:text-xs bg-black/80 border border-neutral-600">{shown.ref} <span className="opacity-60">{shown.version}</span></span>
+                  <span className="rounded px-1.5 py-0.5 text-[10px] sm:text-xs bg-black/80 border border-neutral-600">{shown.ref} <span className="opacity-60">{shown.version}</span>{shown.page && <span className="ml-1 text-amber-300">{shown.page.i + 1}/{shown.page.n}</span>}</span>
                 </div>
                 <div className={`relative flex items-stretch gap-[2cqw] rounded-md bg-black/80 border border-neutral-600 px-[2.5cqw] ${PB.logoSide === "left" ? "flex-row-reverse" : ""}`} style={{ height: `${PB.height}cqh` }}>
                   {logo && PB.logoOn && (
@@ -898,7 +976,7 @@ export default function Control() {
                 ) : (
                   <>
                     <p ref={previewTxt} className={`font-serif leading-snug whitespace-pre-line cursor-text ${shown.kind === "slide" ? "text-center" : ""} ${size}`}><RichText text={shown.text} bold={shown.bold} under={shown.under} /></p>
-                    <div className="mt-2 text-right text-sm">{shown.ref} <span className="text-xs opacity-60">{shown.version}</span></div>
+                    <div className="mt-2 text-right text-sm">{shown.ref} <span className="text-xs opacity-60">{shown.version}</span>{shown.page && <span className="ml-1 text-xs text-amber-300">{shown.page.i + 1}/{shown.page.n}</span>}</div>
                   </>
                 )}
                 </div>
@@ -941,11 +1019,30 @@ export default function Control() {
           </div>
           )}
 
+          {planOn && (
+            <PlanCulte
+              plan={plan}
+              activeItemId={planActive}
+              canProject={canProject}
+              readOnly={planReadOnly}
+              lib={{ chants: library.lib.chants, notes: library.lib.notes, media: ann.list }}
+              missing={planMissing}
+              onPlay={playPlanItem}
+              onNext={() => planStep(1)}
+              onPrev={() => planStep(-1)}
+              onAddRef={planAddRef}
+              onAddLib={planAddLib}
+              onAddCurrent={planAddCurrent}
+              canAddCurrent={!!shown && shown.kind !== "other" && !(liveKind === "media" && String(mediaLive?.id).startsWith("web:"))}
+            />
+          )}
+
           <div className="hidden lg:flex mt-4 flex-col items-center gap-2.5 text-xs xl:text-sm text-neutral-400">
             <div className="flex flex-wrap justify-center gap-x-4 gap-y-2">
               <span className="flex items-center gap-1.5"><Kbd>↑↓</Kbd> choisir</span>
               <span className="flex items-center gap-1.5"><Kbd>Entrée</Kbd> projeter</span>
               <span className="flex items-center gap-1.5"><Kbd>←→</Kbd> naviguer</span>
+              {planOn && <span className="flex items-center gap-1.5"><Kbd>Page ↓↑</Kbd> plan du culte</span>}
             </div>
             <div className="flex flex-wrap justify-center gap-x-4 gap-y-2">
               <span className="flex items-center gap-1.5"><Kbd>Échap</Kbd> effacer</span>

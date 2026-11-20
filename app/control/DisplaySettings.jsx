@@ -59,13 +59,17 @@ export default function DisplaySettings({ settings, logo, onSettings, onLogo, di
         <Seg label="Réglages pour" value={mode} onChange={setMode} options={[["band", "Bandeau"], ["full", "Plein écran"]]} />
 
         {mode === "band" ? (
-          <Slider label="Hauteur du bandeau" unit=" %" value={s.height} range={L.height} disabled={disabled} onChange={(v) => set({ height: v })} />
+          <>
+            <Slider label="Hauteur du bandeau" unit=" %" value={s.height} range={L.height} disabled={disabled} onChange={(v) => set({ height: v })} />
+            <Slider label="Longueur d'une page (passage long)" unit=" car." value={s.pageChars} range={L.pageChars} disabled={disabled} onChange={(v) => set({ pageChars: v })} />
+          </>
         ) : (
           <>
             <Slider label="Marge gauche / droite" unit=" %" value={s.padX} range={L.padX} disabled={disabled} onChange={(v) => set({ padX: v })} />
             <Slider label="Marge du haut" unit=" %" value={s.padTop} range={L.padTop} disabled={disabled} onChange={(v) => set({ padTop: v })} />
             <Slider label="Marge du bas" unit=" %" value={s.padBottom} range={L.padBottom} disabled={disabled} onChange={(v) => set({ padBottom: v })} />
             <Slider label="Taille maximale du texte" unit=" px" value={s.maxFont} range={L.maxFont} disabled={disabled} onChange={(v) => set({ maxFont: v })} />
+            <Slider label="Longueur d'une page (passage long)" unit=" car." value={s.pageChars} range={L.pageChars} disabled={disabled} onChange={(v) => set({ pageChars: v })} />
             <div>
               <span className="block text-xs text-neutral-300 mb-0.5">Alignement vertical</span>
               <Seg label="Alignement vertical" value={s.valign} disabled={disabled} onChange={(v) => set({ valign: v })} options={[["top", "Haut"], ["center", "Centre"], ["bottom", "Bas"]]} />
@@ -104,6 +108,12 @@ export default function DisplaySettings({ settings, logo, onSettings, onLogo, di
               )}
             </>
           )}
+        </div>
+
+        <div className="border-t border-neutral-700 pt-3">
+          <Slider label="Transition douce du texte" unit={settings.fade ? " ms" : " (aucune)"} value={settings.fade} range={LIMITS.fade} disabled={disabled}
+            onChange={(v) => onSettings(mergeSettings({ ...settings, fade: v }))} />
+          <p className="text-[11px] text-neutral-500 mt-1">Un passage plus long que la limite est découpé en pages ; ← → passent d'une page à l'autre.</p>
         </div>
 
         <button type="button" disabled={disabled} onClick={() => onSettings(mergeSettings(DEFAULT_SETTINGS))}

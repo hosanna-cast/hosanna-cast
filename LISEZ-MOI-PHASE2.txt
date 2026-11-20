@@ -1,0 +1,11 @@
+Hosanna Cast : Phase 2 (sans le mode Preview)
+
+1. Copie ces fichiers dans le dépôt, en gardant les mêmes chemins (ils remplacent les anciens).
+2. SUPPRIME ces deux fichiers morts : app/control/Playlist.jsx et lib/playlist.js
+3. Supabase → SQL Editor → colle et lance supabase/plan-culte.sql (une seule fois, relançable sans danger).
+4. Déploie.
+
+Nouveaux : lib/paginate.js, lib/servicePlan.js, lib/useWakeLock.js, lib/secondScreen.js,
+           app/control/PlanCulte.jsx, supabase/plan-culte.sql
+Modifiés : app/control/page.jsx, app/control/DisplaySettings.jsx, app/control/UserMenu.jsx,
+           app/display/page.jsx, app/speaker/page.jsx, app/globals.css, lib/displaySettings.js

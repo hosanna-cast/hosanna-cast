@@ -5,6 +5,7 @@ import { uuid } from "@/lib/uuid";
 import { bgStyle } from "../control/Backgrounds";
 import { RichText } from "@/lib/bold";
 import { DEFAULT_SETTINGS, mergeSettings, loadSettings, saveSettings, loadLogo, saveLogo } from "@/lib/displaySettings";
+import { useWakeLock } from "@/lib/useWakeLock";
 
 // messages dont l'écran confirme la réception à la console (sans confirmation, elle renvoie l'état complet)
 const ACKED = new Set(["show", "update", "clear", "blank", "snapshot"]);
@@ -24,6 +25,27 @@ export default function Display() {
   const vid = useRef(null);
   const chRef = useRef(null);
   const resume = useRef({ url: null, t: 0 });              // reprise de la vidéo si l'écran noir est activé puis retiré
+  useWakeLock(true);                                       // l'écran de projection ne se met jamais en veille
+  const [idle, setIdle] = useState(false);                 // souris immobile : le curseur disparaît (il ne traîne pas sur la projection)
+  const [isFs, setIsFs] = useState(false);
+  const [hint, setHint] = useState(true);                  // rappel « clic = plein écran », quelques secondes après l'ouverture
+
+  const toggleFs = () => {
+    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+    else document.documentElement.requestFullscreen?.().catch(() => {});
+  };
+  useEffect(() => {
+    let t;
+    const wake = () => { setIdle(false); clearTimeout(t); t = setTimeout(() => setIdle(true), 2500); };
+    const onFs = () => setIsFs(!!document.fullscreenElement);
+    const onKey = (e) => { if ((e.key === "f" || e.key === "F") && !e.ctrlKey && !e.metaKey && !e.altKey) toggleFs(); };
+    wake();
+    const hintTimer = setTimeout(() => setHint(false), 9000);
+    window.addEventListener("mousemove", wake);
+    window.addEventListener("keydown", onKey);
+    document.addEventListener("fullscreenchange", onFs);
+    return () => { clearTimeout(t); clearTimeout(hintTimer); window.removeEventListener("mousemove", wake); window.removeEventListener("keydown", onKey); document.removeEventListener("fullscreenchange", onFs); };
+  }, []);
 
   useEffect(() => {
     // /display?k=<jeton> : le jeton est dans le lien « Écran » de la console (copiable pour un autre appareil)
@@ -131,14 +153,20 @@ export default function Display() {
   const fullLogo = logo && F.logoOn;
   const logoLeft = B.logoSide === "left";
   const vAlign = { top: "items-start", center: "items-center", bottom: "items-end" }[F.valign];
+  // transition douce : le contenu est remonté (donc rejoué en fondu) quand le texte, la page ou la mise en page change ;
+  // un changement de gras / souligné ne rejoue rien. L'écran noir, lui, est toujours instantané.
+  const fadeOn = cfg.fade > 0;
+  const fadeKey = `${v?.ref}|${v?.page?.i}|${v?.text}|${v?.url}|${layout}|${blank}`;
+  const fxc = fadeOn ? " hc-fade" : "";
+  const fxs = fadeOn ? { animationDuration: cfg.fade + "ms" } : undefined;
+  const pg = v?.page ? <span className="ml-[0.6em] text-[0.6em] opacity-70">{v.page.i + 1}/{v.page.n}</span> : null;
 
   return (
     <div className={`fixed inset-0 ${transparent ? "" : "bg-black"} text-white flex flex-col ${band ? "justify-end" : "justify-center"}`}
-         style={{ ...(band ? { padding: "4vh 6vw" } : { padding: `${F.padTop}vh ${F.padX}vw ${F.padBottom}vh` }), ...(transparent ? {} : bgStyle(blank ? null : bg)), color: textColor }}
-         onClick={unmute}
-         onDoubleClick={() => document.documentElement.requestFullscreen?.()}>
+         style={{ ...(band ? { padding: "4vh 6vw" } : { padding: `${F.padTop}vh ${F.padX}vw ${F.padBottom}vh` }), ...(transparent ? {} : bgStyle(blank ? null : bg)), color: textColor, ...(idle ? { cursor: "none" } : {}) }}
+         onClick={() => { unmute(); if (!document.fullscreenElement && !forcedMute && !transparent) toggleFs(); }}>
       {!blank && v && v.kind === "media" && (
-        <div className="absolute inset-0 bg-black flex items-center justify-center">
+        <div key={`m|${v.url}`} className={"absolute inset-0 bg-black flex items-center justify-center" + fxc} style={fxs}>
           {v.mediaType === "video" ? (
             <video key={v.url} ref={vid} src={v.url} playsInline className="max-w-full max-h-full"
               onPlaying={() => report(vid.current?.muted && forcedMute ? "muted" : "playing")}
@@ -160,10 +188,10 @@ export default function Display() {
       )}
 
       {band && (
-        <div className="mb-[1vh]">
+        <div key={fadeKey} className={"mb-[1vh]" + fxc} style={fxs}>
           <div className={`flex mb-[1vh] ${bandLogo && !logoLeft ? "justify-start" : "justify-end"}`}>
             <span className="rounded-[0.8vh] px-[1.4vw] py-[0.5vh] text-[2.6vh] font-medium" style={{ background: bandBg, color: bandFg }}>
-              {v.ref} {v.version ? <span className="opacity-60 text-[2.1vh]">{v.version}</span> : null}
+              {v.ref} {v.version ? <span className="opacity-60 text-[2.1vh]">{v.version}</span> : null}{pg}
             </span>
           </div>
           <div className={`relative flex items-stretch gap-[2vw] rounded-[2.2vh] px-[2.5vw] ${logoLeft ? "flex-row-reverse" : ""}`}
@@ -184,20 +212,25 @@ export default function Display() {
       )}
 
       {!band && !blank && v && v.kind === "chant" && (
-        <>
+        <div key={fadeKey} className={"flex-1 flex flex-col min-h-0" + fxc} style={fxs}>
           <div ref={box} className={`flex-1 flex ${vAlign} justify-center min-h-0`}>
             <p ref={txt} className="w-full text-center font-sans font-bold leading-[1.25] whitespace-pre-line">{v.text}</p>
           </div>
           <div className="text-center text-[2.2vh] pt-[1.5vh]">{v.ref}</div>
-        </>
+        </div>
       )}
       {!band && !blank && v && v.kind !== "chant" && v.kind !== "media" && (
-        <>
+        <div key={fadeKey} className={"flex-1 flex flex-col min-h-0" + fxc} style={fxs}>
           <div ref={box} className={`flex-1 flex ${vAlign} min-h-0`}>
             <p ref={txt} className={`leading-snug font-serif whitespace-pre-line ${v.kind === "slide" ? "w-full text-center" : ""}`}><RichText text={v.text} bold={v.bold} under={v.under} /></p>
           </div>
-          <div className="text-right text-[4vh] pt-[2vh]">{v.ref} <span className="opacity-60 text-[2.5vh]">{v.version}</span></div>
-        </>
+          <div className="text-right text-[4vh] pt-[2vh]">{v.ref} <span className="opacity-60 text-[2.5vh]">{v.version}</span>{pg}</div>
+        </div>
+      )}
+      {hint && !isFs && !transparent && (
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-black/70 text-white/70 text-xs px-3 py-1 pointer-events-none select-none">
+          Clique ou appuie sur F pour le plein écran
+        </div>
       )}
     </div>
   );
