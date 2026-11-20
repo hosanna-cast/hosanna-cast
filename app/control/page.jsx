@@ -25,6 +25,7 @@ import { buildSnapshot } from "@/lib/screenProtocol";
 import { pagesOfRange } from "@/lib/paginate";
 import { useServicePlans } from "@/lib/servicePlan";
 import { PlanAdd, PlanList } from "./PlanCulte";
+import { findSimilarVerses } from "@/lib/voiceRefs";
 import VoiceRefs from "./VoiceRefs";        // Voice (test) : détection vocale, supprimable
 import ONLINE from "@/config/online-versions.json";
 
@@ -623,6 +624,8 @@ export default function Control() {
     const r = { b, c: chapter - 1, v: verse != null ? verse - 1 : null, vEnd: vEnd && vEnd > verse && (!Array.isArray(chap) || chap[vEnd - 1]) ? vEnd - 1 : null };
     return { ...r, label: r.v == null ? `${BOOKS[b]} ${chapter}` : refOf(r) };
   };
+  // Voice (test) : versets dont le texte ressemble à ce qui vient d'être dit (sans référence) ; versions locales seulement (index de recherche)
+  const voiceSimilar = (text, level) => findSimilarVerses(text, index, bible, level).map((m) => ({ b: m.b, c: m.c, v: m.v, label: refOf({ b: m.b, c: m.c, v: m.v }), snippet: m.text }));
   const voicePick = (r) => {
     if (r.v == null) { ensureChapter(r.b, r.c); setView({ b: r.b, c: r.c }); setNav({ b: r.b, c: r.c }); if (tabs.includes("bible")) { setTab("bible"); setShowWeb(false); } return; }
     project({ b: r.b, c: r.c, v: r.v, vEnd: r.vEnd });
@@ -865,7 +868,7 @@ export default function Control() {
 
         {/* ───── centre : texte rapide (toujours en haut) puis contenu de l'onglet ───── */}
         <div className={`order-2 min-w-0 space-y-3 ${showWeb ? "hidden" : ""}`}>
-          {tabs.includes("bible") && <VoiceRefs resolve={voiceResolve} onPick={voicePick} canProject={canProject} />}
+          {tabs.includes("bible") && <VoiceRefs resolve={voiceResolve} similar={voiceSimilar} onPick={voicePick} canProject={canProject} />}
           {church.role !== "annonces" && !isOrateur && (
           <QuickText
             onProject={projectFree}
