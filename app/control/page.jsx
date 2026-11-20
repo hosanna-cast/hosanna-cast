@@ -71,8 +71,8 @@ export default function Control() {
     f(); m.addEventListener("change", f);
     return () => m.removeEventListener("change", f);
   }, []);
-  // sur téléphone, l'aide écran n'a pas besoin du plan du culte
-  const tabs = allTabs.filter((k) => !(k === "plan" && church.role === "assistant" && !wide));
+  // sur téléphone, seul l'administrateur voit le plan du culte (l'aide écran et l'orateur n'en ont pas besoin)
+  const tabs = allTabs.filter((k) => !(k === "plan" && church.role !== "admin" && !wide));
   useEffect(() => { if (!tabs.includes(tab)) setTab(tabs[0]); }, [wide]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const [typing, setTyping] = useState(false);            // champ de recherche actif (clavier du téléphone ouvert)
