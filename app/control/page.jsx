@@ -55,7 +55,8 @@ export default function Control() {
   const [view, setView] = useState(null);                // chapitre affiché au centre { b, c }
   const [cite, setCite] = useState(null);                // plage citée dans la note { b, c, v, vEnd }
   const tabs = tabsFor(church.role);                        // onglets autorisés pour ce profil (« Chants » : chants seulement)
-  const [tab, setTab] = useState(tabs[0]);                // "bible" | "notes" | "chants"
+  const [tab, setTab] = useState(tabs[0]);                // "bible" | "notes" | "chants" | "annonces"
+  const [showWeb, setShowWeb] = useState(false);          // panneau « Image depuis internet » (bouton à droite des onglets)
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(0);
   const [wide, setWide] = useState(false);               // ordinateur : le chapitre est lu au centre, pas dans le panneau de gauche
@@ -559,13 +560,27 @@ export default function Control() {
 
         {/* ───── gauche : Bible, notes, chants ───── */}
         <section className="order-3 lg:order-1 lg:sticky lg:top-6">
-          {tabs.length > 1 && (
+          {(tabs.length > 1 || church.role !== "standard") && (
           <div className="flex gap-1 bg-neutral-800 rounded-lg p-1 mb-1.5 sm:mb-2">
             {[["bible", "Bible"], ["notes", "Notes"], ["chants", "Chants"], ["annonces", "Annonces"]].filter(([k]) => tabs.includes(k)).map(([k, l]) => (
               <button key={k} onClick={() => setTab(k)}
                 className={`flex-1 px-3 py-1.5 rounded-md text-sm transition duration-100 active:scale-95 ${tab === k ? "bg-neutral-600 text-white font-medium" : "text-neutral-400 hover:text-white"}`}>{l}</button>
             ))}
+            {church.role !== "standard" && (
+              <button onClick={() => setShowWeb((v) => !v)} title="Image depuis internet" aria-label="Image depuis internet" aria-pressed={showWeb}
+                className={`shrink-0 px-3 py-1.5 rounded-md text-sm transition duration-100 active:scale-95 ${showWeb ? "bg-sky-400 text-black font-medium" : "text-sky-300 hover:text-white"}`}>🌐 Image</button>
+            )}
           </div>
+          )}
+          {church.role !== "standard" && (
+            <div className={showWeb ? "mb-1.5 sm:mb-2" : "hidden"}>
+              <WebImage
+                onProject={projectWebImage}
+                disabled={!canProject}
+                liveUrl={liveKind === "media" && typeof mediaLive?.id === "string" && mediaLive.id.startsWith("web:") ? mediaLive.id.slice(4) : null}
+                status={mediaStatus}
+              />
+            </div>
           )}
 
           {tabs.includes("bible") && (
@@ -707,14 +722,6 @@ export default function Control() {
               ? { onAdd: (t) => keepKey(t, false), addLabel: "Garder dans la note", onAddProject: (t) => keepKey(t, true), addProjectLabel: "Projeter et garder" }
               : {})}
           />
-          )}
-          {church.role !== "standard" && (
-            <WebImage
-              onProject={projectWebImage}
-              disabled={!canProject}
-              liveUrl={liveKind === "media" && typeof mediaLive?.id === "string" && mediaLive.id.startsWith("web:") ? mediaLive.id.slice(4) : null}
-              status={mediaStatus}
-            />
           )}
         {tab === "annonces" ? (
         <section className="min-w-0">
