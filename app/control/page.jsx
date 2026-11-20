@@ -59,8 +59,8 @@ export default function Control() {
   const [chantId, setChantId] = useState(null);
   const [view, setView] = useState(null);                // chapitre affiché au centre { b, c }
   const [cite, setCite] = useState(null);                // plage citée dans la note { b, c, v, vEnd }
-  const tabs = tabsFor(church.role);                        // onglets autorisés pour ce profil (« Chants » : chants seulement)
-  const [tab, setTab] = useState(tabs[0]);                // "bible" | "notes" | "chants" | "annonces" | "plan"
+  const allTabs = tabsFor(church.role);                     // onglets autorisés pour ce profil (« Chants » : chants seulement)
+  const [tab, setTab] = useState(allTabs[0]);                // "bible" | "notes" | "chants" | "annonces" | "plan"
   const [showWeb, setShowWeb] = useState(false);          // panneau « Image depuis internet » (bouton à droite des onglets)
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(0);
@@ -71,6 +71,10 @@ export default function Control() {
     f(); m.addEventListener("change", f);
     return () => m.removeEventListener("change", f);
   }, []);
+  // sur téléphone, l'aide écran n'a pas besoin du plan du culte
+  const tabs = allTabs.filter((k) => !(k === "plan" && church.role === "assistant" && !wide));
+  useEffect(() => { if (!tabs.includes(tab)) setTab(tabs[0]); }, [wide]);   // eslint-disable-line react-hooks/exhaustive-deps
+
   const [typing, setTyping] = useState(false);            // champ de recherche actif (clavier du téléphone ouvert)
   const [live, setLive] = useState(null);                 // dernier verset projeté (indices)
   const [slideLive, setSlideLive] = useState(null);       // dernière diapositive projetée { kind, id, i }
@@ -692,14 +696,14 @@ export default function Control() {
         {/* ───── gauche : Bible, notes, chants ───── */}
         <section className={`order-3 lg:order-1 lg:sticky lg:top-6 ${showWeb ? "lg:col-span-2" : ""}`}>
           {(tabs.length > 1 || church.role !== "standard") && (
-          <div className="flex gap-1 bg-neutral-800 rounded-lg p-1 mb-1.5 sm:mb-2">
+          <div className="flex flex-wrap gap-1 bg-neutral-800 rounded-lg p-1 mb-1.5 sm:mb-2">
             {[["bible", "Bible"], ["notes", "Notes"], ["chants", "Chants"], ["annonces", "Annonces"], ["plan", "Plan"]].filter(([k]) => tabs.includes(k)).map(([k, l]) => (
               <button key={k} onClick={() => { setTab(k); setShowWeb(false); }}
-                className={`flex-1 px-3 py-1.5 rounded-md text-sm transition duration-100 active:scale-95 ${tab === k && !showWeb ? "bg-neutral-600 text-white font-medium" : "text-neutral-400 hover:text-white"}`}>{l}</button>
+                className={`flex-1 min-w-fit px-2.5 py-1.5 rounded-md text-sm transition duration-100 active:scale-95 ${tab === k && !showWeb ? "bg-neutral-600 text-white font-medium" : "text-neutral-400 hover:text-white"}`}>{l}</button>
             ))}
             {church.role !== "standard" && (
               <button onClick={() => setShowWeb((v) => !v)} title="Image depuis internet" aria-label="Image depuis internet" aria-pressed={showWeb}
-                className={`shrink-0 px-3 py-1.5 rounded-md text-sm transition duration-100 active:scale-95 ${showWeb ? "bg-sky-400 text-black font-medium" : "text-sky-300 hover:text-white"}`}>🌐 Image</button>
+                className={`flex-1 min-w-fit px-2.5 py-1.5 rounded-md text-sm transition duration-100 active:scale-95 ${showWeb ? "bg-sky-400 text-black font-medium" : "text-sky-300 hover:text-white"}`}>🌐 Image</button>
             )}
           </div>
           )}
