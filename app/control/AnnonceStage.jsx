@@ -1,6 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
-import { recurText } from "@/lib/expiry";
+import { useState } from "react";
 
 const btn = "rounded-lg bg-neutral-800 hover:bg-neutral-700 px-3 py-2 text-sm transition duration-100 active:scale-95 disabled:opacity-40 disabled:pointer-events-none";
 
@@ -11,74 +10,33 @@ const STATUS = {
   error: ["text-red-400", "⚠ L'écran de projection n'arrive pas à lire cette vidéo (format non pris en charge). Convertis-la en MP4 (H.264) puis ajoute-la de nouveau."],
 };
 
-// Centre de la console, onglet Annonces : aperçu de ce qui est à l'écran + commandes de la vidéo.
-export default function AnnonceStage({ item, live, blank, canProject, canStep, onStep, onCmd, status }) {
+// Onglet Annonces : commandes de la vidéo à l'écran (lecture, recommencer, son).
+// L'aperçu de ce qui est projeté se trouve dans la colonne de droite : on ne le répète plus ici.
+export default function AnnonceStage({ item, live, blank, canProject, onCmd, status }) {
   const [muted, setMuted] = useState(false);
-  const [localErr, setLocalErr] = useState(false);
-  const vref = useRef(null);
+  if (!item || item.kind !== "video") return null;
 
-  // l'aperçu (sans son) suit la projection : il démarre quand la vidéo est envoyée à l'écran
-  useEffect(() => {
-    setLocalErr(false);
-    setMuted(false);
-    const el = vref.current;
-    if (!el || item?.kind !== "video") return;
-    if (live && !blank) { el.currentTime = 0; el.play().catch(() => {}); }
-    else el.pause();
-  }, [item?.id, live, blank]);
-
-  const run = (cmd) => {
-    onCmd(cmd);
-    const el = vref.current;
-    if (!el) return;
-    if (cmd === "toggle") { if (el.paused) el.play().catch(() => {}); else el.pause(); }
-    if (cmd === "restart") { el.currentTime = 0; el.play().catch(() => {}); }
-  };
-
-  if (!item) return null;
-
-  const st = item.kind === "video" && live && !blank ? STATUS[status] : null;
+  const st = live && !blank ? STATUS[status] : null;
 
   return (
-    <div className="space-y-3">
-      <div className="relative rounded-xl bg-black border border-neutral-700 overflow-hidden aspect-video flex items-center justify-center">
-        {item.kind === "image" ? (
-          <img src={item.url} alt="" className="max-w-full max-h-full object-contain" />
-        ) : localErr ? (
-          <p className="px-6 text-center text-sm text-red-300 leading-6">Ce navigateur ne sait pas lire cette vidéo (format ou codec).<br />Convertis-la en MP4 (H.264) puis ajoute-la de nouveau.</p>
-        ) : (
-          <video key={item.id} ref={vref} src={item.url} preload="metadata" muted playsInline onError={() => setLocalErr(true)} className="max-w-full max-h-full object-contain pointer-events-none" />
-        )}
-        <span className={`absolute top-2 left-3 text-xs ${blank ? "text-neutral-400" : live ? "text-green-400" : "text-neutral-500"}`}>
+    <div className="rounded-xl border border-neutral-700 bg-neutral-800/60 p-2.5 sm:p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="min-w-0 truncate text-sm font-medium">🎬 {item.name}</span>
+        <span className={`shrink-0 text-xs ${blank ? "text-neutral-400" : live ? "text-green-400" : "text-neutral-500"}`}>
           {blank ? "● Écran noir" : live ? "● À l'écran" : "○ Pas à l'écran"}
         </span>
       </div>
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <div className="font-medium truncate">{item.kind === "video" ? "🎬 " : ""}{item.name}</div>
-          <div className="text-xs text-neutral-500">{item.kind === "video" ? "Vidéo" : "Photo"}{item.keep ? ` · ↻ ${recurText(item)}` : ""}</div>
-        </div>
-        <div className="flex gap-1.5 shrink-0">
-          <button className={btn} disabled={!canStep} onClick={() => onStep(-1)}>← Préc.</button>
-          <button className={btn} disabled={!canStep} onClick={() => onStep(1)}>Suiv. →</button>
-        </div>
+      <div className="grid grid-cols-3 gap-1.5">
+        <button className={btn} disabled={!live || !canProject} onClick={() => onCmd("toggle")}>⏯ Lecture / Pause</button>
+        <button className={btn} disabled={!live || !canProject} onClick={() => onCmd("restart")}>⏮ Recommencer</button>
+        <button className={btn} disabled={!live || !canProject} onClick={() => { onCmd(muted ? "unmute" : "mute"); setMuted(!muted); }}>{muted ? "🔊 Son" : "🔇 Couper le son"}</button>
       </div>
-
-      {item.kind === "video" && (
-        <div>
-          <div className="grid grid-cols-3 gap-1.5">
-            <button className={btn} disabled={!live || !canProject} onClick={() => run("toggle")}>⏯ Lecture / Pause</button>
-            <button className={btn} disabled={!live || !canProject} onClick={() => run("restart")}>⏮ Recommencer</button>
-            <button className={btn} disabled={!live || !canProject} onClick={() => { onCmd(muted ? "unmute" : "mute"); setMuted(!muted); }}>{muted ? "🔊 Son" : "🔇 Couper le son"}</button>
-          </div>
-          {live && !blank && (
-            <p className={`mt-2 text-xs leading-5 ${st ? st[0] : "text-neutral-500"}`}>
-              {st ? st[1] : "En attente de l'écran de projection… Ouvre la page « Écran » (bouton jaune en haut) : la vidéo joue là-bas, l'aperçu ci-dessus est sans son."}
-            </p>
-          )}
-          {!live && <p className="mt-2 text-xs text-neutral-500 leading-5">Clique la vidéo à gauche pour la lancer à l'écran. Elle joue sur la page « Écran » ; cet aperçu est sans son.</p>}
-        </div>
+      {live && !blank && (
+        <p className={`mt-2 text-xs leading-5 ${st ? st[0] : "text-neutral-500"}`}>
+          {st ? st[1] : "En attente de l'écran de projection… Ouvre la page « Écran » (bouton jaune en haut) : la vidéo joue là-bas."}
+        </p>
       )}
+      {!live && <p className="mt-2 text-xs text-neutral-500 leading-5">Clique la vidéo dans la grille pour la lancer à l'écran. Elle joue sur la page « Écran ».</p>}
     </div>
   );
 }
