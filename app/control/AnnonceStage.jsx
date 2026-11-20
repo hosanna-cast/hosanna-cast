@@ -35,14 +35,7 @@ export default function AnnonceStage({ item, live, blank, canProject, canStep, o
     if (cmd === "restart") { el.currentTime = 0; el.play().catch(() => {}); }
   };
 
-  if (!item) {
-    return (
-      <div className="rounded-xl border border-dashed border-neutral-700 p-8 text-center text-neutral-500 text-sm leading-6">
-        Choisis une photo ou une vidéo à gauche pour l'afficher à l'écran.<br />
-        <span className="text-neutral-600">Les annonces temporaires s'effacent toutes seules après 3 jours ; les récurrentes (↻) restent.</span>
-      </div>
-    );
-  }
+  if (!item) return null;
 
   const st = item.kind === "video" && live && !blank ? STATUS[status] : null;
 
