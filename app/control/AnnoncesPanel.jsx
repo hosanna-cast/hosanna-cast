@@ -83,8 +83,9 @@ function Tile({ a, live, canProject, onProject, onEdit, onDelete }) {
 //  Régulières (cellule, prière, culte…) : jamais effacées.
 //  Temps spéciaux (convention, évangélisation…) : effacées après la date de l'événement.
 //  Ponctuelles : effacées 3 jours après l'ajout.
-export default function AnnoncesPanel({ ann, liveId, canProject, onProject }) {
-  const { list, ready, error, busy, upload, update, replace, remove } = ann;
+// État partagé entre le formulaire d'ajout (colonne de gauche) et la grille (centre)
+export function useAnnoncesUi(ann) {
+  const { upload, update, replace, remove, busy } = ann;
   const [errs, setErrs] = useState([]);
   const [rec, setRec] = useState({ type: "oneoff", days: [], until: "" });      // réglage appliqué aux prochains envois
   const [editId, setEditId] = useState(null);
@@ -121,15 +122,53 @@ export default function AnnoncesPanel({ ann, liveId, canProject, onProject }) {
     else { setErrs([]); setEditId(null); }
   };
 
+  return { errs, setErrs, rec, setRec, editId, setEditId, draft, setDraft, onFiles, edit, del, save, onReplace, busy };
+}
+
+// Colonne de gauche : ajout d'une annonce
+export function AnnoncesAdd({ ann, ui }) {
+  const { error } = ann;
+  const { rec, setRec, onFiles, busy } = ui;
+  return (
+    <div>
+      <div className="mb-1.5">
+        <span className="text-xs text-white font-medium">Ajouter une annonce</span>
+      </div>
+
+      {error && (
+        <p className="mb-2 rounded-lg bg-red-500/10 text-red-300 text-xs px-2.5 py-2 leading-5">
+          Annonces indisponibles : {error}<br />
+          <span className="text-red-300/70">Exécute (ou relance) le fichier <b>supabase/temporaire.sql</b> dans Supabase (SQL Editor).</span>
+        </p>
+      )}
+
+      <div className="rounded-lg border border-neutral-700 p-2 space-y-2">
+        <p className="text-xs text-white">Type de la prochaine annonce</p>
+        <TypePicker value={rec.type} onChange={(type) => setRec({ ...rec, type })} />
+        <TypeFields v={rec} onChange={setRec} />
+        <label className={`block w-full rounded-lg bg-neutral-800 hover:bg-neutral-700 text-amber-400 py-2 text-center text-sm font-medium transition duration-100 active:scale-95 cursor-pointer ${error || busy || (rec.type === "special" && !rec.until) ? "opacity-50 pointer-events-none" : ""}`}>
+          {busy ? "Envoi en cours… (une vidéo peut prendre un moment)" : "+ Ajouter photos ou vidéos"}
+          <input type="file" multiple accept={ACCEPT} onChange={onFiles} className="hidden" />
+        </label>
+        <p className="text-[11px] text-white leading-4">Vidéos : MP4 (H.264), 50 Mo maximum chacune. Les photos sont réduites automatiquement.</p>
+      </div>
+    </div>
+  );
+}
+
+// Centre : toutes les annonces en grille (la vignette verte est celle qui est à l'écran)
+export function AnnoncesGrid({ ann, ui, liveId, canProject, onProject }) {
+  const { list, ready } = ann;
+  const { errs, setErrs, editId, setEditId, draft, setDraft, onReplace, edit, del, save, busy } = ui;
   const sections = TYPE_IDS.map((t) => ({ t, items: list.filter((a) => typeOf(a) === t) }));
 
   const grid = (items) => (
-    <ul className="grid grid-cols-2 gap-2">
+    <ul className="grid grid-cols-2 sm:grid-cols-3 2xl:grid-cols-4 gap-2 sm:gap-3">
       {items.map((a) => (
         <Fragment key={a.id}>
           <Tile a={a} live={liveId === a.id} canProject={canProject} onProject={onProject} onEdit={edit} onDelete={del} />
           {editId === a.id && (
-            <li className="col-span-2 rounded-lg border border-amber-400/40 bg-neutral-900 p-2.5 space-y-2.5">
+            <li className="col-span-full rounded-lg border border-amber-400/40 bg-neutral-900 p-2.5 space-y-2.5">
               <div>
                 <p className="text-xs text-white mb-1">Nom</p>
                 <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} maxLength={80}
@@ -161,29 +200,6 @@ export default function AnnoncesPanel({ ann, liveId, canProject, onProject }) {
 
   return (
     <div>
-      <div className="flex items-baseline justify-between mb-1.5">
-        <span className="text-xs text-white font-medium">Photos et vidéos</span>
-        <span className="text-[11px] text-white">3 sections</span>
-      </div>
-
-      {error && (
-        <p className="mb-2 rounded-lg bg-red-500/10 text-red-300 text-xs px-2.5 py-2 leading-5">
-          Annonces indisponibles : {error}<br />
-          <span className="text-red-300/70">Exécute (ou relance) le fichier <b>supabase/temporaire.sql</b> dans Supabase (SQL Editor).</span>
-        </p>
-      )}
-
-      <div className="rounded-lg border border-neutral-700 p-2 mb-2 space-y-2">
-        <p className="text-xs text-white">Type de la prochaine annonce</p>
-        <TypePicker value={rec.type} onChange={(type) => setRec({ ...rec, type })} />
-        <TypeFields v={rec} onChange={setRec} />
-        <label className={`block w-full rounded-lg bg-neutral-800 hover:bg-neutral-700 text-amber-400 py-2 text-center text-sm font-medium transition duration-100 active:scale-95 cursor-pointer ${error || busy || (rec.type === "special" && !rec.until) ? "opacity-50 pointer-events-none" : ""}`}>
-          {busy ? "Envoi en cours… (une vidéo peut prendre un moment)" : "+ Ajouter photos ou vidéos"}
-          <input type="file" multiple accept={ACCEPT} onChange={onFiles} className="hidden" />
-        </label>
-        <p className="text-[11px] text-white leading-4">Vidéos : MP4 (H.264), 50 Mo maximum chacune. Les photos sont réduites automatiquement.</p>
-      </div>
-
       {errs.length > 0 && (
         <div className="mb-2 rounded-lg bg-red-500/10 text-red-300 text-xs px-2.5 py-2 leading-5">
           {errs.map((m, i) => <p key={i}>{m}</p>)}
@@ -192,12 +208,12 @@ export default function AnnoncesPanel({ ann, liveId, canProject, onProject }) {
       )}
 
       {!ready ? null : !list.length ? (
-        <p className="text-sm text-white mt-3">Aucune annonce pour l'instant. Utilise le bouton ci-dessus pour ajouter une photo ou une vidéo.</p>
+        <p className="text-sm text-neutral-300 mt-3">Aucune annonce pour l'instant. Utilise le bouton « Ajouter photos ou vidéos » à gauche.</p>
       ) : (
         <>
           {sections.map(({ t, items }) => items.length > 0 && (
             <div key={t}>
-              <div className="text-[11px] text-white font-medium mt-3 mb-1.5">{TYPES[t].short} <span className="text-white">({items.length})</span></div>
+              <div className="text-xs text-white font-medium mt-3 first:mt-0 mb-1.5">{TYPES[t].short} <span className="text-neutral-400">({items.length})</span></div>
               {grid(items)}
             </div>
           ))}
