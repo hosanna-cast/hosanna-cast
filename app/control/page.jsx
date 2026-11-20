@@ -24,7 +24,7 @@ import { USFM } from "@/lib/usfmBooks";
 import { buildSnapshot } from "@/lib/screenProtocol";
 import { pagesOfRange } from "@/lib/paginate";
 import { useServicePlans } from "@/lib/servicePlan";
-import PlanCulte from "./PlanCulte";
+import { PlanAdd, PlanList } from "./PlanCulte";
 import ONLINE from "@/config/online-versions.json";
 
 // versions à ouvrir sur bible.com (champ "web" = numéro dans l'adresse bible.com/bible/NUMÉRO/...)
@@ -60,7 +60,7 @@ export default function Control() {
   const [view, setView] = useState(null);                // chapitre affiché au centre { b, c }
   const [cite, setCite] = useState(null);                // plage citée dans la note { b, c, v, vEnd }
   const tabs = tabsFor(church.role);                        // onglets autorisés pour ce profil (« Chants » : chants seulement)
-  const [tab, setTab] = useState(tabs[0]);                // "bible" | "notes" | "chants" | "annonces"
+  const [tab, setTab] = useState(tabs[0]);                // "bible" | "notes" | "chants" | "annonces" | "plan"
   const [showWeb, setShowWeb] = useState(false);          // panneau « Image depuis internet » (bouton à droite des onglets)
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(0);
@@ -230,7 +230,7 @@ export default function Control() {
   // /control?tab=notes, chants ou annonces (liens de la page d'accueil)
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get("tab");
-    if ((t === "notes" || t === "chants" || t === "annonces") && tabs.includes(t)) setTab(t);
+    if ((t === "notes" || t === "chants" || t === "annonces" || t === "plan") && tabs.includes(t)) setTab(t);
   }, []);
 
   // liste des versions réellement générées au build
@@ -571,11 +571,10 @@ export default function Control() {
   const playPlanItem = (it) => {
     if (!canProject) return;
     setPlanActive(it.id);
-    if (it.k === "verse" && it.r) { if (tabs.includes("bible")) { setTab("bible"); setShowWeb(false); } project(it.r); }
+    if (it.k === "verse" && it.r) project(it.r);
     else if (it.k === "chants" || it.k === "notes") {
       const item = library.lib[it.k].find((x) => x.id === it.itemId);
       if (!item) return setHint("Cet élément n'existe plus dans la bibliothèque.");
-      if (tabs.includes(it.k)) { setTab(it.k); setShowWeb(false); }
       if (it.k === "chants") setChantId(item.id); else setNoteId(item.id);
       projectSlide(it.k, item, 0, slidesOf(item));
     }
@@ -694,7 +693,7 @@ export default function Control() {
         <section className={`order-3 lg:order-1 lg:sticky lg:top-6 ${showWeb ? "lg:col-span-2" : ""}`}>
           {(tabs.length > 1 || church.role !== "standard") && (
           <div className="flex gap-1 bg-neutral-800 rounded-lg p-1 mb-1.5 sm:mb-2">
-            {[["bible", "Bible"], ["notes", "Notes"], ["chants", "Chants"], ["annonces", "Annonces"]].filter(([k]) => tabs.includes(k)).map(([k, l]) => (
+            {[["bible", "Bible"], ["notes", "Notes"], ["chants", "Chants"], ["annonces", "Annonces"], ["plan", "Plan"]].filter(([k]) => tabs.includes(k)).map(([k, l]) => (
               <button key={k} onClick={() => { setTab(k); setShowWeb(false); }}
                 className={`flex-1 px-3 py-1.5 rounded-md text-sm transition duration-100 active:scale-95 ${tab === k && !showWeb ? "bg-neutral-600 text-white font-medium" : "text-neutral-400 hover:text-white"}`}>{l}</button>
             ))}
@@ -707,7 +706,7 @@ export default function Control() {
 
           {webImageEl}
 
-          {tabs.includes("bible") && tab !== "annonces" && !showWeb && (
+          {tabs.includes("bible") && tab !== "annonces" && tab !== "plan" && !showWeb && (
           <div className="flex gap-0.5 bg-neutral-800 rounded-md p-0.5 mb-1.5 sm:mb-2">
             {versions.map((v) => (
               <button key={v.id} onClick={() => setVersion(v.id)} title={v.full}
@@ -717,7 +716,7 @@ export default function Control() {
             ))}
           </div>
           )}
-          {tabs.includes("bible") && tab !== "annonces" && !showWeb && WEB_VERSIONS.length > 0 && (() => {
+          {tabs.includes("bible") && tab !== "annonces" && tab !== "plan" && !showWeb && WEB_VERSIONS.length > 0 && (() => {
             // le chapitre visé : résultat sélectionné, sinon verset à l'écran, sinon chapitre affiché
             const t = q.trim() ? results[sel] : liveKind === "verse" && live ? live : view ? { b: view.b, c: view.c, v: null } : null;
             // chapitre + verset(s) visé(s) : bible.com ouvre le chapitre et met le verset en surbrillance
@@ -740,14 +739,24 @@ export default function Control() {
               </div>
             );
           })()}
-          {tabs.includes("bible") && tab !== "annonces" && !showWeb && online && (
+          {tabs.includes("bible") && tab !== "annonces" && tab !== "plan" && !showWeb && online && (
             <p className="text-[10px] leading-snug text-neutral-500 mb-1.5">
               {bibleError ? <span className="text-red-400">Version en ligne indisponible : {bibleError}</span> : versions.find((v) => v.id === version)?.copyright}
             </p>
           )}
 
           <div ref={panel} className={`${showWeb ? "hidden " : ""}relative bg-neutral-800/60 border border-neutral-700 rounded-xl p-2 sm:p-3 max-h-[55vh] lg:max-h-[calc(100vh-7.5rem)] overflow-y-auto`}>
-            {tab === "annonces" ? (
+            {tab === "plan" ? (
+              <PlanAdd
+                plan={plan}
+                readOnly={planReadOnly}
+                lib={{ chants: library.lib.chants, notes: library.lib.notes, media: ann.list }}
+                onAddRef={planAddRef}
+                onAddLib={planAddLib}
+                onAddCurrent={planAddCurrent}
+                canAddCurrent={!!shown && shown.kind !== "other" && !(liveKind === "media" && String(mediaLive?.id).startsWith("web:"))}
+              />
+            ) : tab === "annonces" ? (
               <AnnoncesAdd ann={ann} ui={annUi} />
             ) : tab !== "bible" ? (
               <LibraryPanel
@@ -848,7 +857,20 @@ export default function Control() {
           />
           )}
         <div className="space-y-3">
-        {tab === "annonces" ? (
+        {tab === "plan" ? (
+        <section className="min-w-0">
+          <PlanList
+            plan={plan}
+            activeItemId={planActive}
+            canProject={canProject}
+            readOnly={planReadOnly}
+            missing={planMissing}
+            onPlay={playPlanItem}
+            onNext={() => planStep(1)}
+            onPrev={() => planStep(-1)}
+          />
+        </section>
+        ) : tab === "annonces" ? (
         <section className="min-w-0 space-y-3">
           <AnnonceStage
             item={ann.list.find((x) => x.id === mediaLive?.id) || null}
@@ -1017,24 +1039,6 @@ export default function Control() {
                 className={`rounded-md py-1.5 text-sm transition duration-100 active:scale-95 disabled:opacity-40 disabled:pointer-events-none ${layout === k ? "bg-amber-400 text-black font-medium" : "text-neutral-300 hover:bg-neutral-700"}`}>{l}</button>
             ))}
           </div>
-          )}
-
-          {planOn && (
-            <PlanCulte
-              plan={plan}
-              activeItemId={planActive}
-              canProject={canProject}
-              readOnly={planReadOnly}
-              lib={{ chants: library.lib.chants, notes: library.lib.notes, media: ann.list }}
-              missing={planMissing}
-              onPlay={playPlanItem}
-              onNext={() => planStep(1)}
-              onPrev={() => planStep(-1)}
-              onAddRef={planAddRef}
-              onAddLib={planAddLib}
-              onAddCurrent={planAddCurrent}
-              canAddCurrent={!!shown && shown.kind !== "other" && !(liveKind === "media" && String(mediaLive?.id).startsWith("web:"))}
-            />
           )}
 
           <div className="hidden lg:flex mt-4 flex-col items-center gap-2.5 text-xs xl:text-sm text-neutral-400">
