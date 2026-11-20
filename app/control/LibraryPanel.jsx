@@ -232,29 +232,9 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
           {" · "}{isChant ? `${slides.length} diapositive${slides.length > 1 ? "s" : ""}` : `${(open.keys || []).length} phrase${(open.keys || []).length > 1 ? "s" : ""} clé${(open.keys || []).length > 1 ? "s" : ""}`}
         </div>
 
-        {isChant && pausedSlide && pausedSlide.id === open.id && (
-          <button onClick={() => onSlide(open, pausedSlide.i, slides)}
-            className="w-full mb-3 rounded-lg bg-amber-400 text-black font-medium py-2 text-sm transition duration-100 active:scale-95">
-            ↩ Reprendre le chant (couplet {pausedSlide.i + 1})
-          </button>
-        )}
-
+        {!isChant && (
         <div className="mb-3">
-          <div className="text-xs text-neutral-500 mb-1.5">{isChant ? "Le chantre cite un verset ?" : "Versets de la note"}</div>
-          {isChant && (
-            <>
-              <input value={vq} onChange={(e) => setVq(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && vResults[0]) { onVerse(vResults[0]); setVq(""); } }}
-                placeholder={bible ? "ex. jn 3 16 puis Entrée" : "Chargement de la Bible…"} className={`${field} mb-1.5`} />
-              {vResults.map((r, i) => (
-                <button key={i} onClick={() => { onVerse(r); setVq(""); }}
-                  className="block w-full text-left px-2.5 py-1.5 rounded-lg bg-blue-400/10 hover:bg-blue-400/20 mb-1 text-sm transition duration-100 active:scale-[0.98]">
-                  <b className="font-medium text-blue-300">{refOf(r)}</b>{" "}
-                  <span className="text-neutral-400 line-clamp-1">{textOf(r)}</span>
-                </button>
-              ))}
-            </>
-          )}
+          <div className="text-xs text-neutral-500 mb-1.5">Versets de la note</div>
           {!bible ? (
             !isChant && <p className="text-xs text-neutral-500">Chargement de la Bible…</p>
           ) : verses.length ? (
@@ -270,6 +250,7 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
             <p className="text-xs text-neutral-500">Aucun verset repéré dans cette note.</p>
           ) : null}
         </div>
+        )}
 
         {kind === "notes" && (() => {
           const keys = open.keys || [];
