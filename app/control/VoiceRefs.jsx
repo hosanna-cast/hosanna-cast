@@ -159,15 +159,16 @@ export default function VoiceRefs({ resolve, similar, onPick, canProject }) {
 
       {showSet && (
         <div className="mt-2 grid gap-2 sm:grid-cols-2 text-xs">
-          <label className="grid gap-1 text-neutral-400">Que détecter ?
-            <select value={mode} onChange={(e) => { setMode(e.target.value); save(e.target.value, level); }} className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-sm text-neutral-100">
+          <label className="grid min-w-0 gap-1 text-neutral-400">Que détecter ?
+            <select value={mode} onChange={(e) => { setMode(e.target.value); save(e.target.value, level); }} className="w-full min-w-0 truncate rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-sm text-neutral-100">
               {Object.entries(MODES).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
             </select>
           </label>
-          <label className="grid gap-1 text-neutral-400">Sensibilité de la ressemblance
-            <select value={level} disabled={mode === "ref"} onChange={(e) => { setLevel(e.target.value); save(mode, e.target.value); }} className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-sm text-neutral-100 disabled:opacity-40">
-              {Object.entries(LEVEL_LABELS).map(([k, l]) => <option key={k} value={k}>{l}{k === "strict" ? " (moins de fausses propositions)" : k === "souple" ? " (propose plus, même si mal entendu)" : ""}</option>)}
+          <label className="grid min-w-0 gap-1 text-neutral-400">Sensibilité
+            <select value={level} disabled={mode === "ref"} onChange={(e) => { setLevel(e.target.value); save(mode, e.target.value); }} className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-sm text-neutral-100 disabled:opacity-40 w-full min-w-0">
+              {Object.entries(LEVEL_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
             </select>
+            <span className="text-[11px] leading-4 text-neutral-500">{level === "strict" ? "Moins de fausses propositions." : level === "souple" ? "Propose plus, même si mal entendu." : "Équilibré."}</span>
           </label>
         </div>
       )}
