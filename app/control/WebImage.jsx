@@ -75,7 +75,7 @@ export default function WebImage({ onProject, disabled, liveUrl, status }) {
         const prev = page > 1 && cur?.q === q ? cur.items : [];
         const seen = new Set(prev.map((x) => x.url));
         const items = [...prev, ...j.results.filter((x) => !seen.has(x.url))];
-        return { q, items, sources: j.sources, web: j.web, page, more: j.results.length >= 10 && page < 5 };
+        return { q, items, sources: j.sources, web: j.web, notes: j.notes || [], page, more: j.results.length >= 10 && page < 5 };
       });
     } catch (e) {
       if (id === run.current) setErr(e.message);
@@ -154,6 +154,7 @@ export default function WebImage({ onProject, disabled, liveUrl, status }) {
               className="text-xs text-sky-300 hover:underline">Chercher aussi sur Google Images ↗</a>
             <button onClick={() => { setRes(null); setErr(""); }} className="ml-auto text-xs text-neutral-500 hover:text-white">Fermer</button>
           </div>
+          {res.notes?.length > 0 && <p className="mt-1 text-[11px] text-amber-300 leading-4">⚠ {res.notes.join(" · ")}</p>}
           <p className="mt-1 text-[11px] text-neutral-400 leading-4">
             Sources : {res.sources.join(", ")}{res.web ? "" : " (images libres de droits uniquement : les images du web demandent une clé, voir README)"}. Certaines licences demandent de citer l'auteur : survole une vignette pour le voir.
             Sur Google Images : clic droit sur l'image → « Copier l'adresse de l'image », puis colle-la dans le champ.
