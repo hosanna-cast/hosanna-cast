@@ -6,7 +6,9 @@ import { createClient } from "@/lib/supabase/server";
 // Sources (toutes interrogées depuis le serveur, aucune clé à mettre dans le navigateur) :
 //   - Wikimedia Commons : gratuit, sans clé, images libres de droits
 //   - Openverse         : gratuit, sans clé, images sous licence libre (Creative Commons / domaine public)
-//   - Google            : OPTIONNEL, seulement si GOOGLE_CSE_KEY et GOOGLE_CSE_CX sont définis (voir README)
+//   - Serper (= vrais résultats Google Images) : OPTIONNEL, si SERPER_API_KEY est défini (voir README)
+//   - Brave Search (images du web)             : OPTIONNEL, si BRAVE_API_KEY est défini (voir README)
+//   (l'ancienne API « Google Custom Search » est fermée aux nouveaux comptes et s'arrête le 1er janvier 2027)
 const UA = "HosannaCast/1.0 (projection d'eglise)";
 const fail = (error, status = 400) => NextResponse.json({ error }, { status });
 
@@ -59,24 +61,48 @@ async function openverse(q, page) {
   })).filter((x) => x.thumb && x.url);
 }
 
-async function google(q, page) {
-  const key = process.env.GOOGLE_CSE_KEY, cx = process.env.GOOGLE_CSE_CX;
-  if (!key || !cx) return null;
-  const u = new URL("https://www.googleapis.com/customsearch/v1");
-  u.search = new URLSearchParams({ key, cx, q, searchType: "image", num: "10", start: String(Math.min(91, (page - 1) * 10 + 1)), safe: "active" });
-  const j = await getJson(u);
-  return (j.items || []).map((r) => ({
-    id: "g:" + r.link, thumb: https(r.image?.thumbnailLink) || https(r.link), url: https(r.link),
-    title: strip(r.title), credit: "", license: "", source: "Google", w: r.image?.width, h: r.image?.height, page: https(r.image?.contextLink),
+// Vrais résultats Google Images, via Serper (https://serper.dev, 2 500 recherches gratuites à l'inscription)
+async function serper(q, page) {
+  const key = process.env.SERPER_API_KEY;
+  if (!key) return null;
+  const r = await fetch("https://google.serper.dev/images", {
+    method: "POST",
+    headers: { "X-API-KEY": key, "Content-Type": "application/json", "User-Agent": UA },
+    body: JSON.stringify({ q, gl: "fr", hl: "fr", num: 20, page }),
+    signal: AbortSignal.timeout(7000), cache: "no-store",
+  });
+  if (!r.ok) throw new Error(`Serper HTTP ${r.status}`);
+  const j = await r.json();
+  return (j.images || []).map((x) => ({
+    id: "sp:" + x.imageUrl, thumb: https(x.thumbnailUrl) || https(x.imageUrl), url: https(x.imageUrl),
+    title: strip(x.title), credit: "", license: "", source: strip(x.source || x.domain) || "Google Images",
+    w: x.imageWidth, h: x.imageHeight, page: https(x.link),
   })).filter((x) => x.thumb && x.url);
 }
 
-// mélange les sources une à une (1 de Google, 1 de Commons, 1 d'Openverse, puis on recommence), sans doublon
-function interleave(lists) {
+// Images du web via Brave Search (https://brave.com/search/api, offre gratuite limitée)
+async function brave(q, page) {
+  const key = process.env.BRAVE_API_KEY;
+  if (!key) return null;
+  const u = new URL("https://api.search.brave.com/res/v1/images/search");
+  u.search = new URLSearchParams({ q, count: String(Math.min(100, page * 20)), country: "fr", search_lang: "fr", safesearch: "strict", spellcheck: "1" });
+  const r = await fetch(u, { headers: { "X-Subscription-Token": key, Accept: "application/json", "User-Agent": UA }, signal: AbortSignal.timeout(7000), cache: "no-store" });
+  if (!r.ok) throw new Error(`Brave HTTP ${r.status}`);
+  const j = await r.json();
+  return (j.results || []).slice((page - 1) * 20, page * 20).map((x) => ({
+    id: "br:" + (x.properties?.url || x.url), thumb: https(x.thumbnail?.src) || https(x.properties?.url), url: https(x.properties?.url),
+    title: strip(x.title), credit: "", license: "", source: strip(x.source) || "Brave",
+    w: x.properties?.width, h: x.properties?.height, page: https(x.url),
+  })).filter((x) => x.thumb && x.url);
+}
+
+// ordre : les résultats « web » (Google/Brave) d'abord, comme sur Google ; les images libres de droits
+// (Commons, Openverse) viennent ensuite, mélangées entre elles, sans doublon
+function merge(web, free) {
   const out = [], seen = new Set();
-  for (let i = 0; lists.some((l) => i < l.length); i++) {
-    for (const l of lists) if (l[i] && !seen.has(l[i].url)) { seen.add(l[i].url); out.push(l[i]); }
-  }
+  const add = (x) => { if (x && !seen.has(x.url)) { seen.add(x.url); out.push(x); } };
+  web.forEach((l) => l.forEach(add));
+  for (let i = 0; free.some((l) => i < l.length); i++) for (const l of free) add(l[i]);
   return out;
 }
 
@@ -94,12 +120,21 @@ export async function GET(req) {
   const hit = cache.get(key);
   if (hit && Date.now() - hit.t < TTL) return NextResponse.json(hit.v);
 
-  const names = ["Google", "Wikimedia Commons", "Openverse"];
-  const settled = await Promise.allSettled([google(q, page), commons(q, page), openverse(q, page)]);
-  const used = [], lists = [];
-  settled.forEach((s, i) => { if (s.status === "fulfilled" && s.value) { used.push(names[i]); lists.push(s.value); } });
+  const jobs = [
+    { name: "Google Images", web: true, run: () => serper(q, page) },
+    { name: "Brave", web: true, run: () => brave(q, page) },
+    { name: "Wikimedia Commons", web: false, run: () => commons(q, page) },
+    { name: "Openverse", web: false, run: () => openverse(q, page) },
+  ];
+  const settled = await Promise.allSettled(jobs.map((j) => j.run()));
+  const used = [], web = [], free = [];
+  settled.forEach((s, i) => {
+    if (s.status === "rejected") console.warn("image-search:", jobs[i].name, s.reason?.message);
+    if (s.status === "fulfilled" && s.value) { used.push(jobs[i].name); (jobs[i].web ? web : free).push(s.value); }
+  });
   if (!used.length) return fail("La recherche d'images est indisponible pour le moment. Réessaie, ou colle le lien d'une image.", 502);
 
-  const results = interleave(lists);
-  return NextResponse.json(remember(key, { results, sources: used, google: !!(process.env.GOOGLE_CSE_KEY && process.env.GOOGLE_CSE_CX) }));
+  const results = merge(web, free);
+  const hasWeb = web.length > 0;
+  return NextResponse.json(remember(key, { results, sources: used, web: hasWeb, google: hasWeb }));
 }
