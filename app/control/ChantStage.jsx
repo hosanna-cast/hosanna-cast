@@ -152,47 +152,6 @@ export default function ChantStage({ item, bible, refOf, textOf, isLiveVerse, li
         </div>
       </div>
 
-      {/* le chantre cite un verset / change une parole */}
-      <div className="rounded-xl bg-blue-400/5 border border-blue-400/30 p-3 mb-4">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm text-blue-300">Le chantre cite un verset ?</span>
-            <input value={vq} onChange={(e) => setVq(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && vResults[0]) { onVerse(vResults[0]); setVq(""); } }}
-              placeholder={bible ? "jn 3 16 puis Entrée" : "Chargement de la Bible…"}
-              className="flex-1 min-w-40 bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 ring-blue-400" />
-            {paused && (
-              <button onClick={() => onSlide(item, paused.i, slides)}
-                className="rounded-lg bg-amber-400 text-black font-medium px-3 py-1.5 text-sm transition duration-100 active:scale-95">
-                ↩ Reprendre le chant (n°{paused.i + 1})
-              </button>
-            )}
-          </div>
-          {vResults.length > 0 && (
-            <div className="mt-2 space-y-1">
-              {vResults.map((r, i) => (
-                <button key={i} onClick={() => { onVerse(r); setVq(""); }}
-                  className="block w-full text-left px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-sm transition duration-100 active:scale-[0.99]">
-                  <b className="font-medium text-blue-300">{refOf(r)}</b>{" "}
-                  <span className="text-neutral-400">{textOf(r).slice(0, 120)}</span>
-                </button>
-              ))}
-            </div>
-          )}
-          {detected.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              <span className="text-xs text-neutral-500 mr-1">Dans les paroles :</span>
-              {detected.map((r, i) => (
-                <button key={i} onClick={() => onVerse(r)}
-                  className={`px-2.5 py-0.5 rounded-full text-xs border transition duration-100 active:scale-90 ${isLiveVerse(r) ? "bg-green-600 border-green-600 text-white" : "border-blue-400/60 text-blue-300 hover:bg-blue-400/10"}`}>
-                  {refOf(r)}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* couplets et refrains */}
       <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
         {slides.map((s, i) => {
