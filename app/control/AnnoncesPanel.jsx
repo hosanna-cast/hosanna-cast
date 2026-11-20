@@ -2,6 +2,14 @@
 import { Fragment, useState } from "react";
 import { timeLeft, DAY_ORDER, DAY_SHORT, runsToday, toInputDate, todayInput, TYPES, TYPE_IDS, typeOf, optsOf, daysText, specialText } from "@/lib/expiry";
 
+// couleur de chaque section (titre + raccourci)
+const SEC = {
+  regular: { text: "text-sky-300", chip: "bg-sky-400/15 text-sky-300 hover:bg-sky-400/25", line: "border-sky-400/30" },
+  special: { text: "text-amber-300", chip: "bg-amber-400/15 text-amber-300 hover:bg-amber-400/25", line: "border-amber-400/30" },
+  oneoff:  { text: "text-emerald-300", chip: "bg-emerald-400/15 text-emerald-300 hover:bg-emerald-400/25", line: "border-emerald-400/30" },
+};
+const goSection = (t) => document.getElementById(`ann-sec-${t}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+
 const ACCEPT = "image/*,video/mp4,video/webm,video/quicktime,.mp4,.m4v,.webm,.mov";
 
 function DaysPicker({ days, onChange }) {
@@ -211,9 +219,17 @@ export function AnnoncesGrid({ ann, ui, liveId, canProject, onProject }) {
         <p className="text-sm text-neutral-300 mt-3">Aucune annonce pour l'instant. Utilise le bouton « Ajouter photos ou vidéos » à gauche.</p>
       ) : (
         <>
+          <nav aria-label="Sections des annonces" className="flex flex-wrap gap-1.5 mb-5">
+            {sections.map(({ t, items }) => (
+              <button key={t} onClick={() => goSection(t)} disabled={!items.length}
+                className={`rounded-full px-3 py-1.5 text-sm transition duration-100 active:scale-95 disabled:opacity-30 disabled:pointer-events-none ${SEC[t].chip}`}>
+                {TYPES[t].short} <span className="opacity-70">({items.length})</span>
+              </button>
+            ))}
+          </nav>
           {sections.map(({ t, items }) => items.length > 0 && (
-            <div key={t}>
-              <div className="text-xs text-white font-medium mt-3 first:mt-0 mb-1.5">{TYPES[t].short} <span className="text-neutral-400">({items.length})</span></div>
+            <div key={t} id={`ann-sec-${t}`} className="scroll-mt-4 mb-8 last:mb-0">
+              <div className={`text-base font-semibold mb-3 pb-1.5 border-b ${SEC[t].text} ${SEC[t].line}`}>{TYPES[t].short} <span className="font-normal opacity-70 text-sm">({items.length})</span></div>
               {grid(items)}
             </div>
           ))}
