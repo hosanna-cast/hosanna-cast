@@ -8,6 +8,7 @@ import { useLibrary, slidesOf } from "@/lib/library";
 import ChapterView from "./ChapterView";
 import QuickText from "./QuickText";
 import WebImage from "./WebImage";
+import { useAnnoncesUi, AnnoncesAdd, AnnoncesGrid } from "./AnnoncesPanel";
 import { bgStyle } from "./Backgrounds";
 import { useChurch } from "@/lib/church";
 import UserMenu from "./UserMenu";
@@ -28,7 +29,6 @@ const WEB_VERSIONS = ONLINE.filter((v) => v.web);
 // panneaux chargés seulement quand on en a besoin (onglet ouvert, profil admin) : le premier affichage de la console est plus léger
 const LibraryPanel = dynamic(() => import("./LibraryPanel"));
 const ChantStage = dynamic(() => import("./ChantStage"));
-const AnnoncesPanel = dynamic(() => import("./AnnoncesPanel"));
 const AnnonceStage = dynamic(() => import("./AnnonceStage"));
 const HelpControl = dynamic(() => import("./HelpControl"));
 
@@ -49,6 +49,7 @@ export default function Control() {
   const library = useLibrary();
   const playlists = usePlaylists();                      // playlists de chants (effacées après 3 jours)
   const ann = useAnnouncements();                        // annonces : photos et vidéos (effacées après 3 jours)
+  const annUi = useAnnoncesUi(ann);                    // état commun : formulaire d'ajout (gauche) et grille (centre)
   const [mediaLive, setMediaLive] = useState(null);       // dernière annonce projetée { id }
   const [mediaStatus, setMediaStatus] = useState(null);   // ce que l'écran dit de la vidéo : playing | muted | error
   const [chantId, setChantId] = useState(null);
@@ -583,7 +584,7 @@ export default function Control() {
           </div>
           )}
 
-          {tabs.includes("bible") && (
+          {tabs.includes("bible") && tab !== "annonces" && (
           <div className="flex gap-0.5 bg-neutral-800 rounded-md p-0.5 mb-1.5 sm:mb-2">
             {versions.map((v) => (
               <button key={v.id} onClick={() => setVersion(v.id)} title={v.full}
@@ -593,7 +594,7 @@ export default function Control() {
             ))}
           </div>
           )}
-          {tabs.includes("bible") && WEB_VERSIONS.length > 0 && (() => {
+          {tabs.includes("bible") && tab !== "annonces" && WEB_VERSIONS.length > 0 && (() => {
             // le chapitre visé : résultat sélectionné, sinon verset à l'écran, sinon chapitre affiché
             const t = q.trim() ? results[sel] : liveKind === "verse" && live ? live : view ? { b: view.b, c: view.c, v: null } : null;
             // chapitre + verset(s) visé(s) : bible.com ouvre le chapitre et met le verset en surbrillance
@@ -616,7 +617,7 @@ export default function Control() {
               </div>
             );
           })()}
-          {tabs.includes("bible") && online && (
+          {tabs.includes("bible") && tab !== "annonces" && online && (
             <p className="text-[10px] leading-snug text-neutral-500 mb-1.5">
               {bibleError ? <span className="text-red-400">Version en ligne indisponible : {bibleError}</span> : versions.find((v) => v.id === version)?.copyright}
             </p>
@@ -624,7 +625,7 @@ export default function Control() {
 
           <div ref={panel} className="relative bg-neutral-800/60 border border-neutral-700 rounded-xl p-2 sm:p-3 max-h-[55vh] lg:max-h-[calc(100vh-7.5rem)] overflow-y-auto">
             {tab === "annonces" ? (
-              <AnnoncesPanel ann={ann} liveId={liveKind === "media" ? mediaLive?.id : null} canProject={canProject} onProject={projectMedia} />
+              <AnnoncesAdd ann={ann} ui={annUi} />
             ) : tab !== "bible" ? (
               <LibraryPanel
                 key={tab}
@@ -726,17 +727,16 @@ export default function Control() {
         {webImageEl}
         <div className={showWeb ? "hidden" : "space-y-3"}>
         {tab === "annonces" ? (
-        <section className="min-w-0">
+        <section className="min-w-0 space-y-3">
           <AnnonceStage
             item={ann.list.find((x) => x.id === mediaLive?.id) || null}
             live={liveKind === "media" && !!shown && shown.kind === "media"}
             blank={blank}
             canProject={canProject}
-            canStep={canStep}
-            onStep={step}
             onCmd={mediaCmd}
             status={mediaStatus}
           />
+          <AnnoncesGrid ann={ann} ui={annUi} liveId={liveKind === "media" ? mediaLive?.id : null} canProject={canProject} onProject={projectMedia} />
         </section>
         ) : tab === "chants" ? (
         <section className="min-w-0">
