@@ -25,6 +25,7 @@ import { buildSnapshot } from "@/lib/screenProtocol";
 import { pagesOfRange } from "@/lib/paginate";
 import { useServicePlans } from "@/lib/servicePlan";
 import { PlanAdd, PlanList } from "./PlanCulte";
+import VoiceRefs from "./VoiceRefs";        // Voice (test) : détection vocale, supprimable
 import ONLINE from "@/config/online-versions.json";
 
 // versions à ouvrir sur bible.com (champ "web" = numéro dans l'adresse bible.com/bible/NUMÉRO/...)
@@ -614,6 +615,19 @@ export default function Control() {
     if (liveKind === "free" && shown?.text) plan.add({ k: "text", title: shown.text.split("\n")[0].slice(0, 60), text: shown.text });
   };
 
+  // Voice (test) : valide la référence entendue dans la Bible chargée, puis ouvre le chapitre ou projette le verset
+  const voiceResolve = ({ b, chapter, verse, vEnd }) => {
+    const chap = bible?.[b]?.[chapter - 1];
+    if (!chap) return null;
+    if (verse != null && Array.isArray(chap) && !chap[verse - 1]) return null;
+    const r = { b, c: chapter - 1, v: verse != null ? verse - 1 : null, vEnd: vEnd && vEnd > verse && (!Array.isArray(chap) || chap[vEnd - 1]) ? vEnd - 1 : null };
+    return { ...r, label: r.v == null ? `${BOOKS[b]} ${chapter}` : refOf(r) };
+  };
+  const voicePick = (r) => {
+    if (r.v == null) { ensureChapter(r.b, r.c); setView({ b: r.b, c: r.c }); setNav({ b: r.b, c: r.c }); if (tabs.includes("bible")) { setTab("bible"); setShowWeb(false); } return; }
+    project({ b: r.b, c: r.c, v: r.v, vEnd: r.vEnd });
+  };
+
   const onKey = (e) => {
     const t = e.target;
     // on tape dans le formulaire d'une note : les raccourcis ne s'appliquent pas
@@ -851,6 +865,7 @@ export default function Control() {
 
         {/* ───── centre : texte rapide (toujours en haut) puis contenu de l'onglet ───── */}
         <div className={`order-2 min-w-0 space-y-3 ${showWeb ? "hidden" : ""}`}>
+          {tabs.includes("bible") && <VoiceRefs resolve={voiceResolve} onPick={voicePick} canProject={canProject} />}
           {church.role !== "annonces" && !isOrateur && (
           <QuickText
             onProject={projectFree}
