@@ -108,7 +108,7 @@ export default function WebImage({ onProject, disabled, liveUrl, status }) {
         <input value={text} onChange={(e) => { setText(e.target.value); setErr(""); }}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); go(); } else if (e.key === "Escape") e.target.blur(); }}
           autoCapitalize="none" autoCorrect="off" spellCheck={false}
-          placeholder="Image depuis internet : tape un mot (Jérusalem, croix…) ou colle un lien"
+          placeholder="Un mot (Jérusalem, croix…) ou un lien"
           className="flex-1 min-w-0 bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-sky-400" />
         <button onClick={go} disabled={!text.trim() || disabled || busy || searching}
           className="shrink-0 rounded-lg bg-sky-400 hover:bg-sky-300 text-black font-medium px-3 py-1.5 text-sm transition duration-100 active:scale-95 disabled:opacity-70 disabled:pointer-events-none">
