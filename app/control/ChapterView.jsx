@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 
 // Le chapitre complet du verset projeté : le verset à l'écran est en vert, les versets cités dans la note en bleu.
 // L'orateur peut dire « reviens 3 versets avant » : un clic sur n'importe quel verset le projette.
-export default function ChapterView({ verses, title, label, chapter, chapterCount, live, liveSoft = false, cite, onPick, onChapter }) {
+export default function ChapterView({ verses, title, label, chapter, chapterCount, live, cite, onPick, onChapter }) {
   const box = useRef(null);
 
   useEffect(() => {
@@ -42,8 +42,8 @@ export default function ChapterView({ verses, title, label, chapter, chapterCoun
           const cited = cite && v >= cite.v && v <= cite.vEnd;
           return (
             <li key={v} data-v={v} onClick={(e) => onPick(v, e)}
-              className={`px-3 py-2 rounded-lg cursor-pointer select-none leading-snug transition duration-100 active:scale-[0.99] ${isLive ? (liveSoft ? "bg-green-600/25 text-neutral-100" : "bg-green-600 text-white") : cited ? "bg-blue-400/10 border-l-2 border-blue-400 text-neutral-100 hover:bg-blue-400/20" : "text-neutral-300 hover:bg-neutral-800"}`}>
-              <b className={`mr-2 font-medium ${isLive && !liveSoft ? "text-green-100" : cited ? "text-blue-300" : "text-neutral-500"}`}>{v + 1}</b>
+              className={`px-3 py-2 rounded-lg cursor-pointer select-none leading-snug transition duration-100 active:scale-[0.99] ${isLive ? "bg-green-600 text-white" : cited ? "bg-blue-400/10 border-l-2 border-blue-400 text-neutral-100 hover:bg-blue-400/20" : "text-neutral-300 hover:bg-neutral-800"}`}>
+              <b className={`mr-2 font-medium ${isLive ? "text-green-100" : cited ? "text-blue-300" : "text-neutral-500"}`}>{v + 1}</b>
               {t}
             </li>
           );
