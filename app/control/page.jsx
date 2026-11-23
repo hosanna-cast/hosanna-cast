@@ -27,6 +27,7 @@ import { useServicePlans } from "@/lib/servicePlan";
 import { PlanAdd, PlanList } from "./PlanCulte";
 import { findSimilarVerses } from "@/lib/voiceRefs";
 import VersionSelect from "./VersionSelect";
+import OverlayVerse from "./OverlayVerse";
 import ChantBar from "./ChantBar";
 import ColsText from "@/lib/ColsText";
 import VoiceRefs from "./VoiceRefs";        // Voice (test) : détection vocale, supprimable
@@ -196,7 +197,7 @@ export default function Control() {
       const noted = (what) => { if (who) { setLastBy({ ...who, what }); setRPulse(true); setTimeout(() => setRPulse(false), 700); } };
       if (["show", "update", "clear", "blank"].includes(m.type)) synced.current = true;
       if (m.type === "show" || m.type === "update") {
-        setShown({ type: m.type, kind: m.kind, ref: m.ref, text: m.text, version: m.version, bold: m.bold, under: m.under, next: m.next, page: m.page, cols: m.cols, mediaType: m.mediaType, url: m.url });
+        setShown({ type: m.type, kind: m.kind, ref: m.ref, text: m.text, version: m.version, bold: m.bold, under: m.under, next: m.next, page: m.page, cols: m.cols, mediaType: m.mediaType, url: m.url, overlay: m.overlay });
         if (m.r) {
           setLive(m.r); setLivePage(m.page?.i ?? 0); setLiveKind("verse");
           if (m.type === "show") setHistory((h) => [m.r, ...h.filter((x) => !(x.b === m.r.b && x.c === m.r.c && x.v === m.r.v && x.vEnd === m.r.vEnd))].slice(0, 15));
@@ -453,6 +454,22 @@ export default function Control() {
     setMediaLive({ id: a.id });
     setMediaStatus(null);
     setLiveKind("media");
+    setShown(msg);
+    ch.current?.postMessage(msg);
+    flash();
+  };
+  // verset par-dessus l'image à l'écran (l'image et la vidéo ne sont pas relancées)
+  const projectOverlay = (r) => {
+    if (!canProject || !shown || shown.kind !== "media") return;
+    const msg = { ...shown, type: "update", media: mediaLive, overlay: { ref: refOf(r), text: textOf(r), version: label } };
+    setShown(msg);
+    ch.current?.postMessage(msg);
+    flash();
+  };
+  const clearOverlay = () => {
+    if (!canProject || !shown || shown.kind !== "media") return;
+    const { overlay, ...rest } = shown;
+    const msg = { ...rest, type: "update", media: mediaLive };
     setShown(msg);
     ch.current?.postMessage(msg);
     flash();
@@ -736,18 +753,31 @@ export default function Control() {
   return (
     <main className={`min-h-screen bg-neutral-900 text-white p-3 sm:p-6 2xl:px-10 ${typing ? "pb-[55vh] lg:pb-6" : ""}`}>
       {/* barre du haut */}
-      <header className="flex items-center justify-between gap-3 mb-3 sm:mb-5">
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-3 sm:mb-5">
         <a href="/" title="Accueil" className="inline-flex items-center gap-2.5 transition duration-100 active:scale-95">
           <img src="/logo-96.png" alt="" width={40} height={40} className="h-9 w-9 sm:h-10 sm:w-10" />
           <span className="text-xl sm:text-2xl font-semibold leading-none">Hosanna <span className="text-amber-400">Cast</span></span>
         </a>
         {wide && !showWeb && (
           <button onClick={toggleLeft} aria-pressed={leftHidden} title={leftHidden ? "Afficher le panneau de gauche (P)" : "Masquer le panneau de gauche (P)"}
-            className="mr-auto hidden lg:inline-flex items-center gap-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 px-2.5 py-1.5 text-xs text-neutral-300 transition duration-100 active:scale-95">
+            className="hidden lg:inline-flex items-center gap-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 px-2.5 py-1.5 text-xs text-neutral-300 transition duration-100 active:scale-95">
             {leftHidden ? "› Panneau" : "‹ Panneau"}
           </button>
         )}
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+    {(tabs.length > 1 || church.role !== "standard") && (
+    <div className="order-last w-full lg:order-none lg:w-auto flex flex-wrap gap-1 bg-neutral-800 rounded-lg p-1">
+      {[["bible", "Bible"], ["notes", "Notes"], ["chants", "Chants"], ["annonces", "Annonces"], ["plan", "Plan"]].filter(([k]) => tabs.includes(k)).map(([k, l]) => (
+        <button key={k} onClick={() => { setTab(k); setShowWeb(false); }}
+          className={`flex-1 lg:flex-none min-w-fit px-3 py-1.5 rounded-md text-sm transition duration-100 active:scale-95 ${tab === k && !showWeb ? "bg-neutral-600 text-white font-medium" : "text-neutral-400 hover:text-white"}`}>{l}</button>
+      ))}
+      {church.role !== "standard" && (
+        <button onClick={() => setShowWeb((v) => !v)} title="Image depuis internet" aria-label="Image depuis internet" aria-pressed={showWeb}
+          className={`flex-1 lg:flex-none min-w-fit px-3 py-1.5 rounded-md text-sm transition duration-100 active:scale-95 ${showWeb ? "bg-sky-400 text-black font-medium" : "text-sky-300 hover:text-white"}`}>🌐 Image</button>
+      )}
+    </div>
+    )}
+
+        <div className="ml-auto flex items-center gap-2 sm:gap-3 shrink-0">
           {church.role === "admin" && <HelpControl helperIds={helperIds} peers={peers} busy={helpBusy} onChange={pickHelpers} />}
           <span className="flex items-center gap-1.5 rounded-full bg-neutral-800 border border-neutral-700 px-2.5 py-1 text-xs text-neutral-300" title={scr.tip} role="status">
             <span className={`h-2 w-2 rounded-full ${scr.c}`} />
@@ -770,19 +800,6 @@ export default function Control() {
 
         {/* ───── gauche : Bible, notes, chants ───── */}
         <section className={`order-3 lg:order-1 lg:sticky lg:top-6 ${showWeb ? "lg:col-span-2" : ""} ${leftHidden && !showWeb ? "lg:hidden" : ""}`}>
-          {(tabs.length > 1 || church.role !== "standard") && (
-          <div className="flex flex-wrap gap-1 bg-neutral-800 rounded-lg p-1 mb-1.5 sm:mb-2">
-            {[["bible", "Bible"], ["notes", "Notes"], ["chants", "Chants"], ["annonces", "Annonces"], ["plan", "Plan"]].filter(([k]) => tabs.includes(k)).map(([k, l]) => (
-              <button key={k} onClick={() => { setTab(k); setShowWeb(false); }}
-                className={`flex-1 min-w-fit px-2.5 py-1.5 rounded-md text-sm transition duration-100 active:scale-95 ${tab === k && !showWeb ? "bg-neutral-600 text-white font-medium" : "text-neutral-400 hover:text-white"}`}>{l}</button>
-            ))}
-            {church.role !== "standard" && (
-              <button onClick={() => setShowWeb((v) => !v)} title="Image depuis internet" aria-label="Image depuis internet" aria-pressed={showWeb}
-                className={`flex-1 min-w-fit px-2.5 py-1.5 rounded-md text-sm transition duration-100 active:scale-95 ${showWeb ? "bg-sky-400 text-black font-medium" : "text-sky-300 hover:text-white"}`}>🌐 Image</button>
-            )}
-          </div>
-          )}
-
           {webImageEl}
 
           {tabs.includes("bible") && tab !== "annonces" && tab !== "plan" && tab !== "chants" && !showWeb && (() => {
@@ -1068,9 +1085,14 @@ export default function Control() {
                 )}
                 <div className="w-full">
                 {shown.kind === "media" ? (
-                  <div className="flex flex-col items-center gap-1">
+                  <div className="relative flex items-center justify-center">
                     {shown.mediaType === "image" ? <img src={shown.url} referrerPolicy="no-referrer" alt="" className="max-h-20 sm:max-h-40 object-contain rounded" /> : <span className="text-3xl">🎬</span>}
-                    <span className="text-xs sm:text-sm text-neutral-300 truncate max-w-full">{shown.ref}</span>
+                    {shown.overlay && (
+                      <div className="absolute inset-x-0 bottom-0 rounded bg-black/75 px-1.5 py-1 text-center">
+                        <p className="font-serif text-[9px] sm:text-[11px] leading-tight line-clamp-3">{shown.overlay.text}</p>
+                        <p className="text-[9px] sm:text-[10px] text-amber-300">{shown.overlay.ref}</p>
+                      </div>
+                    )}
                   </div>
                 ) : shown.kind === "chant" ? (
                   <>
@@ -1100,6 +1122,11 @@ export default function Control() {
           )}
 
           {hint && <p className="mt-2 text-xs rounded-lg px-2.5 py-2 bg-amber-400/10 text-amber-200">{hint}</p>}
+
+          {shown && shown.kind === "media" && shown.mediaType === "image" && !blank && (
+            <OverlayVerse bible={bible} refOf={refOf} textOf={textOf} overlay={shown.overlay || null}
+              onPick={projectOverlay} onClear={clearOverlay} disabled={!canProject} />
+          )}
 
           <div className="grid grid-cols-[1.4fr_1.4fr_1fr_0.6fr_0.6fr_1.2fr] lg:grid-cols-6 gap-1.5 lg:gap-2 mt-2 lg:mt-3">
             <button className={btn + " lg:col-span-3"} disabled={!canStep} onClick={() => step(-1)}>← Préc.</button>
