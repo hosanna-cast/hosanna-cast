@@ -54,7 +54,7 @@ export default function Control() {
   // comparaison de 2 versions : 2e colonne de lecture au centre (ordinateur)
   const [compare, setCompare] = useState(false);
   const [version2, setVersion2] = useState("");
-  const [liveAlt, setLiveAlt] = useState(false);              // le verset à l'écran vient de la 2e colonne
+  const [liveBoth, setLiveBoth] = useState(false);            // l'écran montre les 2 versions côte à côte (bouton « Afficher sur l'écran »)
   const online2 = !!versions.find((v) => v.id === version2)?.online;
   const { bible: bible2, loaded: loaded2, error: bibleError2, ensureChapter: ensureChapter2, chapterReady: chapterReady2 } = useBible(compare ? version2 : null, online2);
   const pendingProject = useRef(null);
@@ -295,7 +295,7 @@ export default function Control() {
   const label2 = versions.find((v) => v.id === loaded2)?.label ?? (loaded2 || version2 || "").toUpperCase();
   // 2e version : à l'ouverture on prend la première version différente de la principale
   const toggleCompare = () => {
-    if (compare) { setCompare(false); setLiveAlt(false); return; }
+    if (compare) { setCompare(false); setLiveBoth(false); return; }
     if (!version2 || version2 === version) setVersion2((versions.find((v) => v.id !== version) || versions[0])?.id || "");
     setCompare(true);
   };
@@ -354,28 +354,45 @@ export default function Control() {
     return pagesOfRange(vs, r.v, r.vEnd, layout === "band" ? dset.band.pageChars : dset.full.pageChars);
   };
   // message « verset / passage » pour la page demandée (clampée) : texte de la page, repère « 2/5 », et « à venir » pour la vue orateur
-  const verseMsg = (type, r, page, alt = false) => {
-    const bb = alt ? bible2 : bible;
-    const pages = pagesOf(r, bb);
+  const verseMsg = (type, r, page) => {
+    const pages = pagesOf(r);
     const i = Math.min(Math.max(page, 0), pages.length - 1);
-    const next = i < pages.length - 1 ? { ref: `${refOf(r)} · suite`, text: pages[i + 1] } : nextVerse(r, bb);
-    return { msg: { type, ref: refOf(r), text: pages[i], version: alt ? label2 : label, r, page: pages.length > 1 ? { i, n: pages.length } : null, next }, i };
+    const next = i < pages.length - 1 ? { ref: `${refOf(r)} · suite`, text: pages[i + 1] } : nextVerse(r);
+    return { msg: { type, ref: refOf(r), text: pages[i], version: label, r, page: pages.length > 1 ? { i, n: pages.length } : null, next }, i };
   };
 
-  const project = (r, citeRange, page = 0, alt = false) => {
+  const project = (r, citeRange, page = 0) => {
     if (!canProject) return;
-    if (alt && !(compare && bible2 && chapterReady2(r.b, r.c))) return;     // 2e version indisponible : on ne projette rien
-    if (!alt && !chapterReady(r.b, r.c)) { pendingProject.current = { r, citeRange, page }; ensureChapter(r.b, r.c); return; }
+    if (!chapterReady(r.b, r.c)) { pendingProject.current = { r, citeRange, page }; ensureChapter(r.b, r.c); return; }
     setView({ b: r.b, c: r.c });
     setCite((prev) => (citeRange !== undefined ? citeRange : prev && prev.b === r.b && prev.c === r.c ? prev : null));
-    const { msg, i } = verseMsg("show", r, page, alt);
-    setLiveAlt(alt);
+    const { msg, i } = verseMsg("show", r, page);
+    setLiveBoth(false);
     setLive(r);
     setLivePage(i);
     setLiveKind("verse");
     setShown(msg);
     setNav({ b: r.b, c: r.c });
     setHistory((h) => [r, ...h.filter((x) => refOf(x) !== refOf(r))].slice(0, 15));
+    ch.current?.postMessage(msg);
+    flash();
+  };
+
+  // comparaison : le même passage dans 2 versions, affichés ensemble à l'écran
+  const bothTarget = q.trim() && results[sel] ? results[sel] : liveKind === "verse" && live ? live : null;
+  const bothReady = !!(compare && bothTarget && bible?.[bothTarget.b]?.[bothTarget.c] && bible2?.[bothTarget.b]?.[bothTarget.c]?.[bothTarget.v] && chapterReady(bothTarget.b, bothTarget.c) && chapterReady2(bothTarget.b, bothTarget.c));
+  const projectBoth = (r) => {
+    if (!canProject || !compare || !bible2) return;
+    if (!chapterReady(r.b, r.c) || !chapterReady2(r.b, r.c)) return;
+    const t1 = textOf(r), t2 = textOf(r, bible2);
+    if (!t1 || !t2) return setHint("Ce verset n'existe pas dans l'une des deux versions.");
+    const rr = { b: r.b, c: r.c, v: r.v, vEnd: r.vEnd ?? null };
+    const msg = { type: "show", ref: refOf(rr), text: `${label}\n${t1}\n\n${label2}\n${t2}`, version: `${label} · ${label2}`, r: rr, page: null, next: nextVerse(rr) };
+    setView({ b: rr.b, c: rr.c });
+    setNav({ b: rr.b, c: rr.c });
+    setLive(rr); setLivePage(0); setLiveKind("verse"); setLiveBoth(true);
+    setShown(msg);
+    setHistory((h) => [rr, ...h.filter((x) => refOf(x) !== refOf(rr))].slice(0, 15));
     ch.current?.postMessage(msg);
     flash();
   };
@@ -482,7 +499,7 @@ export default function Control() {
   };
   useEffect(() => {
     if (!bible || !loaded) return;
-    if (prevLoaded.current && prevLoaded.current !== loaded && live && liveKind === "verse" && !liveAlt) reproject(live);
+    if (prevLoaded.current && prevLoaded.current !== loaded && live && liveKind === "verse") (liveBoth ? projectBoth(live) : reproject(live));
     prevLoaded.current = loaded;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded]);
@@ -491,13 +508,13 @@ export default function Control() {
     anchor.current = null; setNav(n); panel.current?.scrollTo({ top: 0 });
     if (n.b !== null && n.c !== null) setView({ b: n.b, c: n.c });   // le chapitre choisi à gauche s'affiche au centre
   };
-  const pickVerse = (b, c, v, e, alt = false) => {
+  const pickVerse = (b, c, v, e) => {
     if (e.shiftKey && anchor.current && anchor.current.b === b && anchor.current.c === c) {
       const a = anchor.current.v;
-      project({ b, c, v: Math.min(a, v), vEnd: Math.max(a, v) }, undefined, 0, alt);
+      project({ b, c, v: Math.min(a, v), vEnd: Math.max(a, v) });
     } else {
       anchor.current = { b, c, v };
-      project({ b, c, v, vEnd: null }, undefined, 0, alt);
+      project({ b, c, v, vEnd: null });
     }
   };
   const isLive = (b, c, v) => liveKind === "verse" && live && live.b === b && live.c === c && v >= live.v && v <= (live.vEnd ?? live.v);
@@ -528,17 +545,21 @@ export default function Control() {
       if (i >= 0 && i < slides.length) projectSlide(slideLive.kind, item, i, slides);
       return;
     }
-    const alt = liveAlt && compare;                      // l'écran montre la 2e version : ← → y restent
-    const bb = alt ? bible2 : bible;
-    if (!live || !bb) return;
+    if (!live || !bible) return;
+    if (liveBoth && compare) {                           // 2 versions à l'écran : ← → passent au verset d'avant / d'après dans les deux
+      const vs = bible[live.b]?.[live.c];
+      const v = d > 0 ? (live.vEnd ?? live.v) + 1 : live.v - 1;
+      if (vs && v >= 0 && v < vs.length) projectBoth({ b: live.b, c: live.c, v, vEnd: null });
+      return;
+    }
     // passage long : ← → tournent d'abord les pages, puis passent au verset d'avant / d'après
-    const pages = pagesOf(live, bb);
+    const pages = pagesOf(live);
     const pi = livePage + d;
-    if (pi >= 0 && pi < pages.length) { project(live, undefined, pi, alt); return; }
-    const vs = bb[live.b]?.[live.c];
+    if (pi >= 0 && pi < pages.length) { project(live, undefined, pi); return; }
+    const vs = bible[live.b]?.[live.c];
     if (!vs) return;
     const v = d > 0 ? (live.vEnd ?? live.v) + 1 : live.v - 1;
-    if (v >= 0 && v < vs.length) project({ b: live.b, c: live.c, v, vEnd: null }, undefined, d < 0 ? Infinity : 0, alt);   // en reculant : dernière page du verset précédent
+    if (v >= 0 && v < vs.length) project({ b: live.b, c: live.c, v, vEnd: null }, undefined, d < 0 ? Infinity : 0);   // en reculant : dernière page du verset précédent
   };
 
   // la sélection faite dans l'aperçu est mémorisée : toucher le bouton « B » ne la perd pas (téléphone)
@@ -949,9 +970,8 @@ export default function Control() {
           </ul>
 
           {!q.trim() && bible && (view && bible[view.b]?.[view.c] && chapterReady(view.b, view.c) ? (
-            wide ? <div className={compare ? "grid grid-cols-2 gap-3" : ""}>
+            wide ? <div>
             <ChapterView
-              liveSoft={liveAlt}
               verses={bible[view.b][view.c]}
               title={BOOKS[view.b]}
               label={label}
@@ -962,20 +982,6 @@ export default function Control() {
               onPick={(v, e) => pickVerse(view.b, view.c, v, e)}
               onChapter={(d) => { setView({ b: view.b, c: view.c + d }); setNav({ b: view.b, c: view.c + d }); }}
             />
-            {compare && (bible2?.[view.b]?.[view.c] && chapterReady2(view.b, view.c) ? (
-              <ChapterView
-                liveSoft={!liveAlt}
-                verses={bible2[view.b][view.c]}
-                title={BOOKS[view.b]}
-                label={label2}
-                chapter={view.c}
-                chapterCount={bible2[view.b].length}
-                live={liveKind === "verse" && live && live.b === view.b && live.c === view.c ? live.v : null}
-                cite={cite && cite.b === view.b && cite.c === view.c ? cite : null}
-                onPick={(v, e) => pickVerse(view.b, view.c, v, e, true)}
-                onChapter={(d) => { setView({ b: view.b, c: view.c + d }); setNav({ b: view.b, c: view.c + d }); }}
-              />
-            ) : <p className="mt-4 text-sm text-neutral-500">{bibleError2 ? `Version indisponible : ${bibleError2}` : "Chargement de la 2e version…"}</p>)}
             </div> : null
           ) : view && !chapterReady(view.b, view.c) ? (
             <p className="mt-4 text-sm text-neutral-500">Chargement du chapitre…</p>
@@ -1106,9 +1112,25 @@ export default function Control() {
                 ⇄ {compare ? "Fermer la comparaison" : "Comparer 2 versions"}
               </button>
               {compare && (
-                <div>
-                  <p className="text-[11px] text-neutral-500 mb-1">2e version (colonne de droite) · clic sur un verset = projette la version de sa colonne</p>
+                <div className="space-y-2">
                   <VersionSelect versions={versions} value={version2} onChange={setVersion2} />
+                  <div className="rounded-lg border border-neutral-700 bg-neutral-800/60 p-2.5 text-sm leading-snug max-h-64 overflow-y-auto">
+                    {bothTarget && bible?.[bothTarget.b]?.[bothTarget.c] ? (
+                      <>
+                        <p className="text-xs font-medium text-neutral-300 mb-1.5">{refOf(bothTarget)}</p>
+                        <p><span className="mr-1.5 text-[11px] font-semibold text-blue-400">{label}</span><span className="text-neutral-200">{textOf(bothTarget)}</span></p>
+                        <p className="mt-2 border-t border-neutral-700 pt-2">
+                          <span className="mr-1.5 text-[11px] font-semibold text-amber-400">{label2 || "…"}</span>
+                          <span className="text-neutral-200">{bible2?.[bothTarget.b]?.[bothTarget.c] && chapterReady2(bothTarget.b, bothTarget.c) ? (textOf(bothTarget, bible2) || "Verset absent de cette version.") : (bibleError2 ? `Version indisponible : ${bibleError2}` : "Chargement…")}</span>
+                        </p>
+                      </>
+                    ) : <p className="text-xs text-neutral-500">Choisis ou projette un verset : il s'affiche ici dans les 2 versions.</p>}
+                  </div>
+                  <button onClick={() => bothTarget && projectBoth(bothTarget)} disabled={!canProject || !bothReady}
+                    className="w-full rounded-lg py-1.5 text-sm font-medium bg-amber-400 text-black transition duration-100 active:scale-95 disabled:opacity-40 disabled:pointer-events-none">
+                    Afficher sur l'écran
+                  </button>
+                  {liveBoth && <p className="text-[11px] text-green-400">● Les 2 versions sont à l'écran</p>}
                 </div>
               )}
             </div>
