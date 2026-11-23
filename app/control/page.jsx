@@ -1047,7 +1047,7 @@ export default function Control() {
                 ) : (
                   <>
                     <p ref={previewTxt} className={`font-serif leading-snug whitespace-pre-line cursor-text ${shown.kind === "slide" ? "text-center" : ""} ${size}`}>{shown.cols ? <ColsText cols={shown.cols} /> : <RichText text={shown.text} bold={shown.bold} under={shown.under} />}</p>
-                    <div className={`mt-2 text-sm ${shown.cols ? "text-center font-semibold text-blue-400" : "text-right"}`}>{shown.ref} {shown.cols ? null : <span className="text-xs opacity-60">{shown.version}</span>}{shown.page && <span className="ml-1 text-xs text-amber-300">{shown.page.i + 1}/{shown.page.n}</span>}</div>
+                    <div className={`mt-2 text-sm ${shown.cols ? "text-center font-semibold text-amber-400" : "text-right"}`}>{shown.ref} {shown.cols ? null : <span className="text-xs opacity-60">{shown.version}</span>}{shown.page && <span className="ml-1 text-xs text-amber-300">{shown.page.i + 1}/{shown.page.n}</span>}</div>
                   </>
                 )}
                 </div>
