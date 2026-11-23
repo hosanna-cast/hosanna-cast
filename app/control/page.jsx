@@ -79,6 +79,7 @@ export default function Control() {
   const [leftHidden, setLeftHidden] = useState(false);       // ordinateur : panneau de gauche masqué (plus de place au centre)
   const [stageEl, setStageEl] = useState(null);               // zone du centre où s'ouvre la note (onglet Notes)
   useEffect(() => { try { setLeftHidden(localStorage.getItem("hc.leftHidden") === "1"); } catch {} }, []);
+  const annFull = tab === "annonces" && !showWeb;            // Annonces : barre d'ajout en haut, la grille prend toute la largeur sous elle
   const toggleLeft = () => setLeftHidden((h) => { const n = !h; try { localStorage.setItem("hc.leftHidden", n ? "1" : "0"); } catch {} return n; });
   const [wide, setWide] = useState(false);               // ordinateur : le chapitre est lu au centre, pas dans le panneau de gauche
   useEffect(() => {
@@ -741,7 +742,7 @@ export default function Control() {
           <img src="/logo-96.png" alt="" width={40} height={40} className="h-9 w-9 sm:h-10 sm:w-10" />
           <span className="text-xl sm:text-2xl font-semibold leading-none">Hosanna <span className="text-amber-400">Cast</span></span>
         </a>
-        {wide && !showWeb && (
+        {wide && !showWeb && !annFull && (
           <button onClick={toggleLeft} aria-pressed={leftHidden} title={leftHidden ? "Afficher le panneau de gauche (P)" : "Masquer le panneau de gauche (P)"}
             className="mr-auto hidden lg:inline-flex items-center gap-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 px-2.5 py-1.5 text-xs text-neutral-300 transition duration-100 active:scale-95">
             {leftHidden ? "› Panneau" : "‹ Panneau"}
@@ -766,10 +767,10 @@ export default function Control() {
         </div>
       </header>
 
-      <div className={`grid gap-3 lg:gap-5 items-start ${leftHidden && !showWeb ? "lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_380px] 2xl:grid-cols-[minmax(0,1fr)_480px]" : "lg:grid-cols-[240px_minmax(0,1fr)_300px] xl:grid-cols-[300px_minmax(0,1fr)_380px] 2xl:grid-cols-[380px_minmax(0,1fr)_480px]"}`}>
+      <div className={`grid gap-3 lg:gap-5 items-start ${(leftHidden && !showWeb) || annFull ? "lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_380px] 2xl:grid-cols-[minmax(0,1fr)_480px]" : "lg:grid-cols-[240px_minmax(0,1fr)_300px] xl:grid-cols-[300px_minmax(0,1fr)_380px] 2xl:grid-cols-[380px_minmax(0,1fr)_480px]"}`}>
 
         {/* ───── gauche : Bible, notes, chants ───── */}
-        <section className={`order-3 lg:order-1 lg:sticky lg:top-6 ${showWeb ? "lg:col-span-2" : ""} ${leftHidden && !showWeb ? "lg:hidden" : ""}`}>
+        <section className={`order-3 lg:order-1 lg:sticky lg:top-6 ${showWeb ? "lg:col-span-2" : ""} ${annFull ? "lg:col-start-1 lg:row-start-1" : leftHidden && !showWeb ? "lg:hidden" : ""}`}>
           {(tabs.length > 1 || church.role !== "standard") && (
           <div className="flex flex-wrap gap-1 bg-neutral-800 rounded-lg p-1 mb-1.5 sm:mb-2">
             {[["bible", "Bible"], ["notes", "Notes"], ["chants", "Chants"], ["annonces", "Annonces"], ["plan", "Plan"]].filter(([k]) => tabs.includes(k)).map(([k, l]) => (
@@ -806,7 +807,9 @@ export default function Control() {
             </p>
           )}
 
-          <div ref={panel} className={`${showWeb ? "hidden " : ""}relative bg-neutral-800/60 border border-neutral-700 rounded-xl p-2 sm:p-3 max-h-[55vh] lg:max-h-[calc(100vh-7.5rem)] overflow-y-auto`}>
+          {annFull && <div className="hidden lg:block"><AnnoncesAdd ann={ann} ui={annUi} compact /></div>}
+
+          <div ref={panel} className={`${showWeb ? "hidden " : ""}${annFull ? "lg:hidden " : ""}relative bg-neutral-800/60 border border-neutral-700 rounded-xl p-2 sm:p-3 max-h-[55vh] lg:max-h-[calc(100vh-7.5rem)] overflow-y-auto`}>
             {tab === "plan" ? (
               <PlanAdd
                 plan={plan}
@@ -910,7 +913,7 @@ export default function Control() {
         </section>
 
         {/* ───── centre : texte rapide (toujours en haut) puis contenu de l'onglet ───── */}
-        <div className={`order-2 min-w-0 space-y-3 ${showWeb ? "hidden" : ""}`}>
+        <div className={`order-2 min-w-0 space-y-3 ${showWeb ? "hidden" : ""} ${annFull ? "lg:col-start-1 lg:row-start-2" : ""}`}>
           {tabs.includes("bible") && tab !== "chants" && <VoiceRefs resolve={voiceResolve} similar={voiceSimilar} onPick={voicePick} canProject={canProject} />}
           {church.role !== "annonces" && !isOrateur && tab !== "chants" && (
           <QuickText
@@ -1033,7 +1036,7 @@ export default function Control() {
         </div>
 
         {/* ───── droite : l'écran (en premier sur mobile) ───── */}
-        <aside className="order-1 lg:order-3 lg:sticky lg:top-6">
+        <aside className={`order-1 lg:order-3 lg:sticky lg:top-6 ${annFull ? "lg:col-start-2 lg:row-start-1 lg:row-span-2" : ""}`}>
           <div className={`relative h-28 sm:h-auto sm:aspect-video sm:w-3/4 sm:mx-auto rounded-xl bg-black border transition-all duration-300 ${pulse ? "border-green-400 shadow-[0_0_0_3px_rgba(74,222,128,0.35)]" : rPulse ? "border-sky-400 shadow-[0_0_0_3px_rgba(56,189,248,0.4)]" : "border-neutral-700"}`} style={{ ...bgStyle(blank ? null : screenBg), color: screenText || undefined, containerType: "size" }}>
             <span className={`hidden sm:block absolute top-2 left-3 text-xs ${blank ? "text-neutral-400" : shown ? "text-green-400" : "text-neutral-500"}`}>
               {blank ? "● Écran noir" : shown ? "● À l'écran" : "○ Rien à l'écran"}
