@@ -7,9 +7,11 @@ const small = "rounded-md bg-neutral-800 hover:bg-neutral-700 px-2 py-1 text-xs 
 
 // Carré « Playlists » : indépendant de la liste des chants (qui est dans son propre carré en dessous).
 // Playlist effacée automatiquement après 3 jours.
-export default function ChantPlaylists({ playlists, chants, selectedId, onPick }) {
+export default function ChantPlaylists({ playlists, chants, selectedId, onPick, openId: openProp, onOpenId }) {
   const { list, error, create, remove, setChants } = playlists;
-  const [openId, setOpenId] = useState(null);
+  const [ownOpen, setOwnOpen] = useState(null);
+  const openId = openProp !== undefined ? openProp : ownOpen;          // playlist active : peut être pilotée par la page (barre « chant en cours »)
+  const setOpenId = onOpenId || setOwnOpen;
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
