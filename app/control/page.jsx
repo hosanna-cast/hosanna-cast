@@ -418,7 +418,7 @@ export default function Control() {
     if (!canProject) return;
     const t = text ?? item.keys?.[k];
     if (t === undefined) return;
-    const msg = { type: "show", kind: "slide", ref: `${item.title} · phrase clé`, text: t, version: "", s: { kind: "notes", id: item.id, key: k }, next: null };
+    const msg = { type: "show", kind: "slide", ref: "", text: t, version: "", s: { kind: "notes", id: item.id, key: k }, next: null };
     setSlideLive({ kind: "notes", id: item.id, key: k });
     setLiveKind("slide");
     setShown(msg);
@@ -960,8 +960,6 @@ export default function Control() {
           />
         </section>
         ) : (
-        <div className={tab === "notes" && wide ? "grid gap-3 xl:grid-cols-2 items-start" : ""}>
-        {tab === "notes" && wide && <div ref={setStageEl} className="min-w-0 empty:hidden" />}
         <section className="min-w-0">
           <input ref={searchRef} value={q} onChange={(e) => setQ(e.target.value)}
             onFocus={() => {
@@ -974,6 +972,9 @@ export default function Control() {
             placeholder={bible ? "jn 3 16  •  tant aimé le monde" : "Chargement de la Bible…"}
             className="w-full text-base sm:text-xl p-2.5 sm:p-3.5 rounded-xl bg-neutral-800 outline-none focus:ring-2 ring-amber-400" />
 
+          <div className={tab === "notes" && wide ? "grid gap-3 xl:grid-cols-2 items-start mt-3" : ""}>
+          {tab === "notes" && wide && <div ref={setStageEl} className="min-w-0 empty:hidden" />}
+          <div className="min-w-0">
           <ul className="mt-2 lg:mt-3 space-y-1 max-h-[36vh] overflow-y-auto lg:max-h-none lg:overflow-visible">
             {results.map((r, i) => (
               <li key={i} onClick={() => { project(r); setQ(""); searchRef.current?.blur(); }}
@@ -1009,8 +1010,9 @@ export default function Control() {
           {q.trim() && bible && !results.length && (
             <p className="mt-3 text-sm text-neutral-500">{online ? "Cette version en ligne se cherche par référence (jn 3 16), pas par mots." : index ? "Aucun résultat. Essaie d'autres mots." : "Préparation de la recherche…"}</p>
           )}
+          </div>
+          </div>
         </section>
-        </div>
         )}
         </div>
         </div>
@@ -1027,7 +1029,7 @@ export default function Control() {
             {shown && shown.kind !== "other" && !blank && bandPreview && (
               <div className="absolute inset-0 flex flex-col justify-end" style={{ padding: "4cqh 6cqw" }}>
                 <div className={`flex mb-[1cqh] ${shown.cols ? "justify-center" : logo && PB.logoOn && PB.logoSide === "right" ? "justify-start" : "justify-end"}`}>
-                  <span className={`rounded px-1.5 py-0.5 text-[10px] sm:text-xs bg-black/80 border border-neutral-600 ${shown.cols ? "text-blue-400" : ""}`}>{shown.ref} {shown.cols ? null : <span className="opacity-60">{shown.version}</span>}{shown.page && <span className="ml-1 text-amber-300">{shown.page.i + 1}/{shown.page.n}</span>}</span>
+                  <span className={`rounded px-1.5 py-0.5 text-[10px] sm:text-xs bg-black/80 border border-neutral-600 ${shown.cols ? "text-amber-400" : ""} ${shown.ref ? "" : "hidden"}`}>{shown.ref} {shown.cols ? null : <span className="opacity-60">{shown.version}</span>}{shown.page && <span className="ml-1 text-amber-300">{shown.page.i + 1}/{shown.page.n}</span>}</span>
                 </div>
                 <div className={`relative flex items-stretch gap-[2cqw] rounded-md bg-black/80 border border-neutral-600 px-[2.5cqw] ${PB.logoSide === "left" ? "flex-row-reverse" : ""}`} style={{ height: `${PB.height}cqh` }}>
                   {logo && PB.logoOn && (
@@ -1062,7 +1064,7 @@ export default function Control() {
                 ) : (
                   <>
                     <p ref={previewTxt} className={`font-serif leading-snug whitespace-pre-line cursor-text ${shown.kind === "slide" ? "text-center" : ""} ${size}`}>{shown.cols ? <ColsText cols={shown.cols} /> : <RichText text={shown.text} bold={shown.bold} under={shown.under} />}</p>
-                    <div className={`mt-2 text-sm ${shown.cols ? "text-center font-semibold text-blue-400" : "text-right"}`}>{shown.ref} {shown.cols ? null : <span className="text-xs opacity-60">{shown.version}</span>}{shown.page && <span className="ml-1 text-xs text-amber-300">{shown.page.i + 1}/{shown.page.n}</span>}</div>
+                    <div className={`mt-2 text-sm ${shown.ref ? "" : "hidden"} ${shown.cols ? "text-center font-semibold text-amber-400" : "text-right"}`}>{shown.ref} {shown.cols ? null : <span className="text-xs opacity-60">{shown.version}</span>}{shown.page && <span className="ml-1 text-xs text-amber-300">{shown.page.i + 1}/{shown.page.n}</span>}</div>
                   </>
                 )}
                 </div>
