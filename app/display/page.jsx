@@ -190,9 +190,9 @@ export default function Display() {
 
       {band && (
         <div key={fadeKey} className={"mb-[1vh]" + fxc} style={fxs}>
-          <div className={`flex mb-[1vh] ${bandLogo && !logoLeft ? "justify-start" : "justify-end"}`}>
-            <span className="rounded-[0.8vh] px-[1.4vw] py-[0.5vh] text-[2.6vh] font-medium" style={{ background: bandBg, color: bandFg }}>
-              {v.ref} {v.version ? <span className="opacity-60 text-[2.1vh]">{v.version}</span> : null}{pg}
+          <div className={`flex mb-[1vh] ${v.cols ? "justify-center" : bandLogo && !logoLeft ? "justify-start" : "justify-end"}`}>
+            <span className="rounded-[0.8vh] px-[1.4vw] py-[0.5vh] text-[2.6vh] font-medium" style={{ background: bandBg, color: v.cols ? "#60a5fa" : bandFg }}>
+              {v.ref} {v.version && !v.cols ? <span className="opacity-60 text-[2.1vh]">{v.version}</span> : null}{pg}
             </span>
           </div>
           <div className={`relative flex items-stretch gap-[2vw] rounded-[2.2vh] px-[2.5vw] ${logoLeft ? "flex-row-reverse" : ""}`}
@@ -225,7 +225,9 @@ export default function Display() {
           <div ref={box} className={`flex-1 flex ${vAlign} min-h-0`}>
             <p ref={txt} className={`leading-snug font-serif whitespace-pre-line ${v.kind === "slide" ? "w-full text-center" : ""}`}>{v.cols ? <ColsText cols={v.cols} /> : <RichText text={v.text} bold={v.bold} under={v.under} />}</p>
           </div>
-          <div className="text-right text-[4vh] pt-[2vh]">{v.ref} <span className="opacity-60 text-[2.5vh]">{v.version}</span>{pg}</div>
+          {v.cols
+            ? <div className="text-center text-[4vh] pt-[2vh] font-semibold" style={{ color: "#60a5fa" }}>{v.ref}</div>
+            : <div className="text-right text-[4vh] pt-[2vh]">{v.ref} <span className="opacity-60 text-[2.5vh]">{v.version}</span>{pg}</div>}
         </div>
       )}
       {hint && !isFs && !transparent && (
