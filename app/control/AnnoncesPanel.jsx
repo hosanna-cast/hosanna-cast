@@ -134,28 +134,9 @@ export function useAnnoncesUi(ann) {
 }
 
 // Colonne de gauche : ajout d'une annonce
-// Coin gauche : un seul bouton ; le formulaire s'ouvre par-dessus la grille (la grille garde toute la place)
-function AddCorner({ ann, ui }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="relative w-fit mb-1.5 sm:mb-2">
-      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}
-        className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition duration-100 active:scale-95 ${open ? "bg-amber-400 text-black" : "bg-neutral-800 hover:bg-neutral-700 text-amber-400"}`}>
-        + Ajouter une annonce {open ? "▴" : "▾"}
-      </button>
-      {open && (
-        <div className="absolute left-0 top-full mt-1.5 z-30 w-[22rem] max-w-[90vw] rounded-xl border border-neutral-600 bg-neutral-900 p-2.5 shadow-2xl">
-          <AnnoncesAdd ann={ann} ui={ui} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-export function AnnoncesAdd({ ann, ui, compact = false }) {
+export function AnnoncesAdd({ ann, ui }) {
   const { error } = ann;
   const { rec, setRec, onFiles, busy } = ui;
-  if (compact) return <AddCorner ann={ann} ui={ui} />;
   return (
     <div>
       <div className="mb-1.5">
@@ -235,7 +216,7 @@ export function AnnoncesGrid({ ann, ui, liveId, canProject, onProject }) {
       )}
 
       {!ready ? null : !list.length ? (
-        <p className="text-sm text-neutral-300 mt-3">Aucune annonce pour l'instant. Utilise le bouton « Ajouter photos ou vidéos » en haut.</p>
+        <p className="text-sm text-neutral-300 mt-3">Aucune annonce pour l'instant. Utilise le bouton « Ajouter photos ou vidéos » à gauche.</p>
       ) : (
         <>
           <nav aria-label="Sections des annonces" className="flex flex-wrap gap-1.5 mb-3">
