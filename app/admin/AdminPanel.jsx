@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { ROLES, ROLE_IDS } from "@/lib/roles";
 import { openScreen } from "@/lib/screen";
-import Backgrounds, { MAX_BG, DEFAULT_TEXT } from "../control/Backgrounds";
+import Backgrounds, { MAX_BG, DEFAULT_TEXT, bgStyle } from "../control/Backgrounds";
 import DisplaySettings from "../control/DisplaySettings";
 import { DEFAULT_SETTINGS, mergeSettings, loadSettings, saveSettings, loadLogo, saveLogo, resizeLogo, LOGO_MAX } from "@/lib/displaySettings";
 
@@ -17,54 +17,69 @@ export default function AdminPanel({ churchName, churchId, token }) {
   const [section, setSection] = useState("profils");     // section affichée à droite : "profils" | "fond" | "affichage"
   const db = () => createClient();
 
-  // fond de l'écran : 3 maximum, un seul actif ; gardé dans ce navigateur et envoyé à l'écran
+  // fond / texte / logo : on prépare d'abord (brouillon + aperçu), puis « Appliquer » les envoie à l'écran
   const [bgs, setBgs] = useState(() => Array(MAX_BG).fill(null));
-  const [bgActive, setBgActive] = useState(-1);
-  const [textColor, setTextColor] = useState(DEFAULT_TEXT);          // couleur du texte projeté
-  // réglages du bandeau / plein écran et logo : gardés dans ce navigateur et envoyés à l'écran
+  const [bgActive, setBgActive] = useState(-1);                       // fond choisi (brouillon)
+  const [textColor, setTextColor] = useState(DEFAULT_TEXT);           // couleur du texte choisie (brouillon)
+  const [logo, setLogo] = useState(null);                             // logo choisi (brouillon)
+  const [applied, setApplied] = useState({ bg: null, text: DEFAULT_TEXT, logo: null });   // ce qui est vraiment sur l'écran
   const [dset, setDset] = useState(DEFAULT_SETTINGS);
-  const [logo, setLogo] = useState(null);
   const dsetRef = useRef(DEFAULT_SETTINGS);
-  const logoRef = useRef(null);
+  const appliedRef = useRef({ bg: null, text: DEFAULT_TEXT, logo: null });
   const scr = useRef(null);
-  const activeRef = useRef(null);
-  const textRef = useRef(DEFAULT_TEXT);
+  const key = "hc.bgs." + churchId;
   useEffect(() => {
+    let ap = { bg: null, text: DEFAULT_TEXT, logo: loadLogo() };
     try {
-      const saved = JSON.parse(localStorage.getItem("hc.bgs." + churchId));
+      const saved = JSON.parse(localStorage.getItem(key));
       const slots = Array.from({ length: MAX_BG }, (_, i) => saved?.slots?.[i] || null);
       setBgs(slots); setBgActive(slots[saved?.active] ? saved.active : -1);
-      activeRef.current = slots[saved?.active] || null;
-      textRef.current = saved?.textColor || DEFAULT_TEXT;
-      setTextColor(textRef.current);
+      setTextColor(saved?.textColor || DEFAULT_TEXT);
+      // ancien format (sans « applied ») : le fond actif était déjà sur l'écran
+      ap = { bg: saved?.applied ? saved.applied.bg || null : slots[saved?.active] || null, text: saved?.applied?.text || saved?.textColor || DEFAULT_TEXT, logo: ap.logo };
     } catch {}
+    appliedRef.current = ap; setApplied(ap); setLogo(ap.logo);
     dsetRef.current = loadSettings(); setDset(dsetRef.current);
-    logoRef.current = loadLogo(); setLogo(logoRef.current);
     scr.current = openScreen(token, (m) => {
-      // l'écran vient de s'ouvrir et demande son fond, la couleur du texte et ses réglages
+      // l'écran vient de s'ouvrir et demande son fond, la couleur du texte et ses réglages (ce qui est appliqué, pas le brouillon)
       if (m.type === "bg?" || m.type === "display?") {
-        scr.current?.postMessage({ type: "bg", bg: activeRef.current, textColor: textRef.current });
+        const a = appliedRef.current;
+        scr.current?.postMessage({ type: "bg", bg: a.bg, textColor: a.text });
         scr.current?.postMessage({ type: "settings", settings: dsetRef.current });
-        if (logoRef.current) scr.current?.postMessage({ type: "logo", logo: logoRef.current });
+        if (a.logo) scr.current?.postMessage({ type: "logo", logo: a.logo });
       }
     });
     return () => scr.current?.close();
   }, [churchId, token]);
-  const saveBgs = (slots, active, tc = textRef.current) => {
-    setBgs(slots); setBgActive(active);
-    activeRef.current = slots[active] || null;
-    textRef.current = tc; setTextColor(tc);
-    try { localStorage.setItem("hc.bgs." + churchId, JSON.stringify({ slots, active, textColor: tc })); } catch { setMsg("Impossible d'enregistrer ce fond : mémoire du navigateur pleine."); }
+
+  const persist = (slots, active, tc, ap) => {
+    try { localStorage.setItem(key, JSON.stringify({ slots, active, textColor: tc, applied: { bg: ap.bg, text: ap.text } })); return true; }
+    catch { setMsg("Impossible d'enregistrer : mémoire du navigateur pleine."); return false; }
   };
-  const sendBg = (bg, tc = textRef.current) => scr.current?.postMessage({ type: "bg", bg, textColor: tc });
-  const pickBg = (i) => { saveBgs(bgs, i); sendBg(i >= 0 ? bgs[i] : null); };
-  const setBgSlot = (i, bg) => { saveBgs(bgs.map((x, k) => (k === i ? bg : x)), bgActive); if (bgActive === i) sendBg(bg); };
+  const draftBg = bgs[bgActive] || null;
+  const dirty = draftBg !== applied.bg || textColor !== applied.text || logo !== applied.logo;
+  const pickBg = (i) => { setBgActive(i); persist(bgs, i, textColor, appliedRef.current); };
+  const setBgSlot = (i, bg) => { const slots = bgs.map((x, k) => (k === i ? bg : x)); setBgs(slots); persist(slots, bgActive, textColor, appliedRef.current); };
   const removeBg = (i) => {
-    const was = bgActive === i;
-    saveBgs(bgs.map((x, k) => (k === i ? null : x)), was ? -1 : bgActive);
-    if (was) sendBg(null);
+    const slots = bgs.map((x, k) => (k === i ? null : x)); const act = bgActive === i ? -1 : bgActive;
+    setBgs(slots); setBgActive(act); persist(slots, act, textColor, appliedRef.current);
   };
-  const pickText = (c) => { saveBgs(bgs, bgActive, c); sendBg(activeRef.current, c); };
+  const pickText = (c) => { setTextColor(c); persist(bgs, bgActive, c, appliedRef.current); };
+
+  // « Appliquer » : n'envoie à l'écran que ce qui a changé (fond, texte, logo)
+  const applyAll = () => {
+    const prev = appliedRef.current;
+    const next = { bg: draftBg, text: textColor, logo };
+    if (!persist(bgs, bgActive, textColor, next)) return;
+    if (next.bg !== prev.bg || next.text !== prev.text) scr.current?.postMessage({ type: "bg", bg: next.bg, textColor: next.text });
+    if (next.logo !== prev.logo) { saveLogo(next.logo); scr.current?.postMessage({ type: "logo", logo: next.logo }); }
+    appliedRef.current = next; setApplied(next);
+  };
+  // « Annuler » : revient à ce qui est affiché sur l'écran
+  const resetDraft = () => {
+    const a = appliedRef.current;
+    setBgActive(bgs.findIndex((x) => x && x === a.bg)); setTextColor(a.text); setLogo(a.logo);
+  };
 
   // réglages d'affichage : enregistrés tout de suite, envoyés à l'écran et aux consoles
   const changeSettings = (c) => {
@@ -75,12 +90,8 @@ export default function AdminPanel({ churchName, churchId, token }) {
   const pickLogo = async (e) => {
     const f = e.target.files?.[0]; e.target.value = "";
     if (!f) return;
-    try { setLogoErr(""); changeLogo(await resizeLogo(f)); }
+    try { setLogoErr(""); setLogo(await resizeLogo(f)); }
     catch (err) { setLogoErr(err.message === "png" ? "Le logo doit être un fichier PNG." : "Impossible de lire cette image."); }
-  };
-  const changeLogo = (l) => {
-    logoRef.current = l; setLogo(l); saveLogo(l);
-    scr.current?.postMessage({ type: "logo", logo: l });
   };
 
   // création directe d'un profil (email + mot de passe provisoire)
@@ -279,11 +290,11 @@ export default function AdminPanel({ churchName, churchId, token }) {
             <h2 className="font-medium">Fond et texte de l'écran</h2>
             <span className="text-xs text-neutral-500">3 maximum</span>
           </div>
-          <p className="text-sm text-neutral-400 mb-3">Image ou couleur. Clique un fond pour l'afficher sur tout l'écran, clique-le encore pour l'enlever. Un écran noir (Ctrl+E) reste noir tant que tu ne le désactives pas.</p>
+          <p className="text-sm text-neutral-400 mb-3">Image ou couleur. Choisis un fond, une couleur de texte et un logo, vérifie l'aperçu, puis clique « Appliquer » : rien n'est envoyé à l'écran avant. Un écran noir (Ctrl+E) reste noir tant que tu ne le désactives pas.</p>
           <Backgrounds slots={bgs} active={bgActive} onPick={pickBg} onSet={setBgSlot} onRemove={removeBg} textColor={textColor} onText={pickText} />
           <div className="mt-4 pt-3 border-t border-neutral-700">
             <div className="text-sm font-medium mb-1">Logo</div>
-            <p className="text-xs text-neutral-400 mb-2">Affiché en haut à droite de l'écran quand un fond est sélectionné. PNG uniquement (fond transparent conseillé), {LOGO_MAX} x {LOGO_MAX} px maximum : une image plus grande est réduite automatiquement.</p>
+            <p className="text-xs text-neutral-400 mb-2">Affiché en haut à droite de l'écran. Il apparaît dans l'aperçu ci-dessous ; il n'est envoyé à l'écran qu'avec « Appliquer ». PNG uniquement (fond transparent conseillé), {LOGO_MAX} x {LOGO_MAX} px maximum : une image plus grande est réduite automatiquement.</p>
             <div className="flex items-center gap-3">
               <div className="h-16 w-16 rounded-lg bg-neutral-900 border border-neutral-700 flex items-center justify-center overflow-hidden">
                 {logo ? <img src={logo} alt="Logo" className="max-h-full max-w-full object-contain" /> : <span className="text-xs text-neutral-600">Aucun</span>}
@@ -292,9 +303,22 @@ export default function AdminPanel({ churchName, churchId, token }) {
                 {logo ? "Changer le logo" : "+ Ajouter un logo"}
                 <input type="file" accept="image/png" className="hidden" onChange={pickLogo} />
               </label>
-              {logo && <button type="button" onClick={() => changeLogo(null)} className="text-sm text-neutral-400 hover:text-red-400">Retirer</button>}
+              {logo && <button type="button" onClick={() => setLogo(null)} className="text-sm text-neutral-400 hover:text-red-400">Retirer</button>}
             </div>
             {logoErr && <p className="text-xs text-amber-300 mt-2">{logoErr}</p>}
+          </div>
+          <div className="mt-4 pt-3 border-t border-neutral-700">
+            <div className="text-sm font-medium mb-2">Aperçu avant d'appliquer</div>
+            <div className="relative aspect-video w-full max-w-md rounded-lg overflow-hidden border border-neutral-600 bg-black" style={bgStyle(draftBg)}>
+              <span className="absolute inset-0 flex items-center justify-center text-center font-bold text-lg px-4 select-none" style={{ color: textColor }}>Aperçu du texte</span>
+              {logo && <img src={logo} alt="" draggable={false} className="absolute object-contain pointer-events-none select-none" style={{ top: "2%", right: "2%", maxWidth: "13%", maxHeight: "23%" }} />}
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button type="button" onClick={applyAll} disabled={!dirty}
+                className="rounded-lg bg-amber-400 hover:bg-amber-300 disabled:opacity-40 disabled:pointer-events-none text-black font-medium text-sm px-5 py-2 active:scale-95 transition duration-100">Appliquer</button>
+              {dirty && <button type="button" onClick={resetDraft} className="rounded-lg bg-neutral-700 hover:bg-neutral-600 text-sm px-4 py-2">Annuler</button>}
+              <span className={`text-xs ${dirty ? "text-amber-300" : "text-green-400"}`}>{dirty ? "Changements pas encore envoyés à l'écran" : "✓ Appliqué sur l'écran"}</span>
+            </div>
           </div>
           <p className="text-xs text-neutral-500 mt-3">Les fonds et le logo sont gardés sur cet appareil : fais ce réglage depuis l'ordinateur de la régie.</p>
         </section>
@@ -304,7 +328,7 @@ export default function AdminPanel({ churchName, churchId, token }) {
         <section className={card}>
           <h2 className="font-medium mb-1">Réglages affichage</h2>
           <p className="text-sm text-neutral-400 mb-3">Bandeau et plein écran ont chacun leurs réglages. Les changements arrivent tout de suite sur l'écran de projection (<a href={`/display?k=${token}`} target="_blank" className="text-amber-400 hover:underline">ouvrir l'écran</a>) et dans l'aperçu de la console.</p>
-          <DisplaySettings standalone settings={dset} logo={logo} onSettings={changeSettings} />
+          <DisplaySettings standalone settings={dset} logo={applied.logo} onSettings={changeSettings} />
           <p className="text-xs text-neutral-500 mt-4">Les réglages sont gardés sur cet appareil : fais-les depuis l'ordinateur de la régie.</p>
         </section>
           )}
