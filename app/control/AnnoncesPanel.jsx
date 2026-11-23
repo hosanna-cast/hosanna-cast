@@ -170,8 +170,16 @@ export function AnnoncesGrid({ ann, ui, liveId, canProject, onProject }) {
   const { errs, setErrs, editId, setEditId, draft, setDraft, onReplace, edit, del, save, busy } = ui;
   const sections = TYPE_IDS.map((t) => ({ t, items: list.filter((a) => typeOf(a) === t) }));
 
-  const grid = (items) => (
+  // ordinateur : le formulaire d'ajout est la 1re case de la grille (coin gauche) ; les images se placent autour et en dessous
+  const firstIdx = sections.findIndex((x) => x.items.length > 0);
+  const addCell = (
+    <li className="hidden lg:block lg:col-span-2 lg:row-span-3 rounded-lg border border-neutral-700 bg-neutral-800/60 p-2.5 self-start">
+      <AnnoncesAdd ann={ann} ui={ui} />
+    </li>
+  );
+  const grid = (items, withAdd) => (
     <ul className="grid gap-2 sm:gap-3 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]">
+      {withAdd && addCell}
       {items.map((a) => (
         <Fragment key={a.id}>
           <Tile a={a} live={liveId === a.id} canProject={canProject} onProject={onProject} onEdit={edit} onDelete={del} />
@@ -216,7 +224,10 @@ export function AnnoncesGrid({ ann, ui, liveId, canProject, onProject }) {
       )}
 
       {!ready ? null : !list.length ? (
-        <p className="text-sm text-neutral-300 mt-3">Aucune annonce pour l'instant. Utilise le bouton « Ajouter photos ou vidéos » à gauche.</p>
+        <div className="mt-1">
+          <div className="hidden lg:block max-w-sm rounded-lg border border-neutral-700 bg-neutral-800/60 p-2.5 mb-3"><AnnoncesAdd ann={ann} ui={ui} /></div>
+          <p className="text-sm text-neutral-300">Aucune annonce pour l'instant. Utilise le bouton « Ajouter photos ou vidéos ».</p>
+        </div>
       ) : (
         <>
           <nav aria-label="Sections des annonces" className="flex flex-wrap gap-1.5 mb-3">
@@ -227,10 +238,10 @@ export function AnnoncesGrid({ ann, ui, liveId, canProject, onProject }) {
               </button>
             ))}
           </nav>
-          {sections.map(({ t, items }) => items.length > 0 && (
+          {sections.map(({ t, items }, si) => items.length > 0 && (
             <div key={t} id={`ann-sec-${t}`} className="scroll-mt-4 mb-4 last:mb-0">
               <div className={`text-sm font-semibold mb-2 pb-1 border-b ${SEC[t].text} ${SEC[t].line}`}>{TYPES[t].short} <span className="font-normal opacity-70 text-sm">({items.length})</span></div>
-              {grid(items)}
+              {grid(items, si === firstIdx)}
             </div>
           ))}
         </>
