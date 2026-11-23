@@ -226,7 +226,7 @@ export default function Display() {
             <p ref={txt} className={`leading-snug font-serif whitespace-pre-line ${v.kind === "slide" ? "w-full text-center" : ""}`}>{v.cols ? <ColsText cols={v.cols} /> : <RichText text={v.text} bold={v.bold} under={v.under} />}</p>
           </div>
           {v.cols
-            ? <div className="text-center text-[4vh] pt-[2vh] font-semibold" style={{ color: "#60a5fa" }}>{v.ref}</div>
+            ? <div className="text-center text-[4vh] pt-[2vh] font-semibold" style={{ color: "#fbbf24" }}>{v.ref}</div>
             : <div className="text-right text-[4vh] pt-[2vh]">{v.ref} <span className="opacity-60 text-[2.5vh]">{v.version}</span>{pg}</div>}
         </div>
       )}
