@@ -68,14 +68,14 @@ function Tile({ a, live, canProject, onProject, onEdit, onDelete }) {
     <li className={`relative rounded-lg overflow-hidden border-2 ${live ? "border-green-500" : isToday ? "border-amber-400" : "border-transparent"} bg-neutral-800`}>
       <button disabled={!canProject} onClick={() => onProject(a)} title={canProject ? "Afficher à l'écran" : ""}
         className="block w-full text-left transition duration-100 active:scale-[0.97] disabled:cursor-default">
-        <div className="aspect-video bg-black flex items-center justify-center">
+        <div className="relative aspect-video bg-black flex items-center justify-center">
           {a.kind === "image"
             ? <img src={a.url} alt="" loading="lazy" className="w-full h-full object-cover" />
             : <video src={`${a.url}#t=0.5`} preload="metadata" muted playsInline className="w-full h-full object-cover pointer-events-none" />}
-        </div>
-        <div className="px-2 py-1.5">
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent px-2 pt-5 pb-1">
           <span className="block text-xs font-medium truncate">{a.kind === "video" ? "🎬 " : ""}{a.name}</span>
-          <span className="block text-[11px] text-white truncate">{{ regular: `↻ ${daysText(a.days)}`, special: `★ ${specialText(a)}`, oneoff: `s'efface dans ${timeLeft(a.expires_at)}` }[typeOf(a)]}</span>
+          <span className="block text-[11px] text-white/90 truncate">{{ regular: `↻ ${daysText(a.days)}`, special: `★ ${specialText(a)}`, oneoff: `s'efface dans ${timeLeft(a.expires_at)}` }[typeOf(a)]}</span>
+          </div>
         </div>
       </button>
       {live && <span className="absolute top-1 left-1 rounded bg-green-600 text-white text-[10px] px-1.5 py-0.5">À l'écran</span>}
@@ -134,9 +134,34 @@ export function useAnnoncesUi(ann) {
 }
 
 // Colonne de gauche : ajout d'une annonce
-export function AnnoncesAdd({ ann, ui }) {
+export function AnnoncesAdd({ ann, ui, compact = false }) {
   const { error } = ann;
   const { rec, setRec, onFiles, busy } = ui;
+  if (compact) {
+    const off = error || busy || (rec.type === "special" && !rec.until);
+    return (
+      <div className="mb-1.5 sm:mb-2 rounded-xl border border-neutral-700 bg-neutral-800/60 px-2.5 py-2 space-y-2">
+        {error && (
+          <p className="rounded-lg bg-red-500/10 text-red-300 text-xs px-2.5 py-2 leading-5">
+            Annonces indisponibles : {error} <span className="text-red-300/70">Exécute (ou relance) le fichier <b>supabase/temporaire.sql</b> dans Supabase (SQL Editor).</span>
+          </p>
+        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-white font-medium mr-1">Nouvelle annonce :</span>
+          {TYPE_IDS.map((t) => (
+            <button key={t} type="button" onClick={() => setRec({ ...rec, type: t })} title={TYPES[t].hint}
+              className={`rounded-md px-2.5 py-1.5 text-xs transition duration-100 active:scale-95 ${rec.type === t ? "bg-amber-400 text-black font-medium" : "bg-neutral-800 text-white hover:bg-neutral-700"}`}>{TYPES[t].label}</button>
+          ))}
+          <label className={`ml-auto rounded-lg bg-neutral-800 hover:bg-neutral-700 text-amber-400 px-4 py-1.5 text-center text-sm font-medium transition duration-100 active:scale-95 cursor-pointer ${off ? "opacity-50 pointer-events-none" : ""}`}>
+            {busy ? "Envoi en cours…" : "+ Ajouter photos ou vidéos"}
+            <input type="file" multiple accept={ACCEPT} onChange={onFiles} className="hidden" />
+          </label>
+        </div>
+        {rec.type !== "oneoff" && <div className="space-y-2"><TypeFields v={rec} onChange={setRec} /></div>}
+        <p className="text-[11px] text-white/80 leading-4">{TYPES[rec.type].hint} · Vidéos : MP4 (H.264), 50 Mo max. Les photos sont réduites automatiquement.</p>
+      </div>
+    );
+  }
   return (
     <div>
       <div className="mb-1.5">
@@ -171,7 +196,7 @@ export function AnnoncesGrid({ ann, ui, liveId, canProject, onProject }) {
   const sections = TYPE_IDS.map((t) => ({ t, items: list.filter((a) => typeOf(a) === t) }));
 
   const grid = (items) => (
-    <ul className="grid grid-cols-2 sm:grid-cols-3 2xl:grid-cols-4 gap-2 sm:gap-3">
+    <ul className="grid gap-2 sm:gap-3 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]">
       {items.map((a) => (
         <Fragment key={a.id}>
           <Tile a={a} live={liveId === a.id} canProject={canProject} onProject={onProject} onEdit={edit} onDelete={del} />
@@ -216,10 +241,10 @@ export function AnnoncesGrid({ ann, ui, liveId, canProject, onProject }) {
       )}
 
       {!ready ? null : !list.length ? (
-        <p className="text-sm text-neutral-300 mt-3">Aucune annonce pour l'instant. Utilise le bouton « Ajouter photos ou vidéos » à gauche.</p>
+        <p className="text-sm text-neutral-300 mt-3">Aucune annonce pour l'instant. Utilise le bouton « Ajouter photos ou vidéos » en haut.</p>
       ) : (
         <>
-          <nav aria-label="Sections des annonces" className="flex flex-wrap gap-1.5 mb-5">
+          <nav aria-label="Sections des annonces" className="flex flex-wrap gap-1.5 mb-3">
             {sections.map(({ t, items }) => (
               <button key={t} onClick={() => goSection(t)} disabled={!items.length}
                 className={`rounded-full px-3 py-1.5 text-sm transition duration-100 active:scale-95 disabled:opacity-30 disabled:pointer-events-none ${SEC[t].chip}`}>
@@ -228,8 +253,8 @@ export function AnnoncesGrid({ ann, ui, liveId, canProject, onProject }) {
             ))}
           </nav>
           {sections.map(({ t, items }) => items.length > 0 && (
-            <div key={t} id={`ann-sec-${t}`} className="scroll-mt-4 mb-8 last:mb-0">
-              <div className={`text-base font-semibold mb-3 pb-1.5 border-b ${SEC[t].text} ${SEC[t].line}`}>{TYPES[t].short} <span className="font-normal opacity-70 text-sm">({items.length})</span></div>
+            <div key={t} id={`ann-sec-${t}`} className="scroll-mt-4 mb-4 last:mb-0">
+              <div className={`text-sm font-semibold mb-2 pb-1 border-b ${SEC[t].text} ${SEC[t].line}`}>{TYPES[t].short} <span className="font-normal opacity-70 text-sm">({items.length})</span></div>
               {grid(items)}
             </div>
           ))}
