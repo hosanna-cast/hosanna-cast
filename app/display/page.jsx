@@ -177,6 +177,14 @@ export default function Display() {
           ) : (
             <img key={v.url} src={v.url} alt="" referrerPolicy="no-referrer" onError={() => report("error")} className="max-w-full max-h-full object-contain" />
           )}
+          {v.overlay && v.overlay.text && (
+            <div className="absolute inset-x-0 bottom-0 flex justify-center" style={{ padding: "4vh 6vw" }}>
+              <div className="max-w-full rounded-[2.2vh] px-[2.5vw] py-[2vh] text-center" style={{ background: "rgba(0,0,0,0.72)", color: "#ffffff", maxHeight: "50vh", overflow: "hidden" }}>
+                <p className="font-serif leading-snug whitespace-pre-line" style={{ fontSize: v.overlay.text.length < 120 ? "4.6vh" : v.overlay.text.length < 260 ? "3.8vh" : "3vh" }}>{v.overlay.text}</p>
+                <div className="mt-[1vh] font-semibold" style={{ fontSize: "3vh", color: "#fbbf24" }}>{v.overlay.ref} {v.overlay.version ? <span className="opacity-60 text-[2.2vh]">{v.overlay.version}</span> : null}</div>
+              </div>
+            </div>
+          )}
           {forcedMute && v.mediaType === "video" && (
             <span className="absolute bottom-3 right-4 rounded-full bg-black/60 text-white/80 text-xs px-3 py-1">🔇 Clique pour activer le son</span>
           )}
