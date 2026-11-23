@@ -770,7 +770,7 @@ export default function Control() {
       <div className={`grid gap-3 lg:gap-5 items-start ${(leftHidden && !showWeb) || annFull ? "lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_380px] 2xl:grid-cols-[minmax(0,1fr)_480px]" : "lg:grid-cols-[240px_minmax(0,1fr)_300px] xl:grid-cols-[300px_minmax(0,1fr)_380px] 2xl:grid-cols-[380px_minmax(0,1fr)_480px]"}`}>
 
         {/* ───── gauche : Bible, notes, chants ───── */}
-        <section className={`order-3 lg:order-1 lg:sticky lg:top-6 ${showWeb ? "lg:col-span-2" : ""} ${annFull ? "lg:col-start-1 lg:row-start-1" : leftHidden && !showWeb ? "lg:hidden" : ""}`}>
+        <section className={`order-3 lg:order-1 lg:sticky lg:top-6 ${showWeb ? "lg:col-span-2" : ""} ${annFull ? "lg:col-start-1 lg:row-start-1 lg:z-20" : leftHidden && !showWeb ? "lg:hidden" : ""}`}>
           {(tabs.length > 1 || church.role !== "standard") && (
           <div className="flex flex-wrap gap-1 bg-neutral-800 rounded-lg p-1 mb-1.5 sm:mb-2">
             {[["bible", "Bible"], ["notes", "Notes"], ["chants", "Chants"], ["annonces", "Annonces"], ["plan", "Plan"]].filter(([k]) => tabs.includes(k)).map(([k, l]) => (
@@ -914,8 +914,8 @@ export default function Control() {
 
         {/* ───── centre : texte rapide (toujours en haut) puis contenu de l'onglet ───── */}
         <div className={`order-2 min-w-0 space-y-3 ${showWeb ? "hidden" : ""} ${annFull ? "lg:col-start-1 lg:row-start-2" : ""}`}>
-          {tabs.includes("bible") && tab !== "chants" && <VoiceRefs resolve={voiceResolve} similar={voiceSimilar} onPick={voicePick} canProject={canProject} />}
-          {church.role !== "annonces" && !isOrateur && tab !== "chants" && (
+          {tabs.includes("bible") && tab !== "chants" && tab !== "annonces" && <VoiceRefs resolve={voiceResolve} similar={voiceSimilar} onPick={voicePick} canProject={canProject} />}
+          {church.role !== "annonces" && !isOrateur && tab !== "chants" && tab !== "annonces" && (
           <QuickText
             onProject={projectFree}
             disabled={!canProject}
