@@ -5,7 +5,7 @@ import { ROLES, ROLE_IDS } from "@/lib/roles";
 import { openScreen } from "@/lib/screen";
 import Backgrounds, { MAX_BG, DEFAULT_TEXT, bgStyle } from "../control/Backgrounds";
 import DisplaySettings from "../control/DisplaySettings";
-import { DEFAULT_SETTINGS, mergeSettings, loadSettings, saveSettings, loadLogo, saveLogo, resizeLogo, LOGO_MAX } from "@/lib/displaySettings";
+import { DEFAULT_SETTINGS, mergeSettings, loadSettings, saveSettings, loadLogo, saveLogo, resizeLogo, LOGO_MAX, LIMITS } from "@/lib/displaySettings";
 
 const card = "rounded-xl bg-neutral-800/60 border border-neutral-700 p-4";
 const field = "rounded-lg bg-neutral-900 border border-neutral-600 px-3 py-2 text-sm outline-none focus:border-amber-400 w-full";
@@ -22,6 +22,7 @@ export default function AdminPanel({ churchName, churchId, token }) {
   const [bgActive, setBgActive] = useState(-1);                       // fond choisi (brouillon)
   const [textColor, setTextColor] = useState(DEFAULT_TEXT);           // couleur du texte choisie (brouillon)
   const [logo, setLogo] = useState(null);                             // logo choisi (brouillon)
+  const [topLogo, setTopLogo] = useState(DEFAULT_SETTINGS.top);       // position / taille du logo (brouillon)
   const [applied, setApplied] = useState({ bg: null, text: DEFAULT_TEXT, logo: null });   // ce qui est vraiment sur l'écran
   const [dset, setDset] = useState(DEFAULT_SETTINGS);
   const dsetRef = useRef(DEFAULT_SETTINGS);
@@ -39,7 +40,7 @@ export default function AdminPanel({ churchName, churchId, token }) {
       ap = { bg: saved?.applied ? saved.applied.bg || null : slots[saved?.active] || null, text: saved?.applied?.text || saved?.textColor || DEFAULT_TEXT, logo: ap.logo };
     } catch {}
     appliedRef.current = ap; setApplied(ap); setLogo(ap.logo);
-    dsetRef.current = loadSettings(); setDset(dsetRef.current);
+    dsetRef.current = loadSettings(); setDset(dsetRef.current); setTopLogo(dsetRef.current.top);
     scr.current = openScreen(token, (m) => {
       // l'écran vient de s'ouvrir et demande son fond, la couleur du texte et ses réglages (ce qui est appliqué, pas le brouillon)
       if (m.type === "bg?" || m.type === "display?") {
@@ -57,7 +58,7 @@ export default function AdminPanel({ churchName, churchId, token }) {
     catch { setMsg("Impossible d'enregistrer : mémoire du navigateur pleine."); return false; }
   };
   const draftBg = bgs[bgActive] || null;
-  const dirty = draftBg !== applied.bg || textColor !== applied.text || logo !== applied.logo;
+  const dirty = draftBg !== applied.bg || textColor !== applied.text || logo !== applied.logo || topLogo.side !== dset.top.side || topLogo.size !== dset.top.size;
   const pickBg = (i) => { setBgActive(i); persist(bgs, i, textColor, appliedRef.current); };
   const setBgSlot = (i, bg) => { const slots = bgs.map((x, k) => (k === i ? bg : x)); setBgs(slots); persist(slots, bgActive, textColor, appliedRef.current); };
   const removeBg = (i) => {
@@ -73,12 +74,13 @@ export default function AdminPanel({ churchName, churchId, token }) {
     if (!persist(bgs, bgActive, textColor, next)) return;
     if (next.bg !== prev.bg || next.text !== prev.text) scr.current?.postMessage({ type: "bg", bg: next.bg, textColor: next.text });
     if (next.logo !== prev.logo) { saveLogo(next.logo); scr.current?.postMessage({ type: "logo", logo: next.logo }); }
+    if (topLogo.side !== dsetRef.current.top.side || topLogo.size !== dsetRef.current.top.size) changeSettings(mergeSettings({ ...dsetRef.current, top: topLogo }));
     appliedRef.current = next; setApplied(next);
   };
   // « Annuler » : revient à ce qui est affiché sur l'écran
   const resetDraft = () => {
     const a = appliedRef.current;
-    setBgActive(bgs.findIndex((x) => x && x === a.bg)); setTextColor(a.text); setLogo(a.logo);
+    setBgActive(bgs.findIndex((x) => x && x === a.bg)); setTextColor(a.text); setLogo(a.logo); setTopLogo(dsetRef.current.top);
   };
 
   // réglages d'affichage : enregistrés tout de suite, envoyés à l'écran et aux consoles
@@ -306,12 +308,29 @@ export default function AdminPanel({ churchName, churchId, token }) {
               {logo && <button type="button" onClick={() => setLogo(null)} className="text-sm text-neutral-400 hover:text-red-400">Retirer</button>}
             </div>
             {logoErr && <p className="text-xs text-amber-300 mt-2">{logoErr}</p>}
+            {logo && (
+              <div className="mt-3 max-w-md space-y-3">
+                <div>
+                  <span className="block text-xs text-neutral-300 mb-1">Position du logo</span>
+                  <div className="grid grid-cols-2 gap-1 rounded-md bg-neutral-900 p-0.5" role="group" aria-label="Position du logo">
+                    {[["left", "En haut à gauche"], ["right", "En haut à droite"]].map(([k, l]) => (
+                      <button key={k} type="button" aria-pressed={topLogo.side === k} onClick={() => setTopLogo((t) => ({ ...t, side: k }))}
+                        className={`rounded py-1.5 text-xs transition active:scale-95 ${topLogo.side === k ? "bg-amber-400 text-black font-medium" : "text-neutral-300 hover:bg-neutral-700"}`}>{l}</button>
+                    ))}
+                  </div>
+                </div>
+                <label className="block">
+                  <span className="flex justify-between text-xs text-neutral-300 mb-0.5"><span>Taille du logo</span><span className="tabular-nums text-neutral-400">{topLogo.size} % (max {Math.round(LOGO_MAX * topLogo.size / 100)} px)</span></span>
+                  <input type="range" min={LIMITS.top.size[0]} max={LIMITS.top.size[1]} step="1" value={topLogo.size} onChange={(e) => setTopLogo((t) => ({ ...t, size: +e.target.value }))} className="w-full accent-amber-400" />
+                </label>
+              </div>
+            )}
           </div>
           <div className="mt-4 pt-3 border-t border-neutral-700">
             <div className="text-sm font-medium mb-2">Aperçu avant d'appliquer</div>
             <div className="relative aspect-video w-full max-w-md rounded-lg overflow-hidden border border-neutral-600 bg-black" style={bgStyle(draftBg)}>
               <span className="absolute inset-0 flex items-center justify-center text-center font-bold text-lg px-4 select-none" style={{ color: textColor }}>Aperçu du texte</span>
-              {logo && <img src={logo} alt="" draggable={false} className="absolute object-contain pointer-events-none select-none" style={{ top: "2%", right: "2%", maxWidth: "13%", maxHeight: "23%" }} />}
+              {logo && <img src={logo} alt="" draggable={false} className="absolute object-contain pointer-events-none select-none" style={{ top: "2%", [topLogo.side === "left" ? "left" : "right"]: "2%", maxWidth: `${13 * topLogo.size / 100}%`, maxHeight: `${23 * topLogo.size / 100}%` }} />}
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <button type="button" onClick={applyAll} disabled={!dirty}
