@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { splitSlides } from "@/lib/library";
 import { findRefs, hasRef } from "@/lib/refs";
 import { readTextFile, readNoteFile } from "@/lib/readFile";
@@ -20,7 +21,7 @@ const Trash = () => (
 );
 const field = "w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-amber-400";
 
-export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUpdate, onPick, selectedId, bible, refOf, textOf, isLiveVerse, liveSlide, pausedSlide, onSlide, onVerse, playlists, onKeyPhrase, onOpen, canAnalyze }) {
+export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUpdate, onPick, selectedId, bible, refOf, textOf, isLiveVerse, liveSlide, pausedSlide, onSlide, onVerse, playlists, onKeyPhrase, onOpen, canAnalyze, stage = null }) {
   const t = COPY[kind];
   const [openId, setOpenId] = useState(null);
   const [adding, setAdding] = useState(false);
@@ -217,10 +218,11 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
   if (open) {
     const isChant = kind === "chants";
     const startEdit = () => { setF({ title: open.title, person: open.person || "", session: open.session || "", text: open.text }); setError(""); setEditing(true); };
-    return (
+    const big = kind === "notes" && !!stage;          // note ouverte dans la colonne centrale : texte plus grand, phrases clés sur 2 colonnes
+    const view = (
       <div>
         <div className="flex items-center justify-between mb-2 text-sm">
-          <button onClick={() => { setOpenId(null); setVq(""); }} className="text-amber-400 hover:underline">‹ {t.list}</button>
+          <button onClick={() => { setOpenId(null); setVq(""); }} className="text-amber-400 hover:underline">{big ? "✕ Fermer la note" : `‹ ${t.list}`}</button>
           <span className="flex gap-3">
             <button onClick={startEdit} className="text-xs text-neutral-400 hover:text-amber-400">Modifier</button>
           <button onClick={() => { if (window.confirm(`Supprimer « ${open.title} » ?`)) { onRemove(open.id); setOpenId(null); } }} className="text-xs text-neutral-500 hover:text-red-400">Supprimer</button>
@@ -267,12 +269,12 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
               {!keys.length ? (
                 <p className="text-xs text-neutral-500">Aucune phrase clé. Elles viennent du texte en gras du fichier importé, ou de « Analyser la note ».</p>
               ) : (
-                <ul className="space-y-1">
+                <ul className={big ? "grid gap-1.5 2xl:grid-cols-2" : "space-y-1"}>
                   {keys.map((s, k) => {
                     const live = liveSlide && liveSlide.id === open.id && liveSlide.key === k;
                     return (
                       <li key={k} onClick={() => onKeyPhrase(open, k)}
-                        className={`flex items-start gap-2 px-2.5 py-2 rounded-lg cursor-pointer select-none text-sm leading-snug border transition duration-100 active:scale-[0.98] ${live ? "bg-green-600 border-green-600 text-white" : "border-amber-400/30 bg-amber-400/5 text-neutral-200 hover:bg-amber-400/10"}`}>
+                        className={`flex items-start gap-2 px-2.5 ${big ? "py-2.5 text-base" : "py-2 text-sm"} rounded-lg cursor-pointer select-none leading-snug border transition duration-100 active:scale-[0.98] ${live ? "bg-green-600 border-green-600 text-white" : "border-amber-400/30 bg-amber-400/5 text-neutral-200 hover:bg-amber-400/10"}`}>
                         <span className="flex-1 whitespace-pre-line">{s}</span>
                         {canAnalyze && (
                           <button aria-label="Retirer cette phrase" title="Retirer"
@@ -362,9 +364,14 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
         </>)}
       </div>
     );
+    if (big) return (<>{renderList()}{createPortal(<div className="rounded-xl border border-neutral-700 bg-neutral-800/60 p-3">{view}</div>, stage)}</>);
+    return view;
   }
 
   /* ───── liste ───── */
+  return renderList();
+
+  function renderList() {
   return (
     <div>
       {kind === "chants" && playlists && (
@@ -386,7 +393,7 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
             {list.map((x) => kind === "notes" ? (
               <div key={x.id} className="flex items-stretch gap-1 mb-1">
                 <button onClick={() => setOpenId(x.id)}
-                  className="flex-1 min-w-0 text-left px-3 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 transition duration-100 active:scale-[0.98]">
+                  className={`flex-1 min-w-0 text-left px-3 py-2 rounded-lg transition duration-100 active:scale-[0.98] ${openId === x.id ? "bg-amber-400/15 ring-1 ring-amber-400" : "bg-neutral-800 hover:bg-neutral-700"}`}>
                   <span className="block text-sm font-medium truncate">{x.title}</span>
                   {x.person && <span className="block text-xs truncate text-neutral-500">{x.person}</span>}
                 </button>
@@ -408,4 +415,5 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
       </div>
     </div>
   );
+  }
 }
