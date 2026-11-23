@@ -27,6 +27,7 @@ import { useServicePlans } from "@/lib/servicePlan";
 import { PlanAdd, PlanList } from "./PlanCulte";
 import { findSimilarVerses } from "@/lib/voiceRefs";
 import VersionSelect from "./VersionSelect";
+import ChantBar from "./ChantBar";
 import ColsText from "@/lib/ColsText";
 import VoiceRefs from "./VoiceRefs";        // Voice (test) : détection vocale, supprimable
 import ONLINE from "@/config/online-versions.json";
@@ -67,6 +68,7 @@ export default function Control() {
   const [mediaLive, setMediaLive] = useState(null);       // dernière annonce projetée { id }
   const [mediaStatus, setMediaStatus] = useState(null);   // ce que l'écran dit de la vidéo : playing | muted | error
   const [chantId, setChantId] = useState(null);
+  const [plId, setPlId] = useState(null);                   // playlist de chants active (barre « chant en cours »)
   const [view, setView] = useState(null);                // chapitre affiché au centre { b, c }
   const [cite, setCite] = useState(null);                // plage citée dans la note { b, c, v, vEnd }
   const allTabs = tabsFor(church.role);                     // onglets autorisés pour ce profil (« Chants » : chants seulement)
@@ -840,6 +842,8 @@ export default function Control() {
                 onKeyPhrase={projectKey}
                 onOpen={setNoteId}
                 stage={tab === "notes" && wide ? stageEl : null}
+                plOpenId={plId}
+                onPlOpenId={setPlId}
               />
             ) : !bible ? (
               <p className="text-sm text-neutral-500">Chargement de la Bible…</p>
@@ -907,8 +911,8 @@ export default function Control() {
 
         {/* ───── centre : texte rapide (toujours en haut) puis contenu de l'onglet ───── */}
         <div className={`order-2 min-w-0 space-y-3 ${showWeb ? "hidden" : ""}`}>
-          {tabs.includes("bible") && <VoiceRefs resolve={voiceResolve} similar={voiceSimilar} onPick={voicePick} canProject={canProject} />}
-          {church.role !== "annonces" && !isOrateur && (
+          {tabs.includes("bible") && tab !== "chants" && <VoiceRefs resolve={voiceResolve} similar={voiceSimilar} onPick={voicePick} canProject={canProject} />}
+          {church.role !== "annonces" && !isOrateur && tab !== "chants" && (
           <QuickText
             onProject={projectFree}
             disabled={!canProject}
@@ -945,6 +949,17 @@ export default function Control() {
         </section>
         ) : tab === "chants" ? (
         <section className="min-w-0">
+          <ChantBar
+            item={library.lib.chants.find((x) => x.id === chantId) || null}
+            count={(() => { const c = library.lib.chants.find((x) => x.id === chantId); return c ? slidesOf(c).length : 0; })()}
+            liveIndex={liveKind === "slide" && slideLive?.kind === "chants" && slideLive.id === chantId ? slideLive.i : null}
+            playlist={playlists.list.find((p) => p.id === plId) || null}
+            chants={library.lib.chants}
+            selectedId={chantId}
+            onPick={setChantId}
+            onStep={step}
+            canStep={canStep && liveKind === "slide" && slideLive?.kind === "chants"}
+          />
           <ChantStage
             item={library.lib.chants.find((x) => x.id === chantId) || null}
             bible={bible}
