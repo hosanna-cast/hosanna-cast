@@ -1118,11 +1118,16 @@ export default function Control() {
                     {bothTarget && bible?.[bothTarget.b]?.[bothTarget.c] ? (
                       <>
                         <p className="text-xs font-medium text-neutral-300 mb-1.5">{refOf(bothTarget)}</p>
-                        <p><span className="mr-1.5 text-[11px] font-semibold text-blue-400">{label}</span><span className="text-neutral-200">{textOf(bothTarget)}</span></p>
-                        <p className="mt-2 border-t border-neutral-700 pt-2">
-                          <span className="mr-1.5 text-[11px] font-semibold text-amber-400">{label2 || "…"}</span>
-                          <span className="text-neutral-200">{bible2?.[bothTarget.b]?.[bothTarget.c] && chapterReady2(bothTarget.b, bothTarget.c) ? (textOf(bothTarget, bible2) || "Verset absent de cette version.") : (bibleError2 ? `Version indisponible : ${bibleError2}` : "Chargement…")}</span>
-                        </p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="min-w-0">
+                            <p className="mb-1 text-[11px] font-semibold text-blue-400">{label}</p>
+                            <p className="text-neutral-200">{textOf(bothTarget)}</p>
+                          </div>
+                          <div className="min-w-0 border-l border-neutral-700 pl-3">
+                            <p className="mb-1 text-[11px] font-semibold text-amber-400">{label2 || "…"}</p>
+                            <p className="text-neutral-200">{bible2?.[bothTarget.b]?.[bothTarget.c] && chapterReady2(bothTarget.b, bothTarget.c) ? (textOf(bothTarget, bible2) || "Verset absent de cette version.") : (bibleError2 ? `Version indisponible : ${bibleError2}` : "Chargement…")}</p>
+                          </div>
+                        </div>
                       </>
                     ) : <p className="text-xs text-neutral-500">Choisis ou projette un verset : il s'affiche ici dans les 2 versions.</p>}
                   </div>
