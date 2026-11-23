@@ -1,6 +1,6 @@
 "use client";
-import { useRef, useState } from "react";
-import { LIMITS, mergeSettings, DEFAULT_SETTINGS, resizeLogo } from "@/lib/displaySettings";
+import { useState } from "react";
+import { LIMITS, mergeSettings, DEFAULT_SETTINGS } from "@/lib/displaySettings";
 
 const Slider = ({ label, value, unit, range, onChange, disabled }) => (
   <label className="block">
@@ -35,23 +35,13 @@ function Wrap({ standalone, children }) {
   );
 }
 
-// Panneau « Réglages de l'écran » : valeurs séparées pour le bandeau et le plein écran, logo PNG, réinitialisation.
-export default function DisplaySettings({ settings, logo, onSettings, onLogo, disabled, standalone = false }) {
+// Panneau « Réglages de l'écran » : valeurs séparées pour le bandeau et le plein écran, réglages du logo, réinitialisation.
+export default function DisplaySettings({ settings, logo, onSettings, disabled, standalone = false }) {
   const [mode, setMode] = useState("band");
-  const [err, setErr] = useState("");
-  const file = useRef(null);
   const s = settings[mode];
   const L = LIMITS[mode];
 
   const set = (patch) => onSettings(mergeSettings({ ...settings, [mode]: { ...settings[mode], ...patch } }));
-
-  const pick = async (e) => {
-    const f = e.target.files?.[0];
-    e.target.value = "";
-    if (!f) return;
-    if (!f.type.startsWith("image/")) { setErr("Choisis une image (PNG transparent de préférence)."); return; }
-    try { setErr(""); onLogo(await resizeLogo(f)); } catch { setErr("Impossible de lire cette image."); }
-  };
 
   return (
     <Wrap standalone={standalone}>
@@ -83,16 +73,9 @@ export default function DisplaySettings({ settings, logo, onSettings, onLogo, di
               <input type="checkbox" checked={s.logoOn} disabled={disabled || !logo} onChange={(e) => set({ logoOn: e.target.checked })} className="accent-amber-400" />
               {mode === "band" ? "Logo dans le bandeau" : "Logo en haut à droite"}
             </label>
-            <div className="flex items-center gap-1.5">
-              {logo && <img src={logo} alt="" className="h-7 w-7 object-contain rounded bg-neutral-900" />}
-              <button type="button" disabled={disabled} onClick={() => file.current?.click()}
-                className="rounded-md bg-neutral-700 hover:bg-neutral-600 px-2 py-1 text-xs disabled:opacity-40">{logo ? "Changer" : "Envoyer un logo"}</button>
-              {logo && <button type="button" disabled={disabled} onClick={() => onLogo(null)} className="rounded-md bg-neutral-700 hover:bg-neutral-600 px-2 py-1 text-xs disabled:opacity-40" aria-label="Retirer le logo">✕</button>}
-            </div>
-            <input ref={file} type="file" accept="image/png,image/webp,image/svg+xml,image/*" className="hidden" onChange={pick} />
+            {logo && <img src={logo} alt="" className="h-7 w-7 object-contain rounded bg-neutral-900" />}
           </div>
-          {err && <p className="text-xs text-amber-300">{err}</p>}
-          {!logo && <p className="text-xs text-neutral-500">Envoie un PNG à fond transparent : il prendra la couleur du bandeau.</p>}
+          {!logo && <p className="text-xs text-neutral-500">Aucun logo : ajoute-le dans « Fond de l'écran ».</p>}
 
           {logo && s.logoOn && (
             <>

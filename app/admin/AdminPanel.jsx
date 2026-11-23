@@ -5,7 +5,7 @@ import { ROLES, ROLE_IDS } from "@/lib/roles";
 import { openScreen } from "@/lib/screen";
 import Backgrounds, { MAX_BG, DEFAULT_TEXT } from "../control/Backgrounds";
 import DisplaySettings from "../control/DisplaySettings";
-import { DEFAULT_SETTINGS, mergeSettings, loadSettings, saveSettings, loadLogo, saveLogo } from "@/lib/displaySettings";
+import { DEFAULT_SETTINGS, mergeSettings, loadSettings, saveSettings, loadLogo, saveLogo, resizeLogo, LOGO_MAX } from "@/lib/displaySettings";
 
 const card = "rounded-xl bg-neutral-800/60 border border-neutral-700 p-4";
 const field = "rounded-lg bg-neutral-900 border border-neutral-600 px-3 py-2 text-sm outline-none focus:border-amber-400 w-full";
@@ -70,6 +70,13 @@ export default function AdminPanel({ churchName, churchId, token }) {
   const changeSettings = (c) => {
     dsetRef.current = c; setDset(c); saveSettings(c);
     scr.current?.postMessage({ type: "settings", settings: c });
+  };
+  const [logoErr, setLogoErr] = useState("");
+  const pickLogo = async (e) => {
+    const f = e.target.files?.[0]; e.target.value = "";
+    if (!f) return;
+    try { setLogoErr(""); changeLogo(await resizeLogo(f)); }
+    catch (err) { setLogoErr(err.message === "png" ? "Le logo doit être un fichier PNG." : "Impossible de lire cette image."); }
   };
   const changeLogo = (l) => {
     logoRef.current = l; setLogo(l); saveLogo(l);
@@ -274,7 +281,22 @@ export default function AdminPanel({ churchName, churchId, token }) {
           </div>
           <p className="text-sm text-neutral-400 mb-3">Image ou couleur. Clique un fond pour l'afficher sur tout l'écran, clique-le encore pour l'enlever. Un écran noir (Ctrl+E) reste noir tant que tu ne le désactives pas.</p>
           <Backgrounds slots={bgs} active={bgActive} onPick={pickBg} onSet={setBgSlot} onRemove={removeBg} textColor={textColor} onText={pickText} />
-          <p className="text-xs text-neutral-500 mt-3">Les fonds sont gardés sur cet appareil : fais ce réglage depuis l'ordinateur de la régie.</p>
+          <div className="mt-4 pt-3 border-t border-neutral-700">
+            <div className="text-sm font-medium mb-1">Logo</div>
+            <p className="text-xs text-neutral-400 mb-2">Affiché en haut à droite de l'écran quand un fond est sélectionné. PNG uniquement (fond transparent conseillé), {LOGO_MAX} x {LOGO_MAX} px maximum : une image plus grande est réduite automatiquement.</p>
+            <div className="flex items-center gap-3">
+              <div className="h-16 w-16 rounded-lg bg-neutral-900 border border-neutral-700 flex items-center justify-center overflow-hidden">
+                {logo ? <img src={logo} alt="Logo" className="max-h-full max-w-full object-contain" /> : <span className="text-xs text-neutral-600">Aucun</span>}
+              </div>
+              <label className="rounded-md bg-neutral-700 hover:bg-neutral-600 px-3 py-1.5 text-sm cursor-pointer active:scale-95 transition duration-100">
+                {logo ? "Changer le logo" : "+ Ajouter un logo"}
+                <input type="file" accept="image/png" className="hidden" onChange={pickLogo} />
+              </label>
+              {logo && <button type="button" onClick={() => changeLogo(null)} className="text-sm text-neutral-400 hover:text-red-400">Retirer</button>}
+            </div>
+            {logoErr && <p className="text-xs text-amber-300 mt-2">{logoErr}</p>}
+          </div>
+          <p className="text-xs text-neutral-500 mt-3">Les fonds et le logo sont gardés sur cet appareil : fais ce réglage depuis l'ordinateur de la régie.</p>
         </section>
           )}
 
@@ -282,7 +304,7 @@ export default function AdminPanel({ churchName, churchId, token }) {
         <section className={card}>
           <h2 className="font-medium mb-1">Réglages affichage</h2>
           <p className="text-sm text-neutral-400 mb-3">Bandeau et plein écran ont chacun leurs réglages. Les changements arrivent tout de suite sur l'écran de projection (<a href={`/display?k=${token}`} target="_blank" className="text-amber-400 hover:underline">ouvrir l'écran</a>) et dans l'aperçu de la console.</p>
-          <DisplaySettings standalone settings={dset} logo={logo} onSettings={changeSettings} onLogo={changeLogo} />
+          <DisplaySettings standalone settings={dset} logo={logo} onSettings={changeSettings} />
           <p className="text-xs text-neutral-500 mt-4">Les réglages sont gardés sur cet appareil : fais-les depuis l'ordinateur de la régie.</p>
         </section>
           )}

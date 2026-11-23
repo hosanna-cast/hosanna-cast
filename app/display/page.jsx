@@ -153,6 +153,9 @@ export default function Display() {
   const bandLogo = logo && B.logoOn;
   const fullLogo = logo && F.logoOn;
   const logoLeft = B.logoSide === "left";
+  // fond sélectionné : le logo s'affiche en haut à droite (sauf s'il est déjà montré par le bandeau / plein écran, ou en écran noir / vidéo)
+  const logoShownByLayout = band ? bandLogo : (fullLogo && v && v.kind !== "media");
+  const bgLogo = logo && bg && !blank && !logoShownByLayout && !(v && v.kind === "media");
   const vAlign = { top: "items-start", center: "items-center", bottom: "items-end" }[F.valign];
   // transition douce : le contenu est remonté (donc rejoué en fondu) quand le texte, la page ou la mise en page change ;
   // un changement de gras / souligné ne rejoue rien. L'écran noir, lui, est toujours instantané.
@@ -189,6 +192,11 @@ export default function Display() {
             <span className="absolute bottom-3 right-4 rounded-full bg-black/60 text-white/80 text-xs px-3 py-1">🔇 Clique pour activer le son</span>
           )}
         </div>
+      )}
+
+      {bgLogo && (
+        <img src={logo} alt="" draggable={false} className="absolute w-auto h-auto object-contain pointer-events-none select-none"
+             style={{ top: "2vh", right: "2vw", maxWidth: "250px", maxHeight: "250px" }} />
       )}
 
       {fullLogo && !band && !blank && v && v.kind !== "media" && (
