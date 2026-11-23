@@ -4,6 +4,7 @@ import { openScreen } from "@/lib/screen";
 import { uuid } from "@/lib/uuid";
 import { bgStyle } from "../control/Backgrounds";
 import { RichText } from "@/lib/bold";
+import ColsText from "@/lib/ColsText";
 import { DEFAULT_SETTINGS, mergeSettings, loadSettings, saveSettings, loadLogo, saveLogo } from "@/lib/displaySettings";
 import { useWakeLock } from "@/lib/useWakeLock";
 
@@ -204,7 +205,7 @@ export default function Display() {
               {v.kind === "chant" ? (
                 <p ref={txt} className="w-full text-center font-sans font-bold leading-[1.25] whitespace-pre-line">{v.text}</p>
               ) : (
-                <p ref={txt} className={`w-full leading-snug font-serif whitespace-pre-line ${v.kind === "slide" ? "text-center" : ""}`}><RichText text={v.text} bold={v.bold} under={v.under} /></p>
+                <p ref={txt} className={`w-full leading-snug font-serif whitespace-pre-line ${v.kind === "slide" ? "text-center" : ""}`}>{v.cols ? <ColsText cols={v.cols} /> : <RichText text={v.text} bold={v.bold} under={v.under} />}</p>
               )}
             </div>
           </div>
@@ -222,7 +223,7 @@ export default function Display() {
       {!band && !blank && v && v.kind !== "chant" && v.kind !== "media" && (
         <div key={fadeKey} className={"flex-1 flex flex-col min-h-0" + fxc} style={fxs}>
           <div ref={box} className={`flex-1 flex ${vAlign} min-h-0`}>
-            <p ref={txt} className={`leading-snug font-serif whitespace-pre-line ${v.kind === "slide" ? "w-full text-center" : ""}`}><RichText text={v.text} bold={v.bold} under={v.under} /></p>
+            <p ref={txt} className={`leading-snug font-serif whitespace-pre-line ${v.kind === "slide" ? "w-full text-center" : ""}`}>{v.cols ? <ColsText cols={v.cols} /> : <RichText text={v.text} bold={v.bold} under={v.under} />}</p>
           </div>
           <div className="text-right text-[4vh] pt-[2vh]">{v.ref} <span className="opacity-60 text-[2.5vh]">{v.version}</span>{pg}</div>
         </div>
