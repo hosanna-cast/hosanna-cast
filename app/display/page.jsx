@@ -153,9 +153,9 @@ export default function Display() {
   const bandLogo = logo && B.logoOn;
   const fullLogo = logo && F.logoOn;
   const logoLeft = B.logoSide === "left";
-  // fond sélectionné : le logo s'affiche en haut à droite (sauf s'il est déjà montré par le bandeau / plein écran, ou en écran noir / vidéo)
+  // le logo s'affiche en haut à droite, avec ou sans fond (ne dépend plus du fond reçu : un fond perdu en route ne le cache plus) (sauf s'il est déjà montré par le bandeau / plein écran, ou en écran noir / vidéo)
   const logoShownByLayout = band ? bandLogo : (fullLogo && v && v.kind !== "media");
-  const bgLogo = logo && bg && !blank && !logoShownByLayout && !(v && v.kind === "media");
+  const bgLogo = logo && !blank && !logoShownByLayout && !(v && v.kind === "media");
   const vAlign = { top: "items-start", center: "items-center", bottom: "items-end" }[F.valign];
   // transition douce : le contenu est remonté (donc rejoué en fondu) quand le texte, la page ou la mise en page change ;
   // un changement de gras / souligné ne rejoue rien. L'écran noir, lui, est toujours instantané.
