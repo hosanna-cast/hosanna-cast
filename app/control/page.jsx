@@ -8,7 +8,7 @@ import { useLibrary, slidesOf } from "@/lib/library";
 import ChapterView from "./ChapterView";
 import QuickText from "./QuickText";
 import WebImage from "./WebImage";
-import { useAnnoncesUi, AnnoncesAdd, AnnoncesGrid } from "./AnnoncesPanel";
+import { useAnnoncesUi, AnnoncesAdd, AnnoncesSections, AnnoncesGrid } from "./AnnoncesPanel";
 import { bgStyle } from "./Backgrounds";
 import { useChurch } from "@/lib/church";
 import UserMenu from "./UserMenu";
@@ -77,7 +77,6 @@ export default function Control() {
   const [showWeb, setShowWeb] = useState(false);          // panneau « Image depuis internet » (bouton à droite des onglets)
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(0);
-  const annFull = tab === "annonces" && !showWeb;            // Annonces (ordinateur) : pas de colonne de gauche, le formulaire d'ajout est dans la grille
   const leftHidden = false;                                   // le bouton « Panneau » a été retiré : le panneau de gauche est toujours affiché
   const [stageEl, setStageEl] = useState(null);               // zone du centre où s'ouvre la note (onglet Notes)
   const [wide, setWide] = useState(false);               // ordinateur : le chapitre est lu au centre, pas dans le panneau de gauche
@@ -790,10 +789,10 @@ export default function Control() {
         </div>
       </header>
 
-      <div className={`grid gap-3 lg:gap-5 items-start ${annFull ? "lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_380px] 2xl:grid-cols-[minmax(0,1fr)_480px]" : "lg:grid-cols-[240px_minmax(0,1fr)_300px] xl:grid-cols-[300px_minmax(0,1fr)_380px] 2xl:grid-cols-[380px_minmax(0,1fr)_480px]"}`}>
+      <div className={`grid gap-3 lg:gap-5 items-start ${leftHidden && !showWeb ? "lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_380px] 2xl:grid-cols-[minmax(0,1fr)_480px]" : "lg:grid-cols-[240px_minmax(0,1fr)_300px] xl:grid-cols-[300px_minmax(0,1fr)_380px] 2xl:grid-cols-[380px_minmax(0,1fr)_480px]"}`}>
 
         {/* ───── gauche : Bible, notes, chants ───── */}
-        <section className={`order-3 lg:order-1 lg:sticky lg:top-6 ${showWeb ? "lg:col-span-2" : ""} ${annFull ? "lg:hidden" : ""}`}>
+        <section className={`order-3 lg:order-1 lg:sticky lg:top-6 ${showWeb ? "lg:col-span-2" : ""} ${leftHidden && !showWeb ? "lg:hidden" : ""}`}>
           {webImageEl}
 
           {tabs.includes("bible") && tab !== "annonces" && tab !== "plan" && tab !== "chants" && !showWeb && (() => {
@@ -829,7 +828,10 @@ export default function Control() {
                 canAddCurrent={!!shown && shown.kind !== "other" && !(liveKind === "media" && String(mediaLive?.id).startsWith("web:"))}
               />
             ) : tab === "annonces" ? (
-              <AnnoncesAdd ann={ann} ui={annUi} />
+              <div className="space-y-3">
+                <AnnoncesAdd ann={ann} ui={annUi} />
+                <AnnoncesSections ann={ann} ui={annUi} />
+              </div>
             ) : tab !== "bible" ? (
               <LibraryPanel
                 key={tab}
