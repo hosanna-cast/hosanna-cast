@@ -1105,7 +1105,7 @@ export default function Control() {
             )}
           </div>
 
-          {peers.length > 0 && (
+          {tab !== "annonces" && peers.length > 0 && (
             <p className={`mt-2 text-xs rounded-lg px-2.5 py-1.5 ${lastBy ? "bg-sky-500/15 text-sky-200" : "bg-neutral-800 text-neutral-400"}`}>
               {lastBy ? <><b className="font-medium">{lastBy.name}</b> <span className="opacity-70">({lastBy.device})</span> · {lastBy.what}</> : "C'est vous qui pilotez l'écran"}
             </p>
@@ -1119,12 +1119,12 @@ export default function Control() {
 
           {hint && <p className="mt-2 text-xs rounded-lg px-2.5 py-2 bg-amber-400/10 text-amber-200">{hint}</p>}
 
-          {shown && shown.kind === "media" && shown.mediaType === "image" && !blank && (
+          {tab !== "annonces" && shown && shown.kind === "media" && shown.mediaType === "image" && !blank && (
             <OverlayVerse bible={bible} refOf={refOf} textOf={textOf} overlay={shown.overlay || null}
               onPick={projectOverlay} onClear={clearOverlay} disabled={!canProject} />
           )}
 
-          <div className="grid grid-cols-[1.4fr_1.4fr_1fr_0.6fr_0.6fr_1.2fr] lg:grid-cols-6 gap-1.5 lg:gap-2 mt-2 lg:mt-3">
+          {tab !== "annonces" && <div className="grid grid-cols-[1.4fr_1.4fr_1fr_0.6fr_0.6fr_1.2fr] lg:grid-cols-6 gap-1.5 lg:gap-2 mt-2 lg:mt-3">
             <button className={btn + " lg:col-span-3"} disabled={!canStep} onClick={() => step(-1)}>← Préc.</button>
             <button className={btn + " lg:col-span-3"} disabled={!canStep} onClick={() => step(1)}>Suiv. →</button>
             <button onClick={toggleBlank} disabled={!canProject}
@@ -1134,9 +1134,9 @@ export default function Control() {
             <button onMouseDown={(e) => e.preventDefault()} onClick={applyUnder} disabled={!canProject} title="Souligné sur les mots sélectionnés dans l'aperçu (Ctrl+U)" aria-label="Souligné"
               className={btn + " lg:col-span-1 underline"}>U</button>
             <button className={btn + " lg:col-span-2"} disabled={!shown || !canProject} onClick={clearScreen}>Effacer</button>
-          </div>
+          </div>}
 
-          {!isOrateur && (
+          {tab !== "annonces" && !isOrateur && (
           <div className="mt-2 lg:mt-3 grid grid-cols-2 gap-1 rounded-lg bg-neutral-800 p-1" role="group" aria-label="Mise en page de l'écran">
             {[["full", "Plein écran"], ["band", "Bandeau"]].map(([k, l]) => (
               <button key={k} onClick={() => setLayoutMode(k)} disabled={!canProject} aria-pressed={layout === k}
@@ -1145,7 +1145,7 @@ export default function Control() {
           </div>
           )}
 
-          <div className="hidden lg:flex mt-4 flex-col items-center gap-2.5 text-xs xl:text-sm text-neutral-400">
+          {tab !== "annonces" && <div className="hidden lg:flex mt-4 flex-col items-center gap-2.5 text-xs xl:text-sm text-neutral-400">
             <div className="flex flex-wrap justify-center gap-x-4 gap-y-2">
               <span className="flex items-center gap-1.5"><Kbd>↑↓</Kbd> choisir</span>
               <span className="flex items-center gap-1.5"><Kbd>Entrée</Kbd> projeter</span>
@@ -1159,7 +1159,7 @@ export default function Control() {
               <span className="flex items-center gap-1.5"><Kbd>Ctrl+U</Kbd> souligné</span>
               {!isOrateur && <span className="flex items-center gap-1.5"><Kbd>B</Kbd> bandeau</span>}
             </div>
-          </div>
+          </div>}
 
           {wide && tabs.includes("bible") && tab === "bible" && (
             <div className="hidden lg:block mt-3 space-y-2">
