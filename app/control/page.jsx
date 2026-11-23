@@ -77,6 +77,7 @@ export default function Control() {
   const [showWeb, setShowWeb] = useState(false);          // panneau « Image depuis internet » (bouton à droite des onglets)
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(0);
+  const annFull = tab === "annonces" && !showWeb;            // Annonces (ordinateur) : pas de colonne de gauche, le formulaire d'ajout est dans la grille
   const leftHidden = false;                                   // le bouton « Panneau » a été retiré : le panneau de gauche est toujours affiché
   const [stageEl, setStageEl] = useState(null);               // zone du centre où s'ouvre la note (onglet Notes)
   const [wide, setWide] = useState(false);               // ordinateur : le chapitre est lu au centre, pas dans le panneau de gauche
@@ -750,7 +751,7 @@ export default function Control() {
   return (
     <main className={`min-h-screen bg-neutral-900 text-white p-3 sm:p-6 2xl:px-10 ${typing ? "pb-[55vh] lg:pb-6" : ""}`}>
       {/* barre du haut */}
-      <header className="mb-3 sm:mb-5 space-y-3">
+      <header className="mb-5 sm:mb-8 space-y-3">
         <a href="/" title="Accueil" className="inline-flex items-center gap-2.5 transition duration-100 active:scale-95">
           <img src="/logo-96.png" alt="" width={40} height={40} className="h-9 w-9 sm:h-10 sm:w-10" />
           <span className="text-xl sm:text-2xl font-semibold leading-none">Hosanna <span className="text-amber-400">Cast</span></span>
@@ -789,10 +790,10 @@ export default function Control() {
         </div>
       </header>
 
-      <div className={`grid gap-3 lg:gap-5 items-start ${leftHidden && !showWeb ? "lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_380px] 2xl:grid-cols-[minmax(0,1fr)_480px]" : "lg:grid-cols-[240px_minmax(0,1fr)_300px] xl:grid-cols-[300px_minmax(0,1fr)_380px] 2xl:grid-cols-[380px_minmax(0,1fr)_480px]"}`}>
+      <div className={`grid gap-3 lg:gap-5 items-start ${annFull ? "lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_380px] 2xl:grid-cols-[minmax(0,1fr)_480px]" : "lg:grid-cols-[240px_minmax(0,1fr)_300px] xl:grid-cols-[300px_minmax(0,1fr)_380px] 2xl:grid-cols-[380px_minmax(0,1fr)_480px]"}`}>
 
         {/* ───── gauche : Bible, notes, chants ───── */}
-        <section className={`order-3 lg:order-1 lg:sticky lg:top-6 ${showWeb ? "lg:col-span-2" : ""} ${leftHidden && !showWeb ? "lg:hidden" : ""}`}>
+        <section className={`order-3 lg:order-1 lg:sticky lg:top-6 ${showWeb ? "lg:col-span-2" : ""} ${annFull ? "lg:hidden" : ""}`}>
           {webImageEl}
 
           {tabs.includes("bible") && tab !== "annonces" && tab !== "plan" && tab !== "chants" && !showWeb && (() => {
