@@ -196,7 +196,7 @@ export default function Display() {
 
       {bgLogo && (
         <img src={logo} alt="" draggable={false} className="absolute w-auto h-auto object-contain pointer-events-none select-none"
-             style={{ top: "2vh", right: "2vw", maxWidth: "250px", maxHeight: "250px" }} />
+             style={{ top: "2vh", [cfg.top.side === "left" ? "left" : "right"]: "2vw", maxWidth: `${250 * cfg.top.size / 100}px`, maxHeight: `${250 * cfg.top.size / 100}px` }} />
       )}
 
       {fullLogo && !band && !blank && v && v.kind !== "media" && (
