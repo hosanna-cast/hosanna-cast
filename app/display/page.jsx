@@ -191,7 +191,7 @@ export default function Display() {
       {band && (
         <div key={fadeKey} className={"mb-[1vh]" + fxc} style={fxs}>
           <div className={`flex mb-[1vh] ${v.cols ? "justify-center" : bandLogo && !logoLeft ? "justify-start" : "justify-end"}`}>
-            <span className="rounded-[0.8vh] px-[1.4vw] py-[0.5vh] text-[2.6vh] font-medium" style={{ background: bandBg, color: v.cols ? "#60a5fa" : bandFg }}>
+            <span className={`rounded-[0.8vh] px-[1.4vw] py-[0.5vh] text-[2.6vh] font-medium ${v.ref ? "" : "hidden"}`} style={{ background: bandBg, color: v.cols ? "#fbbf24" : bandFg }}>
               {v.ref} {v.version && !v.cols ? <span className="opacity-60 text-[2.1vh]">{v.version}</span> : null}{pg}
             </span>
           </div>
@@ -227,7 +227,7 @@ export default function Display() {
           </div>
           {v.cols
             ? <div className="text-center text-[4vh] pt-[2vh] font-semibold" style={{ color: "#fbbf24" }}>{v.ref}</div>
-            : <div className="text-right text-[4vh] pt-[2vh]">{v.ref} <span className="opacity-60 text-[2.5vh]">{v.version}</span>{pg}</div>}
+            : <div className={`text-right text-[4vh] pt-[2vh] ${v.ref ? "" : "hidden"}`}>{v.ref} <span className="opacity-60 text-[2.5vh]">{v.version}</span>{pg}</div>}
         </div>
       )}
       {hint && !isFs && !transparent && (
