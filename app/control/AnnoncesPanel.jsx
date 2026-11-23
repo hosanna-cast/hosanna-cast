@@ -4,9 +4,9 @@ import { timeLeft, DAY_ORDER, DAY_SHORT, runsToday, toInputDate, todayInput, TYP
 
 // couleur de chaque section (titre + raccourci)
 const SEC = {
-  regular: { text: "text-sky-300", chip: "bg-sky-400/15 text-sky-300 hover:bg-sky-400/25", line: "border-sky-400/30" },
-  special: { text: "text-amber-300", chip: "bg-amber-400/15 text-amber-300 hover:bg-amber-400/25", line: "border-amber-400/30" },
-  oneoff:  { text: "text-emerald-300", chip: "bg-emerald-400/15 text-emerald-300 hover:bg-emerald-400/25", line: "border-emerald-400/30" },
+  regular: { text: "text-sky-300", chip: "bg-sky-400/15 text-sky-300 hover:bg-sky-400/25", line: "border-sky-400/30", frame: "border-sky-400", badge: "bg-sky-400" },
+  special: { text: "text-amber-300", chip: "bg-amber-400/15 text-amber-300 hover:bg-amber-400/25", line: "border-amber-400/30", frame: "border-amber-400", badge: "bg-amber-400" },
+  oneoff:  { text: "text-emerald-300", chip: "bg-emerald-400/15 text-emerald-300 hover:bg-emerald-400/25", line: "border-emerald-400/30", frame: "border-emerald-400", badge: "bg-emerald-400" },
 };
 
 const ACCEPT = "image/*,video/mp4,video/webm,video/quicktime,.mp4,.m4v,.webm,.mov";
@@ -63,8 +63,9 @@ function TypeFields({ v, onChange }) {
 
 function Tile({ a, live, canProject, onProject, onEdit, onDelete }) {
   const isToday = runsToday(a);
+  const sec = SEC[typeOf(a)];
   return (
-    <li className={`relative rounded-lg overflow-hidden border-2 ${live ? "border-green-500" : isToday ? "border-amber-400" : "border-transparent"} bg-neutral-800`}>
+    <li className={`relative rounded-lg overflow-hidden border-2 ${sec.frame} ${live ? "ring-2 ring-white" : ""} bg-neutral-800`}>
       <button disabled={!canProject} onClick={() => onProject(a)} title={canProject ? "Afficher à l'écran" : ""}
         className="block w-full text-left transition duration-100 active:scale-[0.97] disabled:cursor-default">
         <div className="relative aspect-video bg-black flex items-center justify-center">
@@ -78,7 +79,7 @@ function Tile({ a, live, canProject, onProject, onEdit, onDelete }) {
         </div>
       </button>
       {live && <span className="absolute top-1 left-1 rounded bg-green-600 text-white text-[10px] px-1.5 py-0.5">À l'écran</span>}
-      {!live && isToday && <span className="absolute top-1 left-1 rounded bg-amber-400 text-black text-[10px] font-medium px-1.5 py-0.5">Aujourd'hui</span>}
+      {!live && isToday && <span className={`absolute top-1 left-1 rounded ${sec.badge} text-black text-[10px] font-medium px-1.5 py-0.5`}>Aujourd'hui</span>}
       <button onClick={() => onDelete(a)} aria-label="Supprimer" className="absolute top-1 right-1 w-6 h-6 rounded bg-black/60 hover:bg-red-600 text-white text-xs">✕</button>
       <button onClick={() => onEdit(a)} aria-label="Modifier" title="Modifier l'annonce (nom, type, jours, date, photo)"
         className="absolute top-1 right-8 w-6 h-6 rounded text-xs bg-black/60 hover:bg-amber-400 hover:text-black text-white">✎</button>
