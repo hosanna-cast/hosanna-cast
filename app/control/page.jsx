@@ -1048,7 +1048,11 @@ export default function Control() {
         {/* ───── droite : l'écran (en premier sur mobile) ───── */}
         <aside className="order-1 lg:order-3 lg:sticky lg:top-6">
           <div className={`relative h-28 sm:h-auto sm:aspect-video sm:w-3/4 sm:mx-auto rounded-xl bg-black border transition-all duration-300 ${pulse ? "border-green-400 shadow-[0_0_0_3px_rgba(74,222,128,0.35)]" : rPulse ? "border-sky-400 shadow-[0_0_0_3px_rgba(56,189,248,0.4)]" : "border-neutral-700"}`} style={{ ...bgStyle(blank ? null : screenBg), color: screenText || undefined, containerType: "size" }}>
-            <span className={`hidden sm:block absolute top-2 left-3 text-xs ${blank ? "text-neutral-400" : shown ? "text-green-400" : "text-neutral-500"}`}>
+            {logo && !blank && !(shown && shown.kind === "media") && !(shown && shown.kind !== "other" && (bandPreview ? PB.logoOn : PF.logoOn)) && (
+              <img src={logo} alt="" draggable={false} className="absolute w-auto h-auto object-contain pointer-events-none select-none"
+                   style={{ top: "2cqh", [dset.top.side === "left" ? "left" : "right"]: "2cqw", maxWidth: `${13 * dset.top.size / 100}cqw`, maxHeight: `${23 * dset.top.size / 100}cqh` }} />
+            )}
+            <span className={`hidden sm:block absolute top-2 ${dset.top.side === "left" ? "right-3" : "left-3"} text-xs ${blank ? "text-neutral-400" : shown ? "text-green-400" : "text-neutral-500"}`}>
               {blank ? "● Écran noir" : shown ? "● À l'écran" : "○ Rien à l'écran"}
             </span>
             {shown && shown.kind === "other" && !blank && (
