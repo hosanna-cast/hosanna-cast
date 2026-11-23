@@ -2,7 +2,7 @@
 // Styles en ligne et <span> seulement : le composant se place dans un <p> et hérite de la taille du texte (ajustée par l'écran).
 const S = {
   grid: { display: "grid", gridTemplateColumns: "1fr 1fr", columnGap: "3%", width: "100%" },
-  label: { display: "block", fontSize: "0.55em", opacity: 0.7, fontFamily: "sans-serif", fontWeight: 600, marginBottom: "0.3em" },
+  label: { display: "block", fontSize: "0.6em", color: "#60a5fa", textAlign: "center", fontFamily: "sans-serif", fontWeight: 700, marginBottom: "0.3em" },
   text: { display: "block", whiteSpace: "pre-line" },
 };
 
