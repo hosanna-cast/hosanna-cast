@@ -134,34 +134,28 @@ export function useAnnoncesUi(ann) {
 }
 
 // Colonne de gauche : ajout d'une annonce
+// Coin gauche : un seul bouton ; le formulaire s'ouvre par-dessus la grille (la grille garde toute la place)
+function AddCorner({ ann, ui }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative w-fit mb-1.5 sm:mb-2">
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}
+        className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition duration-100 active:scale-95 ${open ? "bg-amber-400 text-black" : "bg-neutral-800 hover:bg-neutral-700 text-amber-400"}`}>
+        + Ajouter une annonce {open ? "▴" : "▾"}
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full mt-1.5 z-30 w-[22rem] max-w-[90vw] rounded-xl border border-neutral-600 bg-neutral-900 p-2.5 shadow-2xl">
+          <AnnoncesAdd ann={ann} ui={ui} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AnnoncesAdd({ ann, ui, compact = false }) {
   const { error } = ann;
   const { rec, setRec, onFiles, busy } = ui;
-  if (compact) {
-    const off = error || busy || (rec.type === "special" && !rec.until);
-    return (
-      <div className="mb-1.5 sm:mb-2 rounded-xl border border-neutral-700 bg-neutral-800/60 px-2.5 py-2 space-y-2">
-        {error && (
-          <p className="rounded-lg bg-red-500/10 text-red-300 text-xs px-2.5 py-2 leading-5">
-            Annonces indisponibles : {error} <span className="text-red-300/70">Exécute (ou relance) le fichier <b>supabase/temporaire.sql</b> dans Supabase (SQL Editor).</span>
-          </p>
-        )}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-white font-medium mr-1">Nouvelle annonce :</span>
-          {TYPE_IDS.map((t) => (
-            <button key={t} type="button" onClick={() => setRec({ ...rec, type: t })} title={TYPES[t].hint}
-              className={`rounded-md px-2.5 py-1.5 text-xs transition duration-100 active:scale-95 ${rec.type === t ? "bg-amber-400 text-black font-medium" : "bg-neutral-800 text-white hover:bg-neutral-700"}`}>{TYPES[t].label}</button>
-          ))}
-          <label className={`ml-auto rounded-lg bg-neutral-800 hover:bg-neutral-700 text-amber-400 px-4 py-1.5 text-center text-sm font-medium transition duration-100 active:scale-95 cursor-pointer ${off ? "opacity-50 pointer-events-none" : ""}`}>
-            {busy ? "Envoi en cours…" : "+ Ajouter photos ou vidéos"}
-            <input type="file" multiple accept={ACCEPT} onChange={onFiles} className="hidden" />
-          </label>
-        </div>
-        {rec.type !== "oneoff" && <div className="space-y-2"><TypeFields v={rec} onChange={setRec} /></div>}
-        <p className="text-[11px] text-white/80 leading-4">{TYPES[rec.type].hint} · Vidéos : MP4 (H.264), 50 Mo max. Les photos sont réduites automatiquement.</p>
-      </div>
-    );
-  }
+  if (compact) return <AddCorner ann={ann} ui={ui} />;
   return (
     <div>
       <div className="mb-1.5">
