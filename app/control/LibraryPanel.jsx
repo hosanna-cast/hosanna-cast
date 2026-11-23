@@ -21,7 +21,7 @@ const Trash = () => (
 );
 const field = "w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-amber-400";
 
-export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUpdate, onPick, selectedId, bible, refOf, textOf, isLiveVerse, liveSlide, pausedSlide, onSlide, onVerse, playlists, onKeyPhrase, onOpen, canAnalyze, stage = null }) {
+export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUpdate, onPick, selectedId, bible, refOf, textOf, isLiveVerse, liveSlide, pausedSlide, onSlide, onVerse, playlists, onKeyPhrase, onOpen, canAnalyze, stage = null, plOpenId, onPlOpenId }) {
   const t = COPY[kind];
   const [openId, setOpenId] = useState(null);
   const [adding, setAdding] = useState(false);
@@ -375,7 +375,7 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
   return (
     <div>
       {kind === "chants" && playlists && (
-        <ChantPlaylists playlists={playlists} chants={items} selectedId={selectedId} onPick={onPick} />
+        <ChantPlaylists playlists={playlists} chants={items} selectedId={selectedId} onPick={onPick} openId={plOpenId} onOpenId={onPlOpenId} />
       )}
       <div className={kind === "chants" ? "rounded-lg border border-neutral-700 bg-neutral-900/40 p-2.5" : ""}>
       {kind === "chants" && <div className="text-sm font-medium mb-1.5">{t.list}</div>}
