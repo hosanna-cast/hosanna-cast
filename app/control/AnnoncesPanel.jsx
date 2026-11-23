@@ -8,7 +8,6 @@ const SEC = {
   special: { text: "text-amber-300", chip: "bg-amber-400/15 text-amber-300 hover:bg-amber-400/25", line: "border-amber-400/30" },
   oneoff:  { text: "text-emerald-300", chip: "bg-emerald-400/15 text-emerald-300 hover:bg-emerald-400/25", line: "border-emerald-400/30" },
 };
-const goSection = (t) => document.getElementById(`ann-sec-${t}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
 
 const ACCEPT = "image/*,video/mp4,video/webm,video/quicktime,.mp4,.m4v,.webm,.mov";
 
@@ -96,6 +95,7 @@ export function useAnnoncesUi(ann) {
   const { upload, update, replace, remove, busy } = ann;
   const [errs, setErrs] = useState([]);
   const [rec, setRec] = useState({ type: "oneoff", days: [], until: "" });      // réglage appliqué aux prochains envois
+  const [filter, setFilter] = useState("all");                                 // « all » ou un type : ce que montre la grille
   const [editId, setEditId] = useState(null);
   const [draft, setDraft] = useState({ type: "oneoff", days: [], until: "", name: "" });
 
@@ -130,7 +130,7 @@ export function useAnnoncesUi(ann) {
     else { setErrs([]); setEditId(null); }
   };
 
-  return { errs, setErrs, rec, setRec, editId, setEditId, draft, setDraft, onFiles, edit, del, save, onReplace, busy };
+  return { filter, setFilter, errs, setErrs, rec, setRec, editId, setEditId, draft, setDraft, onFiles, edit, del, save, onReplace, busy };
 }
 
 // Colonne de gauche : ajout d'une annonce
@@ -164,22 +164,33 @@ export function AnnoncesAdd({ ann, ui }) {
   );
 }
 
+// Colonne de gauche, sous le formulaire : choisir ce que montre la grille (avec les compteurs)
+export function AnnoncesSections({ ann, ui }) {
+  const { list } = ann;
+  const { filter, setFilter } = ui;
+  const rows = [["all", "Toutes", list.length, "text-white"], ...TYPE_IDS.map((t) => [t, TYPES[t].short, list.filter((a) => typeOf(a) === t).length, SEC[t].text])];
+  return (
+    <div className="rounded-lg border border-neutral-700 p-1.5 space-y-0.5">
+      <p className="px-2 py-1 text-xs font-medium text-white">Sections</p>
+      {rows.map(([k, label, n, color]) => (
+        <button key={k} onClick={() => setFilter(k)} aria-pressed={filter === k} disabled={k !== "all" && !n}
+          className={`w-full flex items-center justify-between rounded-md px-2.5 py-1.5 text-sm text-left transition duration-100 active:scale-[0.98] disabled:opacity-30 disabled:pointer-events-none ${filter === k ? "bg-neutral-600 font-medium" : "hover:bg-neutral-800"} ${color}`}>
+          <span>{label}</span><span className="opacity-70">{n}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // Centre : toutes les annonces en grille (la vignette verte est celle qui est à l'écran)
 export function AnnoncesGrid({ ann, ui, liveId, canProject, onProject }) {
   const { list, ready } = ann;
   const { errs, setErrs, editId, setEditId, draft, setDraft, onReplace, edit, del, save, busy } = ui;
   const sections = TYPE_IDS.map((t) => ({ t, items: list.filter((a) => typeOf(a) === t) }));
+  const shownItems = ui.filter === "all" ? sections.flatMap((x) => x.items) : (sections.find((x) => x.t === ui.filter)?.items || []);
 
-  // ordinateur : le formulaire d'ajout est la 1re case de la grille (coin gauche) ; les images se placent autour et en dessous
-  const firstIdx = sections.findIndex((x) => x.items.length > 0);
-  const addCell = (
-    <li className="hidden lg:block lg:col-span-2 lg:row-span-3 rounded-lg border border-neutral-700 bg-neutral-800/60 p-2.5 self-start">
-      <AnnoncesAdd ann={ann} ui={ui} />
-    </li>
-  );
-  const grid = (items, withAdd) => (
+  const grid = (items) => (
     <ul className="grid gap-2 sm:gap-3 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]">
-      {withAdd && addCell}
       {items.map((a) => (
         <Fragment key={a.id}>
           <Tile a={a} live={liveId === a.id} canProject={canProject} onProject={onProject} onEdit={edit} onDelete={del} />
@@ -224,26 +235,19 @@ export function AnnoncesGrid({ ann, ui, liveId, canProject, onProject }) {
       )}
 
       {!ready ? null : !list.length ? (
-        <div className="mt-1">
-          <div className="hidden lg:block max-w-sm rounded-lg border border-neutral-700 bg-neutral-800/60 p-2.5 mb-3"><AnnoncesAdd ann={ann} ui={ui} /></div>
-          <p className="text-sm text-neutral-300">Aucune annonce pour l'instant. Utilise le bouton « Ajouter photos ou vidéos ».</p>
-        </div>
+        <p className="text-sm text-neutral-300 mt-1">Aucune annonce pour l'instant. Utilise le bouton « Ajouter photos ou vidéos ».</p>
       ) : (
         <>
-          <nav aria-label="Sections des annonces" className="flex flex-wrap gap-1.5 mb-3">
-            {sections.map(({ t, items }) => (
-              <button key={t} onClick={() => goSection(t)} disabled={!items.length}
-                className={`rounded-full px-3 py-1.5 text-sm transition duration-100 active:scale-95 disabled:opacity-30 disabled:pointer-events-none ${SEC[t].chip}`}>
-                {TYPES[t].short} <span className="opacity-70">({items.length})</span>
+          {/* téléphone : les sections sont ici (sur ordinateur elles sont à gauche, sous le formulaire) */}
+          <nav aria-label="Sections des annonces" className="flex flex-wrap gap-1.5 mb-3 lg:hidden">
+            {[["all", "Toutes", list.length], ...sections.map(({ t, items }) => [t, TYPES[t].short, items.length])].map(([k, label, n]) => (
+              <button key={k} onClick={() => ui.setFilter(k)} disabled={k !== "all" && !n}
+                className={`rounded-full px-3 py-1.5 text-sm transition duration-100 active:scale-95 disabled:opacity-30 disabled:pointer-events-none ${ui.filter === k ? "bg-neutral-600 text-white font-medium" : k === "all" ? "bg-neutral-800 text-white" : SEC[k].chip}`}>
+                {label} <span className="opacity-70">({n})</span>
               </button>
             ))}
           </nav>
-          {sections.map(({ t, items }, si) => items.length > 0 && (
-            <div key={t} id={`ann-sec-${t}`} className="scroll-mt-4 mb-4 last:mb-0">
-              <div className={`text-sm font-semibold mb-2 pb-1 border-b ${SEC[t].text} ${SEC[t].line}`}>{TYPES[t].short} <span className="font-normal opacity-70 text-sm">({items.length})</span></div>
-              {grid(items, si === firstIdx)}
-            </div>
-          ))}
+          {shownItems.length ? grid(shownItems) : <p className="text-sm text-neutral-300">Aucune annonce dans cette section.</p>}
         </>
       )}
     </div>
