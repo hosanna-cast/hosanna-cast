@@ -120,7 +120,7 @@ export default function ChantStage({ item, bible, refOf, textOf, isLiveVerse, li
 
   return (
     <div>
-      <div className="flex items-start justify-between gap-3 mb-3">
+      <div className="flex items-start justify-between gap-3 mb-2">
         <div className="min-w-0">
           {titleEdit !== null ? (
             <div className="flex items-center gap-2">
@@ -153,7 +153,7 @@ export default function ChantStage({ item, bible, refOf, textOf, isLiveVerse, li
       </div>
 
       {/* couplets et refrains */}
-      <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+      <div className="grid gap-2 grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         {slides.map((s, i) => {
           const live = liveSlide && liveSlide.id === item.id && liveSlide.i === i;
           if (edit && !edit.isNew && edit.i === i) {
@@ -170,7 +170,7 @@ export default function ChantStage({ item, bible, refOf, textOf, isLiveVerse, li
           return (
             <div key={i} id={`c-${item.id}-${i}`} role="button" tabIndex={0} onClick={() => onSlide(item, i, slides)}
               onKeyDown={(e) => { if (e.key === "Enter") onSlide(item, i, slides); }}
-              className={`group relative text-center rounded-xl border px-4 py-5 pt-7 whitespace-pre-line leading-snug font-semibold text-base cursor-pointer select-none transition duration-100 active:scale-[0.98] ${live ? "bg-green-600 border-green-500 text-white" : "bg-neutral-800 border-neutral-700 text-neutral-100 hover:border-amber-400/60 hover:bg-neutral-700/70"}`}>
+              className={`group relative text-center rounded-xl border px-3 py-3 pt-6 whitespace-pre-line leading-snug font-semibold text-sm cursor-pointer select-none transition duration-100 active:scale-[0.98] ${live ? "bg-green-600 border-green-500 text-white" : "bg-neutral-800 border-neutral-700 text-neutral-100 hover:border-amber-400/60 hover:bg-neutral-700/70"}`}>
               <span className={`absolute top-1.5 left-2.5 text-xs font-medium ${live ? "text-green-100" : "text-neutral-500"}`}>{i + 1}</span>
               <span className="absolute top-1 right-1.5 flex gap-1 opacity-60 group-hover:opacity-100">
                 <button title="Modifier cette diapositive" onClick={(e) => { e.stopPropagation(); setEdit({ i, isNew: false }); setDraft(s); }}
@@ -193,7 +193,7 @@ export default function ChantStage({ item, bible, refOf, textOf, isLiveVerse, li
           </div>
         ) : (
           <button onClick={() => { setEdit({ i: slides.length, isNew: true }); setDraft(""); }}
-            className="rounded-xl border border-dashed border-neutral-600 py-5 text-sm text-neutral-400 hover:text-amber-400 hover:border-amber-400/60 transition duration-100 active:scale-[0.98]">
+            className="rounded-xl border border-dashed border-neutral-600 py-3 text-sm text-neutral-400 hover:text-amber-400 hover:border-amber-400/60 transition duration-100 active:scale-[0.98]">
             + Ajouter une diapositive
           </button>
         )}
