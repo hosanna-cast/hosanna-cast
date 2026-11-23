@@ -27,6 +27,7 @@ import { useServicePlans } from "@/lib/servicePlan";
 import { PlanAdd, PlanList } from "./PlanCulte";
 import { findSimilarVerses } from "@/lib/voiceRefs";
 import VersionSelect from "./VersionSelect";
+import ColsText from "@/lib/ColsText";
 import VoiceRefs from "./VoiceRefs";        // Voice (test) : détection vocale, supprimable
 import ONLINE from "@/config/online-versions.json";
 
@@ -189,7 +190,7 @@ export default function Control() {
       const noted = (what) => { if (who) { setLastBy({ ...who, what }); setRPulse(true); setTimeout(() => setRPulse(false), 700); } };
       if (["show", "update", "clear", "blank"].includes(m.type)) synced.current = true;
       if (m.type === "show" || m.type === "update") {
-        setShown({ type: m.type, kind: m.kind, ref: m.ref, text: m.text, version: m.version, bold: m.bold, under: m.under, next: m.next, page: m.page, mediaType: m.mediaType, url: m.url });
+        setShown({ type: m.type, kind: m.kind, ref: m.ref, text: m.text, version: m.version, bold: m.bold, under: m.under, next: m.next, page: m.page, cols: m.cols, mediaType: m.mediaType, url: m.url });
         if (m.r) {
           setLive(m.r); setLivePage(m.page?.i ?? 0); setLiveKind("verse");
           if (m.type === "show") setHistory((h) => [m.r, ...h.filter((x) => !(x.b === m.r.b && x.c === m.r.c && x.v === m.r.v && x.vEnd === m.r.vEnd))].slice(0, 15));
@@ -387,7 +388,7 @@ export default function Control() {
     const t1 = textOf(r), t2 = textOf(r, bible2);
     if (!t1 || !t2) return setHint("Ce verset n'existe pas dans l'une des deux versions.");
     const rr = { b: r.b, c: r.c, v: r.v, vEnd: r.vEnd ?? null };
-    const msg = { type: "show", ref: refOf(rr), text: `${label}\n${t1}\n\n${label2}\n${t2}`, version: `${label} · ${label2}`, r: rr, page: null, next: nextVerse(rr) };
+    const msg = { type: "show", ref: refOf(rr), text: `${label}\n${t1}\n\n${label2}\n${t2}`, version: `${label} · ${label2}`, cols: [{ label, text: t1 }, { label: label2, text: t2 }], r: rr, page: null, next: nextVerse(rr) };
     setView({ b: rr.b, c: rr.c });
     setNav({ b: rr.b, c: rr.c });
     setLive(rr); setLivePage(0); setLiveKind("verse"); setLiveBoth(true);
@@ -1021,7 +1022,7 @@ export default function Control() {
                     <p ref={shown.kind === "chant" ? undefined : previewTxt}
                        className={`w-full leading-tight whitespace-pre-line ${shown.kind === "chant" ? "font-sans font-bold text-center" : `font-serif cursor-text ${shown.kind === "slide" ? "text-center" : ""}`}`}
                        style={{ fontSize: "clamp(9px, 4.6cqh, 20px)" }}>
-                      {shown.kind === "chant" ? shown.text : <RichText text={shown.text} bold={shown.bold} under={shown.under} />}
+                      {shown.kind === "chant" ? shown.text : shown.cols ? <ColsText cols={shown.cols} /> : <RichText text={shown.text} bold={shown.bold} under={shown.under} />}
                     </p>
                   </div>
                 </div>
@@ -1045,7 +1046,7 @@ export default function Control() {
                   </>
                 ) : (
                   <>
-                    <p ref={previewTxt} className={`font-serif leading-snug whitespace-pre-line cursor-text ${shown.kind === "slide" ? "text-center" : ""} ${size}`}><RichText text={shown.text} bold={shown.bold} under={shown.under} /></p>
+                    <p ref={previewTxt} className={`font-serif leading-snug whitespace-pre-line cursor-text ${shown.kind === "slide" ? "text-center" : ""} ${size}`}>{shown.cols ? <ColsText cols={shown.cols} /> : <RichText text={shown.text} bold={shown.bold} under={shown.under} />}</p>
                     <div className="mt-2 text-right text-sm">{shown.ref} <span className="text-xs opacity-60">{shown.version}</span>{shown.page && <span className="ml-1 text-xs text-amber-300">{shown.page.i + 1}/{shown.page.n}</span>}</div>
                   </>
                 )}
@@ -1113,7 +1114,10 @@ export default function Control() {
               </button>
               {compare && (
                 <div className="space-y-2">
-                  <VersionSelect versions={versions} value={version2} onChange={setVersion2} />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="min-w-0"><p className="mb-1 text-[11px] text-neutral-500">Version 1</p><VersionSelect versions={versions} value={version} onChange={setVersion} loading={loading} /></div>
+                    <div className="min-w-0"><p className="mb-1 text-[11px] text-neutral-500">Version 2</p><VersionSelect versions={versions} value={version2} onChange={setVersion2} /></div>
+                  </div>
                   <div className="rounded-lg border border-neutral-700 bg-neutral-800/60 p-2.5 text-sm leading-snug max-h-64 overflow-y-auto">
                     {bothTarget && bible?.[bothTarget.b]?.[bothTarget.c] ? (
                       <>
