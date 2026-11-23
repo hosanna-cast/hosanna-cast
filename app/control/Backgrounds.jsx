@@ -58,7 +58,7 @@ export default function Backgrounds({ slots, active, onPick, onSet, onRemove, te
                 Aperçu du texte
               </span>
             )}
-            {active === i && <span className="absolute bottom-1.5 left-1.5 rounded bg-amber-400 text-white text-xs font-medium px-2 py-0.5">Actif</span>}
+            {active === i && <span className="absolute bottom-1.5 left-1.5 rounded bg-amber-400 text-white text-xs font-medium px-2 py-0.5">Choisi</span>}
             <button title="Supprimer ce fond" onClick={(e) => { e.stopPropagation(); onRemove(i); }}
               className="absolute top-1.5 right-1.5 w-6 h-6 rounded bg-black/60 hover:bg-red-600 text-white text-xs">✕</button>
             {bg.type === "color" && (
