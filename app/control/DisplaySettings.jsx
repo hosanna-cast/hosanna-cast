@@ -99,7 +99,7 @@ export default function DisplaySettings({ settings, logo, onSettings, disabled, 
           <p className="text-[11px] text-neutral-500 mt-1">Un passage plus long que la limite est découpé en pages ; ← → passent d'une page à l'autre.</p>
         </div>
 
-        <button type="button" disabled={disabled} onClick={() => onSettings(mergeSettings(DEFAULT_SETTINGS))}
+        <button type="button" disabled={disabled} onClick={() => onSettings(mergeSettings({ ...DEFAULT_SETTINGS, top: settings.top }))}
           className="w-full rounded-md bg-neutral-700 hover:bg-neutral-600 py-1.5 text-xs disabled:opacity-40">Réinitialiser les réglages</button>
       </div>
     </Wrap>
