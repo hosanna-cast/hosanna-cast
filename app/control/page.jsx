@@ -1012,7 +1012,7 @@ export default function Control() {
             {shown && shown.kind !== "other" && !blank && bandPreview && (
               <div className="absolute inset-0 flex flex-col justify-end" style={{ padding: "4cqh 6cqw" }}>
                 <div className={`flex mb-[1cqh] ${shown.cols ? "justify-center" : logo && PB.logoOn && PB.logoSide === "right" ? "justify-start" : "justify-end"}`}>
-                  <span className={`rounded px-1.5 py-0.5 text-[10px] sm:text-xs bg-black/80 border border-neutral-600 ${shown.cols ? "text-blue-400" : ""}`}>{shown.ref} {shown.cols ? null : <span className="opacity-60">{shown.version}</span>}{shown.page && <span className="ml-1 text-amber-300">{shown.page.i + 1}/{shown.page.n}</span>}</span>
+                  <span className={`rounded px-1.5 py-0.5 text-[10px] sm:text-xs bg-black/80 border border-neutral-600 ${shown.cols ? "text-amber-400" : ""}`}>{shown.ref} {shown.cols ? null : <span className="opacity-60">{shown.version}</span>}{shown.page && <span className="ml-1 text-amber-300">{shown.page.i + 1}/{shown.page.n}</span>}</span>
                 </div>
                 <div className={`relative flex items-stretch gap-[2cqw] rounded-md bg-black/80 border border-neutral-600 px-[2.5cqw] ${PB.logoSide === "left" ? "flex-row-reverse" : ""}`} style={{ height: `${PB.height}cqh` }}>
                   {logo && PB.logoOn && (
