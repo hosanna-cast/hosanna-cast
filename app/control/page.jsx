@@ -785,7 +785,7 @@ export default function Control() {
 
           {webImageEl}
 
-          {tabs.includes("bible") && tab !== "annonces" && tab !== "plan" && !showWeb && (() => {
+          {tabs.includes("bible") && tab !== "annonces" && tab !== "plan" && tab !== "chants" && !showWeb && (() => {
             // une version qui n'est pas dans l'application s'ouvre sur bible.com : chapitre visé, verset en surbrillance
             const t = q.trim() ? results[sel] : liveKind === "verse" && live ? live : view ? { b: view.b, c: view.c, v: null } : null;
             const passage = t ? `${USFM[t.b]}.${t.c + 1}${t.v != null ? `.${t.v + 1}${t.vEnd != null && t.vEnd > t.v ? `-${t.vEnd + 1}` : ""}` : ""}` : null;
@@ -800,7 +800,7 @@ export default function Control() {
               </div>
             );
           })()}
-          {tabs.includes("bible") && tab !== "annonces" && tab !== "plan" && !showWeb && online && (
+          {tabs.includes("bible") && tab !== "annonces" && tab !== "plan" && tab !== "chants" && !showWeb && online && (
             <p className="text-[10px] leading-snug text-neutral-500 mb-1.5">
               {bibleError ? <span className="text-red-400">Version en ligne indisponible : {bibleError}</span> : versions.find((v) => v.id === version)?.copyright}
             </p>
