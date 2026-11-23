@@ -1,54 +1,33 @@
 "use client";
-import { useEffect, useRef } from "react";
 
-// Le chapitre complet du verset projeté : le verset à l'écran est en vert, les versets cités dans la note en bleu.
-// L'orateur peut dire « reviens 3 versets avant » : un clic sur n'importe quel verset le projette.
-export default function ChapterView({ verses, title, label, chapter, chapterCount, live, cite, onPick, onChapter }) {
-  const box = useRef(null);
+// Menu déroulant unique des versions de la Bible.
+//  - bleu  : versions de l'application (LSG, OST, DBY, KJV…)
+//  - jaune : versions « bible.com » (S21, BDS, BFC, NFC…) ; si elles ne sont pas disponibles dans l'application, le choix ouvre bible.com (↗)
+// onWeb(v) est appelé pour une version qui ne peut qu'ouvrir bible.com ; sans onWeb, ces versions ne sont pas proposées.
+const BLUE = "#60a5fa";
+const AMBER = "#fbbf24";
+const optStyle = (color) => ({ color, background: "#262626" });
 
-  useEffect(() => {
-    const ul = box.current;
-    if (live == null || !ul) return;
-    const el = ul.querySelector(`[data-v="${live}"]`);
-    if (!el) return;
-    // positions réelles à l'écran (offsetTop était faux : la liste n'est pas le parent positionné)
-    const u = ul.getBoundingClientRect();
-    const r = el.getBoundingClientRect();
-    const margin = 8;
-    const visible = r.top >= u.top + margin && r.bottom <= u.bottom - margin;
-    if (visible) return; // déjà visible : on ne bouge pas la liste
-    const top = ul.scrollTop + (r.top - u.top) - (ul.clientHeight - el.clientHeight) / 2;
-    ul.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
-  }, [live, title, chapter]);
-
+export default function VersionSelect({ versions, value, onChange, webVersions = [], onWeb, loading = false, disabled = false, className = "" }) {
+  const ids = new Set(versions.map((v) => v.id));
+  const webOnly = onWeb ? webVersions.filter((w) => !ids.has(w.id)) : [];
+  const current = versions.find((v) => v.id === value);
+  const color = current?.online ? AMBER : BLUE;
   return (
-    <div className="mt-4">
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <div className="text-sm min-w-0">
-          <span className="font-semibold text-base">{title} {chapter + 1}</span>
-          <span className="text-neutral-500 text-xs ml-2">{label}</span>
-        </div>
-        <div className="flex gap-1.5 shrink-0">
-          <button disabled={chapter === 0} onClick={() => onChapter(-1)}
-            className="px-3 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-sm disabled:opacity-30 transition duration-100 active:scale-95">‹ {chapter}</button>
-          <button disabled={chapter >= chapterCount - 1} onClick={() => onChapter(1)}
-            className="px-3 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-sm disabled:opacity-30 transition duration-100 active:scale-95">{chapter + 2} ›</button>
-        </div>
-      </div>
-      <p className="text-[11px] text-neutral-500 mb-2">Clic = projeter ce verset · Maj+clic = plusieurs versets</p>
-      <ul ref={box} className="relative space-y-1 max-h-[calc(100vh-14rem)] overflow-y-auto pr-1 scroll-py-4">
-        {verses.map((t, v) => {
-          const isLive = live === v;
-          const cited = cite && v >= cite.v && v <= cite.vEnd;
-          return (
-            <li key={v} data-v={v} onClick={(e) => onPick(v, e)}
-              className={`px-3 py-2 rounded-lg cursor-pointer select-none leading-snug transition duration-100 active:scale-[0.99] ${isLive ? "bg-green-600 text-white" : cited ? "bg-blue-400/10 border-l-2 border-blue-400 text-neutral-100 hover:bg-blue-400/20" : "text-neutral-300 hover:bg-neutral-800"}`}>
-              <b className={`mr-2 font-medium ${isLive ? "text-green-100" : cited ? "text-blue-300" : "text-neutral-500"}`}>{v + 1}</b>
-              {t}
-            </li>
-          );
-        })}
-      </ul>
-    </div>
+    <select value={value} disabled={disabled} title={current?.full}
+      onChange={(e) => {
+        const val = e.target.value;
+        if (val.startsWith("web:")) { onWeb?.(webOnly.find((w) => w.id === val.slice(4))); return; }
+        onChange(val);
+      }}
+      style={{ color, colorScheme: "dark" }}
+      className={`w-full min-w-0 rounded-lg bg-neutral-800 border border-neutral-700 px-2.5 py-1.5 text-sm font-medium disabled:opacity-40 ${loading ? "animate-pulse" : ""} ${className}`}>
+      {versions.map((v) => (
+        <option key={v.id} value={v.id} style={optStyle(v.online ? AMBER : BLUE)}>{v.label} · {v.full}</option>
+      ))}
+      {webOnly.map((w) => (
+        <option key={w.id} value={"web:" + w.id} style={optStyle(AMBER)}>{w.label} · {w.full} ↗</option>
+      ))}
+    </select>
   );
 }
