@@ -77,10 +77,8 @@ export default function Control() {
   const [showWeb, setShowWeb] = useState(false);          // panneau « Image depuis internet » (bouton à droite des onglets)
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(0);
-  const [leftHidden, setLeftHidden] = useState(false);       // ordinateur : panneau de gauche masqué (plus de place au centre)
+  const leftHidden = false;                                   // le bouton « Panneau » a été retiré : le panneau de gauche est toujours affiché
   const [stageEl, setStageEl] = useState(null);               // zone du centre où s'ouvre la note (onglet Notes)
-  useEffect(() => { try { setLeftHidden(localStorage.getItem("hc.leftHidden") === "1"); } catch {} }, []);
-  const toggleLeft = () => setLeftHidden((h) => { const n = !h; try { localStorage.setItem("hc.leftHidden", n ? "1" : "0"); } catch {} return n; });
   const [wide, setWide] = useState(false);               // ordinateur : le chapitre est lu au centre, pas dans le panneau de gauche
   useEffect(() => {
     const m = window.matchMedia("(min-width: 1024px)");
@@ -725,7 +723,6 @@ export default function Control() {
     else if (!q && e.key === "ArrowRight") step(1);
     else if (!q && e.key === "ArrowLeft") step(-1);
     else if (!q && !inField && k === "n") toggleBlank();
-    else if (!q && !inField && k === "p" && wide) toggleLeft();
     else if (!q && !inField && k === "b" && !isOrateur) setLayoutMode(layout === "band" ? "full" : "band");
   };
 
@@ -753,19 +750,14 @@ export default function Control() {
   return (
     <main className={`min-h-screen bg-neutral-900 text-white p-3 sm:p-6 2xl:px-10 ${typing ? "pb-[55vh] lg:pb-6" : ""}`}>
       {/* barre du haut */}
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-3 sm:mb-5">
+      <header className="mb-3 sm:mb-5 space-y-3">
         <a href="/" title="Accueil" className="inline-flex items-center gap-2.5 transition duration-100 active:scale-95">
           <img src="/logo-96.png" alt="" width={40} height={40} className="h-9 w-9 sm:h-10 sm:w-10" />
           <span className="text-xl sm:text-2xl font-semibold leading-none">Hosanna <span className="text-amber-400">Cast</span></span>
         </a>
-        {wide && !showWeb && (
-          <button onClick={toggleLeft} aria-pressed={leftHidden} title={leftHidden ? "Afficher le panneau de gauche (P)" : "Masquer le panneau de gauche (P)"}
-            className="hidden lg:inline-flex items-center gap-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 px-2.5 py-1.5 text-xs text-neutral-300 transition duration-100 active:scale-95">
-            {leftHidden ? "› Panneau" : "‹ Panneau"}
-          </button>
-        )}
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
     {(tabs.length > 1 || church.role !== "standard") && (
-    <div className="order-last w-full lg:order-none lg:w-auto flex flex-wrap gap-1 bg-neutral-800 rounded-lg p-1">
+    <div className="w-full lg:w-auto flex flex-wrap gap-1 bg-neutral-800 rounded-lg p-1">
       {[["bible", "Bible"], ["notes", "Notes"], ["chants", "Chants"], ["annonces", "Annonces"], ["plan", "Plan"]].filter(([k]) => tabs.includes(k)).map(([k, l]) => (
         <button key={k} onClick={() => { setTab(k); setShowWeb(false); }}
           className={`flex-1 lg:flex-none min-w-fit px-3 py-1.5 rounded-md text-sm transition duration-100 active:scale-95 ${tab === k && !showWeb ? "bg-neutral-600 text-white font-medium" : "text-neutral-400 hover:text-white"}`}>{l}</button>
@@ -793,6 +785,7 @@ export default function Control() {
             </div>
           )}
           <UserMenu church={church} onRotate={church.role === "admin" ? rotateToken : null} copied={copied} onCopy={copyScreen} copiedObs={copiedObs} onCopyObs={copyObs} onLogout={logout} />
+        </div>
         </div>
       </header>
 
