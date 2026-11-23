@@ -74,6 +74,10 @@ export default function Control() {
   const [showWeb, setShowWeb] = useState(false);          // panneau « Image depuis internet » (bouton à droite des onglets)
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(0);
+  const [leftHidden, setLeftHidden] = useState(false);       // ordinateur : panneau de gauche masqué (plus de place au centre)
+  const [stageEl, setStageEl] = useState(null);               // zone du centre où s'ouvre la note (onglet Notes)
+  useEffect(() => { try { setLeftHidden(localStorage.getItem("hc.leftHidden") === "1"); } catch {} }, []);
+  const toggleLeft = () => setLeftHidden((h) => { const n = !h; try { localStorage.setItem("hc.leftHidden", n ? "1" : "0"); } catch {} return n; });
   const [wide, setWide] = useState(false);               // ordinateur : le chapitre est lu au centre, pas dans le panneau de gauche
   useEffect(() => {
     const m = window.matchMedia("(min-width: 1024px)");
@@ -702,6 +706,7 @@ export default function Control() {
     else if (!q && e.key === "ArrowRight") step(1);
     else if (!q && e.key === "ArrowLeft") step(-1);
     else if (!q && !inField && k === "n") toggleBlank();
+    else if (!q && !inField && k === "p" && wide) toggleLeft();
     else if (!q && !inField && k === "b" && !isOrateur) setLayoutMode(layout === "band" ? "full" : "band");
   };
 
@@ -734,6 +739,12 @@ export default function Control() {
           <img src="/logo-96.png" alt="" width={40} height={40} className="h-9 w-9 sm:h-10 sm:w-10" />
           <span className="text-xl sm:text-2xl font-semibold leading-none">Hosanna <span className="text-amber-400">Cast</span></span>
         </a>
+        {wide && !showWeb && (
+          <button onClick={toggleLeft} aria-pressed={leftHidden} title={leftHidden ? "Afficher le panneau de gauche (P)" : "Masquer le panneau de gauche (P)"}
+            className="mr-auto hidden lg:inline-flex items-center gap-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 px-2.5 py-1.5 text-xs text-neutral-300 transition duration-100 active:scale-95">
+            {leftHidden ? "› Panneau" : "‹ Panneau"}
+          </button>
+        )}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           {church.role === "admin" && <HelpControl helperIds={helperIds} peers={peers} busy={helpBusy} onChange={pickHelpers} />}
           <span className="flex items-center gap-1.5 rounded-full bg-neutral-800 border border-neutral-700 px-2.5 py-1 text-xs text-neutral-300" title={scr.tip} role="status">
@@ -753,10 +764,10 @@ export default function Control() {
         </div>
       </header>
 
-      <div className="grid gap-3 lg:gap-5 lg:grid-cols-[240px_minmax(0,1fr)_300px] xl:grid-cols-[300px_minmax(0,1fr)_380px] 2xl:grid-cols-[380px_minmax(0,1fr)_480px] items-start">
+      <div className={`grid gap-3 lg:gap-5 items-start ${leftHidden && !showWeb ? "lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_380px] 2xl:grid-cols-[minmax(0,1fr)_480px]" : "lg:grid-cols-[240px_minmax(0,1fr)_300px] xl:grid-cols-[300px_minmax(0,1fr)_380px] 2xl:grid-cols-[380px_minmax(0,1fr)_480px]"}`}>
 
         {/* ───── gauche : Bible, notes, chants ───── */}
-        <section className={`order-3 lg:order-1 lg:sticky lg:top-6 ${showWeb ? "lg:col-span-2" : ""}`}>
+        <section className={`order-3 lg:order-1 lg:sticky lg:top-6 ${showWeb ? "lg:col-span-2" : ""} ${leftHidden && !showWeb ? "lg:hidden" : ""}`}>
           {(tabs.length > 1 || church.role !== "standard") && (
           <div className="flex flex-wrap gap-1 bg-neutral-800 rounded-lg p-1 mb-1.5 sm:mb-2">
             {[["bible", "Bible"], ["notes", "Notes"], ["chants", "Chants"], ["annonces", "Annonces"], ["plan", "Plan"]].filter(([k]) => tabs.includes(k)).map(([k, l]) => (
@@ -828,6 +839,7 @@ export default function Control() {
                 onVerse={projectFirst}
                 onKeyPhrase={projectKey}
                 onOpen={setNoteId}
+                stage={tab === "notes" && wide ? stageEl : null}
               />
             ) : !bible ? (
               <p className="text-sm text-neutral-500">Chargement de la Bible…</p>
@@ -948,6 +960,8 @@ export default function Control() {
           />
         </section>
         ) : (
+        <div className={tab === "notes" && wide ? "grid gap-3 xl:grid-cols-2 items-start" : ""}>
+        {tab === "notes" && wide && <div ref={setStageEl} className="min-w-0 empty:hidden" />}
         <section className="min-w-0">
           <input ref={searchRef} value={q} onChange={(e) => setQ(e.target.value)}
             onFocus={() => {
@@ -989,13 +1003,14 @@ export default function Control() {
           ) : (
             <p className="hidden lg:block mt-4 text-sm text-neutral-500 leading-6">
               Tape une référence (<span className="text-neutral-300">jn 3 16</span>, <span className="text-neutral-300">1 co 13</span>) ou quelques mots du verset.
-              Le prédicateur cite un autre verset ? Cherche-le ici, ta note reste ouverte à gauche.
+              Le prédicateur cite un autre verset ? Cherche-le ici, ta note reste ouverte.
             </p>
           ))}
           {q.trim() && bible && !results.length && (
             <p className="mt-3 text-sm text-neutral-500">{online ? "Cette version en ligne se cherche par référence (jn 3 16), pas par mots." : index ? "Aucun résultat. Essaie d'autres mots." : "Préparation de la recherche…"}</p>
           )}
         </section>
+        </div>
         )}
         </div>
         </div>
@@ -1012,7 +1027,7 @@ export default function Control() {
             {shown && shown.kind !== "other" && !blank && bandPreview && (
               <div className="absolute inset-0 flex flex-col justify-end" style={{ padding: "4cqh 6cqw" }}>
                 <div className={`flex mb-[1cqh] ${shown.cols ? "justify-center" : logo && PB.logoOn && PB.logoSide === "right" ? "justify-start" : "justify-end"}`}>
-                  <span className={`rounded px-1.5 py-0.5 text-[10px] sm:text-xs bg-black/80 border border-neutral-600 ${shown.cols ? "text-amber-400" : ""}`}>{shown.ref} {shown.cols ? null : <span className="opacity-60">{shown.version}</span>}{shown.page && <span className="ml-1 text-amber-300">{shown.page.i + 1}/{shown.page.n}</span>}</span>
+                  <span className={`rounded px-1.5 py-0.5 text-[10px] sm:text-xs bg-black/80 border border-neutral-600 ${shown.cols ? "text-blue-400" : ""}`}>{shown.ref} {shown.cols ? null : <span className="opacity-60">{shown.version}</span>}{shown.page && <span className="ml-1 text-amber-300">{shown.page.i + 1}/{shown.page.n}</span>}</span>
                 </div>
                 <div className={`relative flex items-stretch gap-[2cqw] rounded-md bg-black/80 border border-neutral-600 px-[2.5cqw] ${PB.logoSide === "left" ? "flex-row-reverse" : ""}`} style={{ height: `${PB.height}cqh` }}>
                   {logo && PB.logoOn && (
@@ -1047,7 +1062,7 @@ export default function Control() {
                 ) : (
                   <>
                     <p ref={previewTxt} className={`font-serif leading-snug whitespace-pre-line cursor-text ${shown.kind === "slide" ? "text-center" : ""} ${size}`}>{shown.cols ? <ColsText cols={shown.cols} /> : <RichText text={shown.text} bold={shown.bold} under={shown.under} />}</p>
-                    <div className={`mt-2 text-sm ${shown.cols ? "text-center font-semibold text-amber-400" : "text-right"}`}>{shown.ref} {shown.cols ? null : <span className="text-xs opacity-60">{shown.version}</span>}{shown.page && <span className="ml-1 text-xs text-amber-300">{shown.page.i + 1}/{shown.page.n}</span>}</div>
+                    <div className={`mt-2 text-sm ${shown.cols ? "text-center font-semibold text-blue-400" : "text-right"}`}>{shown.ref} {shown.cols ? null : <span className="text-xs opacity-60">{shown.version}</span>}{shown.page && <span className="ml-1 text-xs text-amber-300">{shown.page.i + 1}/{shown.page.n}</span>}</div>
                   </>
                 )}
                 </div>
