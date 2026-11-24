@@ -211,7 +211,7 @@ export default function Display() {
               {v.ref} {v.version && !v.cols ? <span className="opacity-60 text-[2.1vh]">{v.version}</span> : null}{pg}
             </span>
           </div>
-          <div className={`relative flex items-stretch gap-[2vw] rounded-[2.2vh] px-[2.5vw] ${logoLeft ? "flex-row-reverse" : ""}`}
+          <div className={`relative flex items-stretch gap-[2vw] rounded-[2.2vh] px-[2.5vw] ${logoLeft ? "" : "flex-row-reverse"}`}
                style={{ background: bandBg, color: bandFg, height: `${B.height}vh` }}>
             {bandLogo && (
               <img src={logo} alt="" draggable={false} className="shrink-0 w-auto object-contain self-start pointer-events-none select-none"
