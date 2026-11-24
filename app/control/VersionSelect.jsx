@@ -7,6 +7,8 @@
 const BLUE = "#60a5fa";
 const AMBER = "#fbbf24";
 const optStyle = (color) => ({ color, background: "#262626" });
+// indication de langue : FR (français) ou GB (anglais). Les versions locales n'ont pas de champ « lang » : seule la KJV est en anglais.
+const tag = (v) => ((v.lang || (v.id === "kjv" ? "en" : "fr")) === "en" ? "GB" : "FR");
 
 export default function VersionSelect({ versions, value, onChange, webVersions = [], onWeb, loading = false, disabled = false, className = "" }) {
   const ids = new Set(versions.map((v) => v.id));
@@ -23,10 +25,10 @@ export default function VersionSelect({ versions, value, onChange, webVersions =
       style={{ color, colorScheme: "dark" }}
       className={`w-full min-w-0 rounded-lg bg-neutral-800 border border-neutral-700 px-2.5 py-1.5 text-sm font-medium disabled:opacity-40 ${loading ? "animate-pulse" : ""} ${className}`}>
       {versions.map((v) => (
-        <option key={v.id} value={v.id} style={optStyle(v.online ? AMBER : BLUE)}>{v.label} · {v.full}</option>
+        <option key={v.id} value={v.id} style={optStyle(v.online ? AMBER : BLUE)}>{tag(v)} · {v.label} · {v.full}</option>
       ))}
       {webOnly.map((w) => (
-        <option key={w.id} value={"web:" + w.id} style={optStyle(AMBER)}>{w.label} · {w.full} ↗</option>
+        <option key={w.id} value={"web:" + w.id} style={optStyle(AMBER)}>{tag(w)} · {w.label} · {w.full} ↗</option>
       ))}
     </select>
   );
