@@ -78,6 +78,25 @@ export async function GET(req) {
   const action = q.get("action");
   const configured = ONLINE.filter((v) => v.yv);
 
+  // Diagnostic : liste les Bibles françaises que la clé peut lire (accessible: true) ou qui demandent une licence (false)
+  //   ouvrir /api/bible?action=catalog une fois connecté
+  if (action === "catalog") {
+    if (!KEY) return fail("YVP_APP_KEY absente sur ce déploiement.", 500);
+    try {
+      const list = async (all) => {
+        const out = []; let token = "";
+        do {
+          const j = await yv(`/bibles?language_ranges[]=fr&page_size=99${all ? "&all_available=true" : ""}${token ? `&page_token=${encodeURIComponent(token)}` : ""}`);
+          out.push(...(j.data || [])); token = j.next_page_token || "";
+        } while (token);
+        return out;
+      };
+      const [ok, all] = await Promise.all([list(false), list(true)]);
+      const okIds = new Set(ok.map((b) => b.id));
+      return NextResponse.json(all.map((b) => ({ id: b.id, abbreviation: b.abbreviation || "", title: b.title, accessible: okIds.has(b.id) })));
+    } catch (e) { return fail(e.message, e.status || 502); }
+  }
+
   if (action === "versions") {
     if (!KEY) return NextResponse.json([]);
     const out = [];
