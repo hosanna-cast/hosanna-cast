@@ -104,7 +104,7 @@ export async function GET(req) {
     for (const v of configured) {
       let copyright = "";
       try { copyright = (await (cache.get("meta" + v.yv) ?? remember("meta" + v.yv, await yv(`/bibles/${v.yv}`)))).copyright || ""; } catch {}
-      out.push({ id: v.id, label: v.label, full: v.full, online: true, copyright: String(copyright).replace(/^"|"$/g, "") });
+      out.push({ id: v.id, label: v.label, full: v.full, lang: v.lang || "fr", online: true, copyright: String(copyright).replace(/^"|"$/g, "") });
     }
     return NextResponse.json(out);
   }
