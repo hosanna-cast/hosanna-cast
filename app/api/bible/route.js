@@ -81,12 +81,13 @@ export async function GET(req) {
   // Diagnostic : liste les Bibles françaises que la clé peut lire (accessible: true) ou qui demandent une licence (false)
   //   ouvrir /api/bible?action=catalog une fois connecté
   if (action === "catalog") {
+    const lang = (q.get("lang") || "fr").replace(/[^a-z-]/gi, "").slice(0, 8) || "fr";   // ex. &lang=en pour l'anglais
     if (!KEY) return fail("YVP_APP_KEY absente sur ce déploiement.", 500);
     try {
       const list = async (all) => {
         const out = []; let token = "";
         do {
-          const j = await yv(`/bibles?language_ranges[]=fr&page_size=99${all ? "&all_available=true" : ""}${token ? `&page_token=${encodeURIComponent(token)}` : ""}`);
+          const j = await yv(`/bibles?language_ranges[]=${lang}&page_size=99${all ? "&all_available=true" : ""}${token ? `&page_token=${encodeURIComponent(token)}` : ""}`);
           out.push(...(j.data || [])); token = j.next_page_token || "";
         } while (token);
         return out;
