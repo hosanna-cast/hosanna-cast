@@ -146,12 +146,13 @@ export default function Display() {
   // le bandeau est sombre si le texte est clair, clair si le texte est foncé (toujours lisible)
   const lum = (() => { const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(textColor || ""); return m ? (0.299 * parseInt(m[1], 16) + 0.587 * parseInt(m[2], 16) + 0.114 * parseInt(m[3], 16)) / 255 : 1; })();
   const darkBand = lum > 0.55;
-  const bandBg = darkBand ? "rgba(0,0,0,0.78)" : "rgba(255,255,255,0.94)";
-  const bandFg = darkBand ? textColor : "#111111";
+  const bandBg = "transparent";   // plus de fond noir derrière le texte
+  const bandFg = textColor;
+  const shadow = "0 0.2vh 0.8vh rgba(0,0,0,0.85), 0 0 0.3vh rgba(0,0,0,0.9)";   // lisibilité sans fond
   const band = layout === "band" && !blank && v && v.kind !== "media";
   const B = cfg.band, F = cfg.full;
-  const bandLogo = logo && B.logoOn;
-  const fullLogo = logo && F.logoOn;
+  const bandLogo = false;   // le logo reste toujours à sa place (réglage « fond d'écran »), en plein écran comme en bandeau
+  const fullLogo = false;
   const logoLeft = B.logoSide === "left";
   // le logo s'affiche en haut à droite, avec ou sans fond (ne dépend plus du fond reçu : un fond perdu en route ne le cache plus) (sauf s'il est déjà montré par le bandeau / plein écran, ou en écran noir / vidéo)
   const logoShownByLayout = band ? bandLogo : (fullLogo && v && v.kind !== "media");
@@ -207,12 +208,12 @@ export default function Display() {
       {band && (
         <div key={fadeKey} className={"mb-[1vh]" + fxc} style={fxs}>
           <div className={`flex mb-[1vh] ${v.cols ? "justify-center" : bandLogo && !logoLeft ? "justify-start" : "justify-end"}`}>
-            <span className={`rounded-[0.8vh] px-[1.4vw] py-[0.5vh] text-[2.6vh] font-medium ${v.ref ? "" : "hidden"}`} style={{ background: bandBg, color: v.cols ? "#fbbf24" : bandFg }}>
+            <span className={`rounded-[0.8vh] px-[1.4vw] py-[0.5vh] text-[2.6vh] font-medium ${v.ref ? "" : "hidden"}`} style={{ color: v.cols ? "#fbbf24" : bandFg, textShadow: shadow }}>
               {v.ref} {v.version && !v.cols ? <span className="opacity-60 text-[2.1vh]">{v.version}</span> : null}{pg}
             </span>
           </div>
           <div className={`relative flex items-stretch gap-[2vw] rounded-[2.2vh] px-[2.5vw] ${logoLeft ? "" : "flex-row-reverse"}`}
-               style={{ background: bandBg, color: bandFg, height: `${B.height}vh` }}>
+               style={{ color: bandFg, textShadow: shadow, height: `${B.height}vh` }}>
             {bandLogo && (
               <img src={logo} alt="" draggable={false} className="shrink-0 w-auto object-contain self-start pointer-events-none select-none"
                    style={{ height: `${B.logoSize}vh`, marginTop: `${-B.logoRise}vh` }} />
