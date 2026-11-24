@@ -24,12 +24,21 @@ export default function VersionSelect({ versions, value, onChange, webVersions =
       }}
       style={{ color, colorScheme: "dark" }}
       className={`w-full min-w-0 rounded-lg bg-neutral-800 border border-neutral-700 px-2.5 py-1.5 text-sm font-medium disabled:opacity-40 ${loading ? "animate-pulse" : ""} ${className}`}>
-      {versions.map((v) => (
-        <option key={v.id} value={v.id} style={optStyle(v.online ? AMBER : BLUE)}>{tag(v)} · {v.label} · {v.full}</option>
-      ))}
-      {webOnly.map((w) => (
-        <option key={w.id} value={"web:" + w.id} style={optStyle(AMBER)}>{tag(w)} · {w.label} · {w.full} ↗</option>
-      ))}
+      {["FR", "GB"].map((g) => {
+        const own = versions.filter((v) => tag(v) === g);
+        const web = webOnly.filter((w) => tag(w) === g);
+        if (!own.length && !web.length) return null;
+        return (
+          <optgroup key={g} label={g} style={{ color: "#a3a3a3", background: "#262626" }}>
+            {own.map((v) => (
+              <option key={v.id} value={v.id} style={optStyle(v.online ? AMBER : BLUE)}>{v.label} · {v.full}</option>
+            ))}
+            {web.map((w) => (
+              <option key={w.id} value={"web:" + w.id} style={optStyle(AMBER)}>{w.label} · {w.full} ↗</option>
+            ))}
+          </optgroup>
+        );
+      })}
     </select>
   );
 }
