@@ -8,5 +8,8 @@
   {"id": "nasb20", "label": "NASB", "full": "New American Standard Bible 2020", "web": 2692, "yv": 2692, "lang": "en"},
   {"id": "amp", "label": "AMP", "full": "Amplified Bible", "web": 1588, "yv": 1588, "lang": "en"},
   {"id": "bsb", "label": "BSB", "full": "Berean Standard Bible", "web": 3034, "yv": 3034, "lang": "en"},
-  {"id": "webus", "label": "WEB", "full": "World English Bible", "web": 206, "yv": 206, "lang": "en"}
+  {"id": "webus", "label": "WEB", "full": "World English Bible", "web": 206, "yv": 206, "lang": "en"},
+  {"id": "nlt", "label": "NLT", "full": "New Living Translation", "yv": null, "ab": "d6e14a625393b4da-01", "lang": "en"},
+  {"id": "nkjv", "label": "NKJV", "full": "New King James Version", "yv": null, "ab": "63097d2a0a2f7db3-01", "lang": "en"},
+  {"id": "csb", "label": "CSB", "full": "Christian Standard Bible", "yv": null, "ab": "a556c5305ee15c3f-01", "lang": "en"}
 ]
