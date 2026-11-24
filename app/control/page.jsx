@@ -13,6 +13,8 @@ import { bgStyle } from "./Backgrounds";
 import { useChurch } from "@/lib/church";
 import UserMenu from "./UserMenu";
 import { DEFAULT_SETTINGS, mergeSettings, loadSettings, saveSettings, loadLogo, saveLogo } from "@/lib/displaySettings";
+import { fetchChurchSettings, migrateLegacy, appliedOf, watchChurchSettings, cacheLocally } from "@/lib/churchSettings";
+import { useT } from "@/lib/i18n/client";
 import { usePlaylists } from "@/lib/playlists";
 import { useAnnouncements } from "@/lib/announcements";
 import { openScreen } from "@/lib/screen";
@@ -48,6 +50,7 @@ const Kbd = ({ children }) => (
 
 export default function Control() {
   const church = useChurch();
+  const tr = useT();                                       // textes dans la langue choisie (FR / EN)
   const [copied, setCopied] = useState(false);
   const [copiedObs, setCopiedObs] = useState(false);
   const [versions, setVersions] = useState([{ id: "lsg", label: "LSG", full: "Louis Segond 1910" }]);
@@ -232,8 +235,26 @@ export default function Control() {
     });
     return () => ch.current.close();
   }, [church.token]);
-  // réglages de l'écran : modifiés dans l'Administration (message « settings » / « logo »), gardés sur cet appareil, renvoyés à l'écran dès qu'il demande (bg?)
+  // réglages de l'écran PARTAGÉS par toute l'église (table church_settings) : fond, couleur du texte, logo, bandeau / plein écran.
+  // Chaque membre les retrouve sur son appareil sans rien reconfigurer ; la copie locale sert seulement à l'affichage instantané.
+  // Ils sont renvoyés à l'écran dès qu'il demande (bg? / display?).
   useEffect(() => { setDset(loadSettings()); setLogo(loadLogo()); }, []);
+  useEffect(() => {
+    if (!church?.id) return;
+    let off = false;
+    const apply = async () => {
+      let { data } = await fetchChurchSettings(church.id);
+      if (off) return;
+      if (!data && church.role === "admin") { const legacy = await migrateLegacy(church.id); if (legacy) data = legacy; }   // reprise unique de l'ancien stockage du navigateur
+      if (!data) return;                                  // rien d'enregistré pour l'église : valeurs locales / par défaut
+      const a = appliedOf(data.bgs), ds = mergeSettings(data.display);
+      setDset(ds); setLogo(data.logo || null); setScreenBg(a.bg); setScreenText(a.text || null);
+      cacheLocally({ display: ds, logo: data.logo });
+    };
+    apply();
+    const stop = watchChurchSettings(church.id, apply);   // un administrateur change les réglages depuis un autre appareil
+    return () => { off = true; stop(); };
+  }, [church?.id, church?.role]);
   const screenUrl = () => `${location.origin}/display?k=${church.token}`;
   const copyObs = () => navigator.clipboard?.writeText(`${screenUrl()}&transparent=1`).then(() => { setCopiedObs(true); setTimeout(() => setCopiedObs(false), 1500); });
   const copyScreen = () => navigator.clipboard?.writeText(screenUrl()).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); });
@@ -287,15 +308,6 @@ export default function Control() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bible]);
 
-  // fond de l'écran : choisi dans l'Administration (gardé dans ce navigateur, séparé par église)
-  useEffect(() => {
-    if (!church?.id) return;
-    try {
-      const saved = JSON.parse(localStorage.getItem("hc.bgs." + church.id));
-      setScreenBg(saved?.slots?.[saved.active] || null);
-      setScreenText(saved?.textColor || null);
-    } catch {}
-  }, [church?.id]);
 
   const label = versions.find((v) => v.id === loaded)?.label ?? (loaded || version).toUpperCase();
   const label2 = versions.find((v) => v.id === loaded2)?.label ?? (loaded2 || version2 || "").toUpperCase();
@@ -742,29 +754,29 @@ export default function Control() {
   const chapters = nav.b !== null ? bible?.[nav.b] : null;
 
   // voyant de l'écran : la console dit clairement si ce qu'elle envoie arrive
-  const scr = screenOk === false ? { c: "bg-red-500", t: "L'écran ne confirme pas", tip: "Aucune confirmation de l'écran : vérifie qu'il est ouvert et connecté. L'état complet lui a été renvoyé." }
-    : screenOk || screens.length ? { c: "bg-green-400", t: "Écran connecté", tip: "L'écran est ouvert et confirme ce que tu projettes." }
-    : net === "offline" ? { c: "bg-amber-400", t: "Connexion perdue", tip: "Connexion internet perdue : seul un écran ouvert dans ce même navigateur reçoit encore." }
-    : { c: "bg-neutral-500", t: "Aucun écran ouvert", tip: "Ouvre l'écran avec le bouton « Écran » (ou le lien copié) sur le PC du vidéoprojecteur." };
+  const scr = screenOk === false ? { c: "bg-red-500", t: tr("scr.noConfirm"), tip: tr("scr.noConfirmTip") }
+    : screenOk || screens.length ? { c: "bg-green-400", t: tr("scr.ok"), tip: tr("scr.okTip") }
+    : net === "offline" ? { c: "bg-amber-400", t: tr("scr.offline"), tip: tr("scr.offlineTip") }
+    : { c: "bg-neutral-500", t: tr("scr.none"), tip: tr("scr.noneTip") };
 
   return (
     <main className={`min-h-screen bg-neutral-900 text-white p-3 sm:p-6 2xl:px-10 ${typing ? "pb-[55vh] lg:pb-6" : ""}`}>
       {/* barre du haut */}
       <header className="mb-5 sm:mb-8 space-y-3">
-        <a href="/" title="Accueil" className="inline-flex items-center gap-2.5 transition duration-100 active:scale-95">
+        <a href="/" title={tr("common.home")} className="inline-flex items-center gap-2.5 transition duration-100 active:scale-95">
           <img src="/logo-96.png" alt="" width={40} height={40} className="h-9 w-9 sm:h-10 sm:w-10" />
           <span className="text-xl sm:text-2xl font-semibold leading-none">Hosanna <span className="text-amber-400">Cast</span></span>
         </a>
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
     {(tabs.length > 1 || church.role !== "standard") && (
     <div className="w-full lg:w-auto flex flex-wrap gap-1 bg-neutral-800 rounded-lg p-1">
-      {[["bible", "Bible"], ["notes", "Notes"], ["chants", "Chants"], ["annonces", "Annonces"], ["plan", "Plan"]].filter(([k]) => tabs.includes(k)).map(([k, l]) => (
+      {["bible", "notes", "chants", "annonces", "plan"].filter((k) => tabs.includes(k)).map((k) => (
         <button key={k} onClick={() => { setTab(k); setShowWeb(false); }}
-          className={`flex-1 lg:flex-none min-w-fit px-3 py-1.5 rounded-md text-sm transition duration-100 active:scale-95 ${tab === k && !showWeb ? "bg-neutral-600 text-white font-medium" : "text-neutral-400 hover:text-white"}`}>{l}</button>
+          className={`flex-1 lg:flex-none min-w-fit px-3 py-1.5 rounded-md text-sm transition duration-100 active:scale-95 ${tab === k && !showWeb ? "bg-neutral-600 text-white font-medium" : "text-neutral-400 hover:text-white"}`}>{tr(`tab.${k}`)}</button>
       ))}
       {church.role !== "standard" && (
-        <button onClick={() => setShowWeb((v) => !v)} title="Image depuis internet" aria-label="Image depuis internet" aria-pressed={showWeb}
-          className={`flex-1 lg:flex-none min-w-fit px-3 py-1.5 rounded-md text-sm transition duration-100 active:scale-95 ${showWeb ? "bg-sky-400 text-black font-medium" : "text-sky-300 hover:text-white"}`}>🌐 Image</button>
+        <button onClick={() => setShowWeb((v) => !v)} title={tr("tab.webTitle")} aria-label={tr("tab.webTitle")} aria-pressed={showWeb}
+          className={`flex-1 lg:flex-none min-w-fit px-3 py-1.5 rounded-md text-sm transition duration-100 active:scale-95 ${showWeb ? "bg-sky-400 text-black font-medium" : "text-sky-300 hover:text-white"}`}>🌐 {tr("tab.web")}</button>
       )}
     </div>
     )}
@@ -776,9 +788,9 @@ export default function Control() {
             <span className={screenOk === false ? "" : "hidden sm:inline"}>{scr.t}</span>
           </span>
           {peers.length > 0 && (
-            <div className="flex items-center gap-1.5 rounded-full bg-neutral-800 border border-neutral-700 pl-2 pr-1 py-1" title={peers.map((p) => `${p.name} (${p.device})`).join(", ") + " : connecté aussi"}>
+            <div className="flex items-center gap-1.5 rounded-full bg-neutral-800 border border-neutral-700 pl-2 pr-1 py-1" title={peers.map((p) => `${p.name} (${p.device})`).join(", ") + " : " + tr("scr.alsoConnected")}>
               <span className="h-2 w-2 rounded-full bg-sky-400" />
-              <span className="hidden sm:inline text-xs text-neutral-300">{peers.length === 1 ? peers[0].name : `${peers.length} autres`}</span>
+              <span className="hidden sm:inline text-xs text-neutral-300">{peers.length === 1 ? peers[0].name : tr("scr.others", { n: peers.length })}</span>
               {peers.slice(0, 3).map((p) => (
                 <span key={p.id} className="h-6 w-6 rounded-full bg-sky-500/80 text-[11px] font-medium text-black flex items-center justify-center">{(p.name || "?").charAt(0).toUpperCase()}</span>
               ))}

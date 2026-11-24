@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { LIMITS, mergeSettings, DEFAULT_SETTINGS } from "@/lib/displaySettings";
+import { useT } from "@/lib/i18n/client";
 
 const Slider = ({ label, value, unit, range, onChange, disabled }) => (
   <label className="block">
@@ -23,11 +24,12 @@ const Seg = ({ options, value, onChange, disabled, label }) => (
 
 // Dans l'Administration : le panneau est toujours ouvert. Ailleurs : ligne repliable.
 function Wrap({ standalone, children }) {
+  const t = useT();
   if (standalone) return <div>{children}</div>;
   return (
     <details className="mt-2 lg:mt-3 rounded-lg bg-neutral-800 group">
       <summary className="cursor-pointer select-none list-none px-3 py-2 text-sm flex items-center justify-between text-neutral-200">
-        <span>Réglages de l'écran</span>
+        <span>{t("ds.title")}</span>
         <span className="text-neutral-500 text-xs group-open:rotate-180 transition-transform">▾</span>
       </summary>
       {children}
@@ -37,6 +39,7 @@ function Wrap({ standalone, children }) {
 
 // Panneau « Réglages de l'écran » : valeurs séparées pour le bandeau et le plein écran, réglages du logo, réinitialisation.
 export default function DisplaySettings({ settings, logo, onSettings, disabled, standalone = false }) {
+  const t = useT();
   const [mode, setMode] = useState("band");
   const s = settings[mode];
   const L = LIMITS[mode];
@@ -46,23 +49,23 @@ export default function DisplaySettings({ settings, logo, onSettings, disabled, 
   return (
     <Wrap standalone={standalone}>
       <div className={standalone ? "space-y-3 max-w-md" : "px-3 pb-3 space-y-3"}>
-        <Seg label="Réglages pour" value={mode} onChange={setMode} options={[["band", "Bandeau"], ["full", "Plein écran"]]} />
+        <Seg label={t("ds.for")} value={mode} onChange={setMode} options={[["band", t("ds.band")], ["full", t("ds.full")]]} />
 
         {mode === "band" ? (
           <>
-            <Slider label="Hauteur du bandeau" unit=" %" value={s.height} range={L.height} disabled={disabled} onChange={(v) => set({ height: v })} />
-            <Slider label="Longueur d'une page (passage long)" unit=" car." value={s.pageChars} range={L.pageChars} disabled={disabled} onChange={(v) => set({ pageChars: v })} />
+            <Slider label={t("ds.bandHeight")} unit=" %" value={s.height} range={L.height} disabled={disabled} onChange={(v) => set({ height: v })} />
+            <Slider label={t("ds.pageChars")} unit={t("ds.chars")} value={s.pageChars} range={L.pageChars} disabled={disabled} onChange={(v) => set({ pageChars: v })} />
           </>
         ) : (
           <>
-            <Slider label="Marge gauche / droite" unit=" %" value={s.padX} range={L.padX} disabled={disabled} onChange={(v) => set({ padX: v })} />
-            <Slider label="Marge du haut" unit=" %" value={s.padTop} range={L.padTop} disabled={disabled} onChange={(v) => set({ padTop: v })} />
-            <Slider label="Marge du bas" unit=" %" value={s.padBottom} range={L.padBottom} disabled={disabled} onChange={(v) => set({ padBottom: v })} />
-            <Slider label="Taille maximale du texte" unit=" px" value={s.maxFont} range={L.maxFont} disabled={disabled} onChange={(v) => set({ maxFont: v })} />
-            <Slider label="Longueur d'une page (passage long)" unit=" car." value={s.pageChars} range={L.pageChars} disabled={disabled} onChange={(v) => set({ pageChars: v })} />
+            <Slider label={t("ds.padX")} unit=" %" value={s.padX} range={L.padX} disabled={disabled} onChange={(v) => set({ padX: v })} />
+            <Slider label={t("ds.padTop")} unit=" %" value={s.padTop} range={L.padTop} disabled={disabled} onChange={(v) => set({ padTop: v })} />
+            <Slider label={t("ds.padBottom")} unit=" %" value={s.padBottom} range={L.padBottom} disabled={disabled} onChange={(v) => set({ padBottom: v })} />
+            <Slider label={t("ds.maxFont")} unit=" px" value={s.maxFont} range={L.maxFont} disabled={disabled} onChange={(v) => set({ maxFont: v })} />
+            <Slider label={t("ds.pageChars")} unit={t("ds.chars")} value={s.pageChars} range={L.pageChars} disabled={disabled} onChange={(v) => set({ pageChars: v })} />
             <div>
-              <span className="block text-xs text-neutral-300 mb-0.5">Alignement vertical</span>
-              <Seg label="Alignement vertical" value={s.valign} disabled={disabled} onChange={(v) => set({ valign: v })} options={[["top", "Haut"], ["center", "Centre"], ["bottom", "Bas"]]} />
+              <span className="block text-xs text-neutral-300 mb-0.5">{t("ds.valign")}</span>
+              <Seg label={t("ds.valign")} value={s.valign} disabled={disabled} onChange={(v) => set({ valign: v })} options={[["top", t("ds.top")], ["center", t("ds.center")], ["bottom", t("ds.bottom")]]} />
             </div>
           </>
         )}
@@ -71,22 +74,22 @@ export default function DisplaySettings({ settings, logo, onSettings, disabled, 
           <div className="flex items-center justify-between gap-2">
             <label className="flex items-center gap-2 text-xs text-neutral-300">
               <input type="checkbox" checked={s.logoOn} disabled={disabled || !logo} onChange={(e) => set({ logoOn: e.target.checked })} className="accent-amber-400" />
-              {mode === "band" ? "Logo dans le bandeau" : "Logo en haut à droite"}
+              {mode === "band" ? t("ds.logoBand") : t("ds.logoFull")}
             </label>
             {logo && <img src={logo} alt="" className="h-7 w-7 object-contain rounded bg-neutral-900" />}
           </div>
-          {!logo && <p className="text-xs text-neutral-500">Aucun logo : ajoute-le dans « Fond de l'écran ».</p>}
+          {!logo && <p className="text-xs text-neutral-500">{t("ds.noLogo")}</p>}
 
           {logo && s.logoOn && (
             <>
-              <Slider label="Taille du logo" unit=" %" value={s.logoSize} range={L.logoSize} disabled={disabled} onChange={(v) => set({ logoSize: v })} />
+              <Slider label={t("ds.logoSize")} unit=" %" value={s.logoSize} range={L.logoSize} disabled={disabled} onChange={(v) => set({ logoSize: v })} />
               {mode === "band" && (
                 <>
                   <div>
-                    <span className="block text-xs text-neutral-300 mb-0.5">Position du logo</span>
-                    <Seg label="Position du logo" value={s.logoSide} disabled={disabled} onChange={(v) => set({ logoSide: v })} options={[["left", "Gauche"], ["right", "Droite"]]} />
+                    <span className="block text-xs text-neutral-300 mb-0.5">{t("ds.logoPos")}</span>
+                    <Seg label={t("ds.logoPos")} value={s.logoSide} disabled={disabled} onChange={(v) => set({ logoSide: v })} options={[["left", t("ds.left")], ["right", t("ds.right")]]} />
                   </div>
-                  <Slider label="Dépasse au-dessus du bandeau" unit=" %" value={s.logoRise} range={L.logoRise} disabled={disabled} onChange={(v) => set({ logoRise: v })} />
+                  <Slider label={t("ds.logoRise")} unit=" %" value={s.logoRise} range={L.logoRise} disabled={disabled} onChange={(v) => set({ logoRise: v })} />
                 </>
               )}
             </>
@@ -94,13 +97,13 @@ export default function DisplaySettings({ settings, logo, onSettings, disabled, 
         </div>
 
         <div className="border-t border-neutral-700 pt-3">
-          <Slider label="Transition douce du texte" unit={settings.fade ? " ms" : " (aucune)"} value={settings.fade} range={LIMITS.fade} disabled={disabled}
+          <Slider label={t("ds.fade")} unit={settings.fade ? " ms" : t("ds.fadeNone")} value={settings.fade} range={LIMITS.fade} disabled={disabled}
             onChange={(v) => onSettings(mergeSettings({ ...settings, fade: v }))} />
-          <p className="text-[11px] text-neutral-500 mt-1">Un passage plus long que la limite est découpé en pages ; ← → passent d'une page à l'autre.</p>
+          <p className="text-[11px] text-neutral-500 mt-1">{t("ds.pagesHint")}</p>
         </div>
 
         <button type="button" disabled={disabled} onClick={() => onSettings(mergeSettings({ ...DEFAULT_SETTINGS, top: settings.top }))}
-          className="w-full rounded-md bg-neutral-700 hover:bg-neutral-600 py-1.5 text-xs disabled:opacity-40">Réinitialiser les réglages</button>
+          className="w-full rounded-md bg-neutral-700 hover:bg-neutral-600 py-1.5 text-xs disabled:opacity-40">{t("ds.reset")}</button>
       </div>
     </Wrap>
   );

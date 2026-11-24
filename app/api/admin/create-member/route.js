@@ -2,17 +2,19 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ROLE_IDS, normalizeRole } from "@/lib/roles";
+import { getT } from "@/lib/i18n/server";
 
 const fail = (error, status = 400) => NextResponse.json({ error }, { status });
 
 // L'administrateur crée directement le compte d'un membre (email + mot de passe provisoire + profil)
 export async function POST(req) {
+  const t = await getT();
   // 1) l'appelant doit être un administrateur connecté
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return fail("Connexion requise.", 401);
+  if (!user) return fail(t("api.loginRequired"), 401);
   const { data: m } = await supabase.from("memberships").select("church_id, role").eq("user_id", user.id).limit(1).maybeSingle();
-  if (!m || normalizeRole(m.role) !== "admin") return fail("Réservé aux administrateurs.", 403);
+  if (!m || normalizeRole(m.role) !== "admin") return fail(t("api.adminOnly"), 403);
 
   // 2) données saisies
   const b = await req.json().catch(() => ({}));
@@ -21,9 +23,9 @@ export async function POST(req) {
   const email = String(b.email || "").trim().toLowerCase();
   const password = String(b.password || "");
   const role = b.role;
-  if (!first || !email.includes("@")) return fail("Prénom et email obligatoires.");
-  if (password.length < 8) return fail("Le mot de passe doit faire au moins 8 caractères.");
-  if (!ROLE_IDS.includes(role)) return fail("Profil inconnu.");
+  if (!first || !email.includes("@")) return fail(t("api.firstEmailRequired"));
+  if (password.length < 8) return fail(t("api.passwordShort"));
+  if (!ROLE_IDS.includes(role)) return fail(t("api.unknownRole"));
 
   // 3) création du compte (clé « service » à ajouter dans Vercel)
   const admin = createAdminClient();
@@ -34,7 +36,7 @@ export async function POST(req) {
   }
 
   const { data, error } = await admin.auth.admin.createUser({ email, password, email_confirm: true, app_metadata: { must_change_password: true } });
-  if (error) return fail(/already|registered|exists/i.test(error.message) ? "Cet email a déjà un compte." : error.message);
+  if (error) return fail(/already|registered|exists/i.test(error.message) ? t("api.emailExists") : error.message);
   const uid = data.user.id;
 
   const { error: e2 } = await admin.from("memberships").insert({ user_id: uid, church_id: m.church_id, role });

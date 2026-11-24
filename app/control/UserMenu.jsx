@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { ROLES } from "@/lib/roles";
+import { roleLabel } from "@/lib/roles";
+import { useT } from "@/lib/i18n/client";
+import LangSwitch from "../LangSwitch";
 import { canPlaceWindows, openOnSecondScreen } from "@/lib/secondScreen";
 
 const Icon = ({ d, className = "h-4 w-4" }) => (
@@ -20,6 +22,7 @@ const I = {
 
 // En-tête : bouton Écran + pastille utilisateur avec menu
 export default function UserMenu({ church, copied, onCopy, copiedObs, onCopyObs, onLogout, onRotate }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const box = useRef(null);
 
@@ -38,8 +41,8 @@ export default function UserMenu({ church, copied, onCopy, copiedObs, onCopyObs,
 
   return (
     <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-      <a href={`/display?k=${church.token}`} target="_blank" aria-label="Ouvrir l'écran de projection"
-        title={canPlaceWindows() ? "Ouvre l'écran sur le 2ᵉ écran (vidéoprojecteur) s'il est branché" : "Ouvrir l'écran de projection"}
+      <a href={`/display?k=${church.token}`} target="_blank" aria-label={t("menu.screenOpen")}
+        title={canPlaceWindows() ? t("menu.screenSecond") : t("menu.screenOpen")}
         onClick={(e) => {
           // ordinateur avec 2ᵉ écran : la fenêtre s'ouvre directement dessus ; sinon le lien s'ouvre normalement dans un nouvel onglet
           if (!canPlaceWindows() || e.ctrlKey || e.metaKey || e.shiftKey) return;
@@ -48,7 +51,7 @@ export default function UserMenu({ church, copied, onCopy, copiedObs, onCopyObs,
           openOnSecondScreen(url).then((w) => { if (!w) window.open(url, "_blank"); }).catch(() => window.open(url, "_blank"));
         }}
         className="inline-flex items-center gap-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-black font-medium text-sm px-2.5 sm:px-3.5 py-1.5 transition duration-100 active:scale-95">
-        <span className="hidden sm:inline">Écran</span>
+        <span className="hidden sm:inline">{t("menu.screen")}</span>
         <Icon d={I.out} className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
       </a>
 
@@ -66,47 +69,51 @@ export default function UserMenu({ church, copied, onCopy, copiedObs, onCopyObs,
               <div className="text-sm font-medium truncate">{fullName || shortName}</div>
               <div className="text-[13px] text-neutral-400 truncate">{church.name}</div>
               <div className="text-xs text-neutral-500 truncate">{church.email}</div>
-              <span className="inline-block mt-1.5 rounded-full bg-neutral-700 px-2 py-0.5 text-[11px] text-amber-300">{ROLES[church.role]?.label}</span>
+              <span className="inline-block mt-1.5 rounded-full bg-neutral-700 px-2 py-0.5 text-[11px] text-amber-300">{roleLabel(t, church.role)}</span>
             </div>
             {church.role === "admin" && (
               <a role="menuitem" href="/admin" className="w-full flex items-start gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-neutral-700">
                 <Icon d={I.admin} className="h-[18px] w-[18px] mt-0.5 text-neutral-400" />
-                <span>Administration<span className="block text-xs text-neutral-400">Équipe, rôles et invitations</span></span>
+                <span>{t("menu.admin")}<span className="block text-xs text-neutral-400">{t("menu.adminDesc")}</span></span>
               </a>
             )}
             <button role="menuitem" onClick={onCopy} className="w-full flex items-start gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-neutral-700">
               <Icon d={copied ? I.check : I.copy} className="h-[18px] w-[18px] mt-0.5 text-neutral-400" />
               <span>
-                {copied ? "Lien copié" : "Copier le lien écran"}
-                <span className="block text-xs text-neutral-400">Pour le PC du vidéoprojecteur</span>
+                {copied ? t("menu.copied") : t("menu.copyScreen")}
+                <span className="block text-xs text-neutral-400">{t("menu.copyScreenDesc")}</span>
               </span>
             </button>
             <button role="menuitem" onClick={onCopyObs} className="w-full flex items-start gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-neutral-700">
               <Icon d={copiedObs ? I.check : I.copy} className="h-[18px] w-[18px] mt-0.5 text-neutral-400" />
               <span>
-                {copiedObs ? "Lien copié" : "Copier le lien pour la diffusion"}
-                <span className="block text-xs text-neutral-400">Fond transparent, pour OBS ou vMix</span>
+                {copiedObs ? t("menu.copied") : t("menu.copyObs")}
+                <span className="block text-xs text-neutral-400">{t("menu.copyObsDesc")}</span>
               </span>
             </button>
             {onRotate && (
               <button role="menuitem" onClick={() => { setOpen(false); onRotate(); }} className="w-full flex items-start gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-neutral-700">
                 <Icon d={I.key} className="h-[18px] w-[18px] mt-0.5 text-neutral-400" />
-                <span>Régénérer le lien écran<span className="block text-xs text-neutral-400">Si le lien a été partagé à tort</span></span>
+                <span>{t("menu.rotate")}<span className="block text-xs text-neutral-400">{t("menu.rotateDesc")}</span></span>
               </button>
             )}
             {church.role !== "standard" && church.role !== "annonces" && (
               <a role="menuitem" href={`/speaker?k=${church.token}`} target="_blank" className="w-full flex items-start gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-neutral-700">
                 <Icon d={I.out} className="h-[18px] w-[18px] mt-0.5 text-neutral-400" />
-                <span>Vue orateur<span className="block text-xs text-neutral-400">Écran de la chaire : verset, suivant, chrono</span></span>
+                <span>{t("menu.speaker")}<span className="block text-xs text-neutral-400">{t("menu.speakerDesc")}</span></span>
               </a>
             )}
             <a role="menuitem" href="/change-password" className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-neutral-300 hover:bg-neutral-700">
               <Icon d={I.key} className="h-[18px] w-[18px] text-neutral-400" />
-              Changer le mot de passe
+              {t("menu.changePassword")}
             </a>
+            <div className="flex items-center justify-between gap-2 px-3 py-2">
+              <span className="text-sm text-neutral-300">{t("menu.language")}</span>
+              <LangSwitch />
+            </div>
             <button role="menuitem" onClick={onLogout} className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-neutral-300 hover:bg-neutral-700">
               <Icon d={I.logout} className="h-[18px] w-[18px] text-neutral-400" />
-              Déconnexion
+              {t("common.logout")}
             </button>
           </div>
         )}

@@ -15,5 +15,6 @@ export default async function AdminPage() {
   if (!m?.churches) redirect("/onboarding");
   if (!isAdmin(m.role)) redirect("/control");
 
-  return <AdminPanel churchName={m.churches.name} churchId={m.churches.id} token={m.churches.screen_token} />;
+  const { data: cs } = await supabase.from("church_settings").select("default_locale").eq("church_id", m.churches.id).maybeSingle();
+  return <AdminPanel churchName={m.churches.name} churchId={m.churches.id} token={m.churches.screen_token} defaultLocale={cs?.default_locale || "fr"} />;
 }

@@ -1,0 +1,31 @@
+Hosanna Cast : Phase 3 — réglages partagés par église + plateforme bilingue (FR / EN)
+
+1. Copie les fichiers de cette archive dans le dépôt (mêmes chemins).
+2. Supabase → SQL Editor → colle et lance supabase/church-settings.sql (une seule fois, relançable sans danger).
+   Pré-requis : roles.sql déjà lancé (on utilise my_church() et role_of()).
+3. Déploie. Aucune nouvelle dépendance.
+
+PARTAGE PAR ÉGLISE
+- Fond, couleur du texte, logo, bandeau / plein écran : enregistrés dans la table church_settings (plus dans le navigateur).
+  Tout membre qui se connecte retrouve le même écran, sur n'importe quel appareil.
+- Les chants, notes, playlists, annonces et plans de culte étaient déjà partagés par église (inchangé).
+- Reprise de l'existant : la première fois qu'un administrateur ouvre la console ou l'Administration, les réglages
+  de son navigateur sont copiés vers l'église (uniquement si l'église n'a encore rien d'enregistré).
+- Seuls les administrateurs peuvent modifier ces réglages (règle côté base) ; tous les membres les lisent.
+
+LANGUE
+- Français / English choisissables sur la page de connexion, dans le menu de la console et dans Administration → Langue.
+- Le choix est mémorisé (cookie) et enregistré sur le profil : il suit la personne sur ses autres appareils.
+- Administration → Langue : langue par défaut de l'église, proposée aux nouveaux membres à leur première connexion
+  (et utilisée pour le message de bienvenue WhatsApp).
+- Ajouter une langue : créer lib/i18n/xx.js (mêmes clés que fr.js) et l'ajouter dans lib/i18n/index.js (LOCALES + DICTS).
+- Dans le code : const t = useT(); puis t("clé") (client) — ou const t = await getT(); (serveur).
+
+DÉJÀ TRADUIT : connexion, inscription, invitation, mot de passe, menu utilisateur, Administration (profils, fond, logo,
+réglages d'affichage, langue), onglets et voyant écran de la console, messages des routes /api/admin et /api/auth.
+RESTE EN FRANÇAIS : les panneaux internes de la console (Bibliothèque, Plan, Annonces, ChantStage, Playlists, KeyPoint,
+VoiceRefs, WebImage, Aide écran…), la page /display, la page /speaker et quelques messages de lib/ (expiry, announcements, readFile).
+
+Nouveaux : lib/i18n/{index,fr,en,server}.js, lib/i18n/client.jsx, lib/churchSettings.js, app/LangSwitch.jsx, supabase/church-settings.sql
+Modifiés : app/layout.jsx, app/login, app/join, app/onboarding, app/change-password, app/LogoutButton.jsx, app/admin/{page,AdminPanel}.jsx,
+           app/control/{page,UserMenu,Backgrounds,DisplaySettings}.jsx, app/api/admin/*, app/api/auth/change-password, lib/roles.js
