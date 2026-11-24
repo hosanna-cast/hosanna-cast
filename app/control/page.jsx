@@ -1048,7 +1048,7 @@ export default function Control() {
         {/* ───── droite : l'écran (en premier sur mobile) ───── */}
         <aside className="order-1 lg:order-3 lg:sticky lg:top-6">
           <div className={`relative h-28 sm:h-auto sm:aspect-video sm:w-3/4 sm:mx-auto rounded-xl bg-black border transition-all duration-300 ${pulse ? "border-green-400 shadow-[0_0_0_3px_rgba(74,222,128,0.35)]" : rPulse ? "border-sky-400 shadow-[0_0_0_3px_rgba(56,189,248,0.4)]" : "border-neutral-700"}`} style={{ ...bgStyle(blank ? null : screenBg), color: screenText || undefined, containerType: "size" }}>
-            {logo && !blank && !(shown && shown.kind === "media") && !(shown && shown.kind !== "other" && (bandPreview ? PB.logoOn : PF.logoOn)) && (
+            {logo && !blank && !(shown && shown.kind === "media") && (
               <img src={logo} alt="" draggable={false} className="absolute w-auto h-auto object-contain pointer-events-none select-none"
                    style={{ top: "2cqh", [dset.top.side === "left" ? "left" : "right"]: "2cqw", maxWidth: `${13 * dset.top.size / 100}cqw`, maxHeight: `${23 * dset.top.size / 100}cqh` }} />
             )}
@@ -1061,10 +1061,10 @@ export default function Control() {
             {shown && shown.kind !== "other" && !blank && bandPreview && (
               <div className="absolute inset-0 flex flex-col justify-end" style={{ padding: "4cqh 6cqw" }}>
                 <div className={`flex mb-[1cqh] ${shown.cols ? "justify-center" : logo && PB.logoOn && PB.logoSide === "right" ? "justify-start" : "justify-end"}`}>
-                  <span className={`rounded px-1.5 py-0.5 text-[10px] sm:text-xs bg-black/80 border border-neutral-600 ${shown.cols ? "text-amber-400" : ""} ${shown.ref ? "" : "hidden"}`}>{shown.ref} {shown.cols ? null : <span className="opacity-60">{shown.version}</span>}{shown.page && <span className="ml-1 text-amber-300">{shown.page.i + 1}/{shown.page.n}</span>}</span>
+                  <span className={`rounded px-1.5 py-0.5 text-[10px] sm:text-xs ${shown.cols ? "text-amber-400" : ""} ${shown.ref ? "" : "hidden"}`}>{shown.ref} {shown.cols ? null : <span className="opacity-60">{shown.version}</span>}{shown.page && <span className="ml-1 text-amber-300">{shown.page.i + 1}/{shown.page.n}</span>}</span>
                 </div>
-                <div className={`relative flex items-stretch gap-[2cqw] rounded-md bg-black/80 border border-neutral-600 px-[2.5cqw] ${PB.logoSide === "left" ? "" : "flex-row-reverse"}`} style={{ height: `${PB.height}cqh` }}>
-                  {logo && PB.logoOn && (
+                <div className={`relative flex items-stretch gap-[2cqw] rounded-md px-[2.5cqw] ${PB.logoSide === "left" ? "" : "flex-row-reverse"}`} style={{ height: `${PB.height}cqh` }}>
+                  {false && (
                     <img src={logo} alt="" draggable={false} className="shrink-0 w-auto object-contain self-start pointer-events-none select-none" style={{ height: `${PB.logoSize}cqh`, marginTop: `${-PB.logoRise}cqh` }} />
                   )}
                   <div className="flex-1 min-w-0 h-full overflow-hidden flex items-center">
@@ -1080,7 +1080,7 @@ export default function Control() {
             {shown && shown.kind !== "other" && !blank && !bandPreview && (
               <div className={`absolute inset-0 flex flex-col overflow-y-auto ${shown.kind === "media" ? "justify-center" : { top: "justify-start", center: "justify-center", bottom: "justify-end" }[PF.valign]}`}
                    style={{ padding: `max(${PF.padTop}cqh, 1.4rem) ${PF.padX}cqw ${PF.padBottom}cqh` }}>
-                {logo && PF.logoOn && shown.kind !== "media" && (
+                {false && shown.kind !== "media" && (
                   <img src={logo} alt="" draggable={false} className="absolute w-auto object-contain pointer-events-none select-none" style={{ top: "2cqh", right: "2cqw", height: `${PF.logoSize}cqh` }} />
                 )}
                 <div className="w-full">
