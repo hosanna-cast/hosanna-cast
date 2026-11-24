@@ -69,6 +69,29 @@ async function chapter(yvId, code, c) {
   return Array.from({ length: max }, (_, i) => map[i + 1] || "");
 }
 
+// ───── API.Bible (https://scripture.api.bible) : versions anglaises NLT, NKJV, CSB… (champ « ab » du fichier de config) ─────
+const AB_KEY = process.env.API_BIBLE_KEY;
+async function ab(path) {
+  const res = await fetch(`https://api.scripture.api.bible/v1${path}`, { headers: { "api-key": AB_KEY, Accept: "application/json" }, cache: "no-store" });
+  if (!res.ok) throw Object.assign(new Error(`API.Bible ${res.status} sur ${path}`), { status: res.status });
+  return res.json();
+}
+// chapitre en texte avec numéros « [1] … [2] … » → tableau de versets
+async function abChapter(abId, code, c) {
+  const j = await ab(`/bibles/${abId}/chapters/${code}.${c}?content-type=text&include-notes=false&include-titles=false&include-chapter-numbers=false&include-verse-numbers=true&include-verse-spans=false`);
+  const txt = String(j.data?.content || "");
+  const parts = txt.split(/\[(\d+)\]/);   // [avant, n, texte, n, texte…]
+  const map = {};
+  for (let i = 1; i < parts.length; i += 2) {
+    const n = +parts[i];
+    const t = parts[i + 1].replace(/\s+/g, " ").trim();
+    map[n] = map[n] ? map[n] + " " + t : t;
+  }
+  const max = Math.max(0, ...Object.keys(map).map(Number));
+  if (!max) throw Object.assign(new Error("Chapitre vide ou illisible (API.Bible)."), { status: 502 });
+  return Array.from({ length: max }, (_, i) => map[i + 1] || "");
+}
+
 export async function GET(req) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -76,7 +99,7 @@ export async function GET(req) {
 
   const q = new URL(req.url).searchParams;
   const action = q.get("action");
-  const configured = ONLINE.filter((v) => v.yv);
+  const configured = ONLINE.filter((v) => v.yv || (v.ab && AB_KEY));
 
   // Diagnostic : liste les Bibles françaises que la clé peut lire (accessible: true) ou qui demandent une licence (false)
   //   ouvrir /api/bible?action=catalog une fois connecté
@@ -103,7 +126,10 @@ export async function GET(req) {
     const out = [];
     for (const v of configured) {
       let copyright = "";
-      try { copyright = (await (cache.get("meta" + v.yv) ?? remember("meta" + v.yv, await yv(`/bibles/${v.yv}`)))).copyright || ""; } catch {}
+      try {
+        if (v.ab) copyright = (await (cache.get("meta" + v.ab) ?? remember("meta" + v.ab, (await ab(`/bibles/${v.ab}`)).data || {}))).copyright || "";
+        else copyright = (await (cache.get("meta" + v.yv) ?? remember("meta" + v.yv, await yv(`/bibles/${v.yv}`)))).copyright || "";
+      } catch {}
       out.push({ id: v.id, label: v.label, full: v.full, lang: v.lang || "fr", online: true, copyright: String(copyright).replace(/^"|"$/g, "") });
     }
     return NextResponse.json(out);
@@ -115,9 +141,11 @@ export async function GET(req) {
 
   try {
     if (action === "index") {
-      const k = `idx${v.yv}`;
+      // une version API.Bible n'a pas d'index : on prend celui d'une version YouVersion de même langue (même découpage en versets)
+      const refId = v.yv || (ONLINE.find((x) => x.yv && x.lang === v.lang) || ONLINE.find((x) => x.yv))?.yv;
+      const k = `idx${refId}`;
       if (cache.has(k)) return NextResponse.json(cache.get(k));
-      const idx = await yv(`/bibles/${v.yv}/index`);
+      const idx = await yv(`/bibles/${refId}/index`);
       const byId = Object.fromEntries((idx.books || []).map((b) => [b.id, b]));
       const counts = USFM.map((code) => (byId[code]?.chapters || []).map((c) => (c.verses || []).length));
       return NextResponse.json(remember(k, counts));
@@ -125,9 +153,9 @@ export async function GET(req) {
     if (action === "chapter") {
       const b = +q.get("b"), c = +q.get("c");
       if (!(b >= 0 && b < 66) || !(c >= 0 && c < 200)) return fail("Référence invalide.");
-      const k = `ch${v.yv}.${b}.${c}`;
+      const k = `ch${v.ab || v.yv}.${b}.${c}`;
       if (cache.has(k)) return NextResponse.json(cache.get(k));
-      return NextResponse.json(remember(k, await chapter(v.yv, USFM[b], c + 1)));
+      return NextResponse.json(remember(k, v.ab ? await abChapter(v.ab, USFM[b], c + 1) : await chapter(v.yv, USFM[b], c + 1)));
     }
   } catch (e) {
     return fail(e.message, e.status === 401 || e.status === 403 ? 502 : e.status || 502);
