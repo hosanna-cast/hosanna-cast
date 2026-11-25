@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { BOOKS } from "@/lib/books";
+import { BOOKS, EN_BOOKS } from "@/lib/books";
 import { parseRef } from "@/lib/parseRef";
 import { useBible } from "@/lib/useBible";
 import { useLibrary, slidesOf } from "@/lib/library";
@@ -14,7 +14,7 @@ import { useChurch } from "@/lib/church";
 import UserMenu from "./UserMenu";
 import { DEFAULT_SETTINGS, mergeSettings, loadSettings, saveSettings, loadLogo, saveLogo } from "@/lib/displaySettings";
 import { fetchChurchSettings, migrateLegacy, appliedOf, watchChurchSettings, cacheLocally } from "@/lib/churchSettings";
-import { useT } from "@/lib/i18n/client";
+import { useT, useLocale } from "@/lib/i18n/client";
 import { usePlaylists } from "@/lib/playlists";
 import { useAnnouncements } from "@/lib/announcements";
 import { openScreen } from "@/lib/screen";
@@ -51,6 +51,9 @@ const Kbd = ({ children }) => (
 export default function Control() {
   const church = useChurch();
   const tr = useT();                                       // textes dans la langue choisie (FR / EN)
+  const locale = useLocale();
+  const bookNames = locale === "en" ? EN_BOOKS : BOOKS;      // noms des livres dans la langue choisie
+  const devName = (d) => (d === "mobile" ? tr("pg.dev.mobile") : d === "desktop" || d === "ordinateur" ? tr("pg.dev.desktop") : d);
   const [copied, setCopied] = useState(false);
   const [copiedObs, setCopiedObs] = useState(false);
   const [versions, setVersions] = useState([{ id: "lsg", label: "LSG", full: "Louis Segond 1910" }]);
@@ -145,7 +148,7 @@ export default function Control() {
   // donc tout le monde voit la même chose à l'écran et ← → repartent du bon endroit.
   // On ne déplace PAS la lecture de l'autre (sa Bible reste où il la consulte).
   useEffect(() => {
-    const me = { id: uuid(), name: church.firstName || church.email.split("@")[0], device: window.matchMedia("(min-width: 1024px)").matches ? "ordinateur" : "mobile", role: church.role, uid: church.userId };
+    const me = { id: uuid(), name: church.firstName || church.email.split("@")[0], device: window.matchMedia("(min-width: 1024px)").matches ? "desktop" : "mobile", role: church.role, uid: church.userId };
     mine.current = me;
     const applyState = (m) => {
       synced.current = true;
@@ -195,7 +198,7 @@ export default function Control() {
         return;
       }
       const who = m.by ? { name: m.by.name, device: m.by.device } : null;
-      const noted = (what) => { if (who) { setLastBy({ ...who, what }); setRPulse(true); setTimeout(() => setRPulse(false), 700); } };
+      const noted = (what, wk) => { if (who) { setLastBy({ ...who, what, wk }); setRPulse(true); setTimeout(() => setRPulse(false), 700); } };
       if (["show", "update", "clear", "blank"].includes(m.type)) synced.current = true;
       if (m.type === "show" || m.type === "update") {
         setShown({ type: m.type, kind: m.kind, ref: m.ref, text: m.text, version: m.version, bold: m.bold, under: m.under, next: m.next, page: m.page, cols: m.cols, mediaType: m.mediaType, url: m.url, overlay: m.overlay });
@@ -208,10 +211,10 @@ export default function Control() {
         if (m.type === "show") noted(m.ref);
       } else if (m.type === "clear") {
         setLive(null); setSlideLive(null); setMediaLive(null); setShown(null);
-        noted("a effacé l'écran");
+        noted(null, "pg.clearedBy");
       } else if (m.type === "blank") {
         setBlank(m.on === undefined ? (b) => !b : m.on);
-        noted(m.on === false ? "a réaffiché l'écran" : "a mis l'écran en noir");
+        noted(null, m.on === false ? "pg.unblankedBy" : "pg.blankedBy");
       } else if (m.type === "sync?") {
         // quelqu'un vient d'ouvrir la console : on lui dit ce qui est à l'écran
         const st = stateRef.current;
@@ -260,9 +263,9 @@ export default function Control() {
   const copyScreen = () => navigator.clipboard?.writeText(screenUrl()).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); });
   // jeton d'écran compromis ou lien partagé trop largement : on en génère un nouveau (les anciens liens cessent de marcher)
   const rotateToken = async () => {
-    if (!confirm("Régénérer le lien de l'écran ?\n\nLes écrans et vues orateur déjà ouverts seront déconnectés : il faudra les rouvrir avec le nouveau lien.")) return;
+    if (!confirm(tr("pg.confirmRotate"))) return;
     const { error } = await createClient().rpc("rotate_screen_token");
-    if (error) return alert("Impossible de régénérer le lien : " + error.message);
+    if (error) return alert(tr("pg.rotateFail", { msg: error.message }));
     location.reload();
   };
   const logout = async () => { await createClient().auth.signOut(); location.href = "/login"; };
@@ -283,7 +286,10 @@ export default function Control() {
       const list = [...(Array.isArray(local) ? local : []), ...(Array.isArray(remote) ? remote : [])];
       if (!list.length) return;
       setVersions(list);
-      setVersion((cur) => (list.some((v) => v.id === cur) ? cur : list[0].id));
+      // langue de l'interface = langue de la première version proposée (tant que la personne n'a rien choisi)
+      const langOf = (v) => v.lang || (v.id === "kjv" ? "en" : "fr");
+      const pref = locale === "fr" ? null : list.find((v) => langOf(v) === locale);
+      setVersion((cur) => (cur === "lsg" && pref ? pref.id : list.some((v) => v.id === cur) ? cur : (pref || list[0]).id));
     });
   }, []);
 
@@ -352,7 +358,7 @@ export default function Control() {
     const end = Math.min(r.vEnd ?? r.v, vs.length - 1);
     return vs.slice(r.v, end + 1).map((t, i) => (end > r.v ? `${r.v + i + 1} ` : "") + (t ?? "")).join(" ");
   };
-  const refOf = (r) => `${BOOKS[r.b]} ${r.c + 1}:${r.v + 1}${r.vEnd && r.vEnd > r.v ? "-" + (r.vEnd + 1) : ""}`;
+  const refOf = (r) => `${bookNames[r.b]} ${r.c + 1}:${r.v + 1}${r.vEnd && r.vEnd > r.v ? "-" + (r.vEnd + 1) : ""}`;
 
   // verset suivant : envoyé à la vue orateur (« à venir »)
   const nextVerse = (r, bb = bible) => {
@@ -403,7 +409,7 @@ export default function Control() {
     if (!canProject || !compare || !bible2) return;
     if (!chapterReady(r.b, r.c) || !chapterReady2(r.b, r.c)) return;
     const t1 = textOf(r), t2 = textOf(r, bible2);
-    if (!t1 || !t2) return setHint("Ce verset n'existe pas dans l'une des deux versions.");
+    if (!t1 || !t2) return setHint(tr("pg.bothMissing"));
     const rr = { b: r.b, c: r.c, v: r.v, vEnd: r.vEnd ?? null };
     const msg = { type: "show", ref: refOf(rr), text: `${label}\n${t1}\n\n${label2}\n${t2}`, version: `${label} · ${label2}`, cols: [{ label, text: t1 }, { label: label2, text: t2 }], r: rr, page: null, next: nextVerse(rr) };
     setView({ b: rr.b, c: rr.c });
@@ -451,7 +457,7 @@ export default function Control() {
   const projectFree = (text) => {
     if (!canProject) return;
     const chant = tab === "chants" ? library.lib.chants.find((x) => x.id === chantId) : null;
-    const msg = { type: "show", kind: "chant", ref: chant ? `${chant.title} · texte libre` : "Texte rapide", text, version: "", free: true };
+    const msg = { type: "show", kind: "chant", ref: chant ? `${chant.title} · ${tr("pg.freeText")}` : tr("pg.quickText"), text, version: "", free: true };
     setLiveKind("free");
     setShown(msg);
     ch.current?.postMessage(msg);
@@ -514,7 +520,7 @@ export default function Control() {
     setHelpBusy(true);
     const { error } = await createClient().rpc("set_helpers", { ids });
     setHelpBusy(false);
-    if (error) return alert("Impossible de changer l'aide : " + error.message);
+    if (error) return alert(tr("pg.helpFail", { msg: error.message }));
     setHelperIds(ids);
     ch.current?.postMessage({ type: "helper", ids });
   };
@@ -620,14 +626,14 @@ export default function Control() {
   const applyFormat = (field) => {
     if (!canProject) return;
     if (!shown || shown.kind === "other" || shown.kind === "media") return setHint("Projette d'abord un verset ou un texte.");
-    if (shown.kind === "chant") return setHint("Le gras et le souligné ne s'appliquent pas aux chants.");
+    if (shown.kind === "chant") return setHint(tr("pg.boldNotChant"));
     const sel = selRef.current;
-    if (!sel) return setHint("Sélectionne des mots dans l'aperçu de l'écran, puis appuie sur B (gras) ou U (souligné).");
+    if (!sel) return setHint(tr("pg.selectWords"));
     let { start, end } = sel;
     const tx = shown.text || "";
     while (start < end && /\s/.test(tx[start])) start++;
     while (end > start && /\s/.test(tx[end - 1])) end--;
-    if (end <= start) return setHint("Sélectionne des mots dans l'aperçu de l'écran, puis appuie sur B (gras) ou U (souligné).");
+    if (end <= start) return setHint(tr("pg.selectWords"));
     const msg = { ...shown, type: "update", [field]: toggleRange(shown[field] || [], start, end) };
     ch.current?.postMessage(msg);
     setShown(msg);
@@ -658,13 +664,13 @@ export default function Control() {
     if (it.k === "verse" && it.r) project(it.r);
     else if (it.k === "chants" || it.k === "notes") {
       const item = library.lib[it.k].find((x) => x.id === it.itemId);
-      if (!item) return setHint("Cet élément n'existe plus dans la bibliothèque.");
+      if (!item) return setHint(tr("pg.noLongerInLib"));
       if (it.k === "chants") setChantId(item.id); else setNoteId(item.id);
       projectSlide(it.k, item, 0, slidesOf(item));
     }
     else if (it.k === "media") {
       const a = ann.list.find((x) => x.id === it.itemId);
-      if (!a) return setHint("Cette annonce n'existe plus (ou a expiré).");
+      if (!a) return setHint(tr("pg.annGone"));
       projectMedia(a);
     }
     else if (it.k === "text") projectFree(it.text || it.title);
@@ -700,7 +706,7 @@ export default function Control() {
     if (!chap) return null;
     if (verse != null && Array.isArray(chap) && !chap[verse - 1]) return null;
     const r = { b, c: chapter - 1, v: verse != null ? verse - 1 : null, vEnd: vEnd && vEnd > verse && (!Array.isArray(chap) || chap[vEnd - 1]) ? vEnd - 1 : null };
-    return { ...r, label: r.v == null ? `${BOOKS[b]} ${chapter}` : refOf(r) };
+    return { ...r, label: r.v == null ? `${bookNames[b]} ${chapter}` : refOf(r) };
   };
   // Voice (test) : versets dont le texte ressemble à ce qui vient d'être dit (sans référence) ; versions locales seulement (index de recherche)
   const voiceSimilar = (text, level) => findSimilarVerses(text, index, bible, level).map((m) => ({ b: m.b, c: m.c, v: m.v, label: refOf({ b: m.b, c: m.c, v: m.v }), snippet: m.text }));
@@ -788,7 +794,7 @@ export default function Control() {
             <span className={screenOk === false ? "" : "hidden sm:inline"}>{scr.t}</span>
           </span>
           {peers.length > 0 && (
-            <div className="flex items-center gap-1.5 rounded-full bg-neutral-800 border border-neutral-700 pl-2 pr-1 py-1" title={peers.map((p) => `${p.name} (${p.device})`).join(", ") + " : " + tr("scr.alsoConnected")}>
+            <div className="flex items-center gap-1.5 rounded-full bg-neutral-800 border border-neutral-700 pl-2 pr-1 py-1" title={peers.map((p) => `${p.name} (${devName(p.device)})`).join(", ") + " : " + tr("scr.alsoConnected")}>
               <span className="h-2 w-2 rounded-full bg-sky-400" />
               <span className="hidden sm:inline text-xs text-neutral-300">{peers.length === 1 ? peers[0].name : tr("scr.others", { n: peers.length })}</span>
               {peers.slice(0, 3).map((p) => (
@@ -816,7 +822,7 @@ export default function Control() {
                 <VersionSelect versions={versions} value={version} onChange={setVersion} loading={loading} webVersions={WEB_VERSIONS}
                   onWeb={(v) => {
                     if (!v) return;
-                    if (!passage) return setHint("Tape ou choisis d'abord un verset pour l'ouvrir sur bible.com.");
+                    if (!passage) return setHint(tr("pg.openBibleCom"));
                     window.open(`https://www.bible.com/bible/${v.web}/${passage}.${v.label}`, "_blank", "noopener,noreferrer");
                   }} />
               </div>
@@ -824,7 +830,7 @@ export default function Control() {
           })()}
           {tabs.includes("bible") && tab !== "annonces" && tab !== "plan" && tab !== "chants" && !showWeb && online && (
             <p className="text-[10px] leading-snug text-neutral-500 mb-1.5">
-              {bibleError ? <span className="text-red-400">Version en ligne indisponible : {bibleError}</span> : versions.find((v) => v.id === version)?.copyright}
+              {bibleError ? <span className="text-red-400">{tr("pg.onlineUnavailable", { err: bibleError })}</span> : versions.find((v) => v.id === version)?.copyright}
             </p>
           )}
 
@@ -871,21 +877,21 @@ export default function Control() {
                 onPlOpenId={setPlId}
               />
             ) : !bible ? (
-              <p className="text-sm text-neutral-500">Chargement de la Bible…</p>
+              <p className="text-sm text-neutral-500">{tr("ov.loadingBible")}</p>
             ) : (
               <>
                 <div className="flex items-center gap-1.5 text-sm mb-3 flex-wrap">
-                  <button onClick={() => go({ b: null, c: null })} className={nav.b === null ? "font-medium" : "text-amber-400 hover:underline"}>Livres</button>
+                  <button onClick={() => go({ b: null, c: null })} className={nav.b === null ? "font-medium" : "text-amber-400 hover:underline"}>{tr("pg.books")}</button>
                   {nav.b !== null && (<><span className="text-neutral-600">›</span>
-                    <button onClick={() => go({ b: nav.b, c: null })} className={nav.c === null ? "font-medium" : "text-amber-400 hover:underline"}>{BOOKS[nav.b]}</button></>)}
+                    <button onClick={() => go({ b: nav.b, c: null })} className={nav.c === null ? "font-medium" : "text-amber-400 hover:underline"}>{bookNames[nav.b]}</button></>)}
                   {nav.c !== null && (<><span className="text-neutral-600">›</span><span className="font-medium">{nav.c + 1}</span></>)}
                 </div>
 
-                {nav.b === null && [["Ancien Testament", 0, 39], ["Nouveau Testament", 39, 66]].map(([title, from, to]) => (
+                {nav.b === null && [[tr("pg.ot"), 0, 39], [tr("pg.nt"), 39, 66]].map(([title, from, to]) => (
                   <div key={title} className="mb-4">
                     <h3 className="text-xs text-neutral-500 mb-2">{title}</h3>
                     <div className="grid grid-cols-2 gap-1.5">
-                      {BOOKS.slice(from, to).map((name, i) => (
+                      {bookNames.slice(from, to).map((name, i) => (
                         <button key={name} onClick={() => go({ b: from + i, c: null })}
                           className="px-2 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 active:scale-95 active:bg-amber-400 active:text-black text-sm text-left truncate transition duration-100">{name}</button>
                       ))}
@@ -917,7 +923,7 @@ export default function Control() {
                       <button disabled={nav.c === 0} onClick={() => go({ b: nav.b, c: nav.c - 1 })} className="px-3 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30">‹ {nav.c}</button>
                       <button disabled={nav.c >= chapters.length - 1} onClick={() => go({ b: nav.b, c: nav.c + 1 })} className="px-3 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30">{nav.c + 2} ›</button>
                     </div>
-                    <p className="hidden lg:block text-[11px] text-neutral-500 mb-2">Clic = projeter · Maj+clic = plusieurs versets</p>
+                    <p className="hidden lg:block text-[11px] text-neutral-500 mb-2">{tr("pg.clickHint")}</p>
                     <ul className="space-y-1">
                       {chapters[nav.c].map((t, v) => (
                         <li key={v} id={`v-${nav.b}-${nav.c}-${v}`} onClick={(e) => pickVerse(nav.b, nav.c, v, e)} title={t}
@@ -942,7 +948,7 @@ export default function Control() {
             onProject={projectFree}
             disabled={!canProject}
             {...(tab === "notes" && noteId && library.lib.notes.some((x) => x.id === noteId)
-              ? { onAdd: (t) => keepKey(t, false), addLabel: "Garder dans la note", onAddProject: (t) => keepKey(t, true), addProjectLabel: "Projeter et garder" }
+              ? { onAdd: (t) => keepKey(t, false), addLabel: tr("pg.keepInNote"), onAddProject: (t) => keepKey(t, true), addProjectLabel: tr("kp.keepProject") }
               : {})}
           />
           )}
@@ -951,6 +957,7 @@ export default function Control() {
         <section className="min-w-0">
           <PlanList
             plan={plan}
+            titleOf={(it) => (it.k === "verse" && it.r ? refOf(it.r) : it.title)}
             activeItemId={planActive}
             canProject={canProject}
             readOnly={planReadOnly}
@@ -1009,7 +1016,7 @@ export default function Control() {
                 setTimeout(() => searchRef.current?.scrollIntoView({ block: "start", behavior: "smooth" }), 350);
             }}
             onBlur={() => setTyping(false)}
-            placeholder={bible ? "jn 3 16  •  tant aimé le monde" : "Chargement de la Bible…"}
+            placeholder={bible ? tr("pg.searchPh") : tr("ov.loadingBible")}
             className="w-full text-base sm:text-xl p-2.5 sm:p-3.5 rounded-xl bg-neutral-800 outline-none focus:ring-2 ring-amber-400" />
 
           <div className={tab === "notes" && wide ? "grid gap-3 xl:grid-cols-2 items-start mt-3" : ""}>
@@ -1029,7 +1036,7 @@ export default function Control() {
             wide ? <div>
             <ChapterView
               verses={bible[view.b][view.c]}
-              title={BOOKS[view.b]}
+              title={bookNames[view.b]}
               label={label}
               chapter={view.c}
               chapterCount={bible[view.b].length}
@@ -1040,15 +1047,14 @@ export default function Control() {
             />
             </div> : null
           ) : view && !chapterReady(view.b, view.c) ? (
-            <p className="mt-4 text-sm text-neutral-500">Chargement du chapitre…</p>
+            <p className="mt-4 text-sm text-neutral-500">{tr("pg.loadingChapter")}</p>
           ) : (
             <p className="hidden lg:block mt-4 text-sm text-neutral-500 leading-6">
-              Tape une référence (<span className="text-neutral-300">jn 3 16</span>, <span className="text-neutral-300">1 co 13</span>) ou quelques mots du verset.
-              Le prédicateur cite un autre verset ? Cherche-le ici, ta note reste ouverte.
+              {tr("pg.searchHelp", { ex1: "\u0001", ex2: "\u0002" }).split(/\u0001|\u0002/).flatMap((p, i) => i ? [<span key={i} className="text-neutral-300">{i === 1 ? "jn 3 16" : "1 co 13"}</span>, p] : [p])}
             </p>
           ))}
           {q.trim() && bible && !results.length && (
-            <p className="mt-3 text-sm text-neutral-500">{online ? "Cette version en ligne se cherche par référence (jn 3 16), pas par mots." : index ? "Aucun résultat. Essaie d'autres mots." : "Préparation de la recherche…"}</p>
+            <p className="mt-3 text-sm text-neutral-500">{online ? tr("pg.onlineByRef") : index ? tr("pg.noResultTry") : tr("pg.preparing")}</p>
           )}
           </div>
           </div>
@@ -1065,10 +1071,10 @@ export default function Control() {
                    style={{ top: "2cqh", [dset.top.side === "left" ? "left" : "right"]: "2cqw", maxWidth: `${13 * dset.top.size / 100}cqw`, maxHeight: `${23 * dset.top.size / 100}cqh` }} />
             )}
             <span className={`hidden sm:block absolute top-2 ${dset.top.side === "left" ? "right-3" : "left-3"} text-xs ${blank ? "text-neutral-400" : shown ? "text-green-400" : "text-neutral-500"}`}>
-              {blank ? "● Écran noir" : shown ? "● À l'écran" : "○ Rien à l'écran"}
+              {blank ? tr("scr.black") : shown ? tr("scr.live") : tr("pg.nothing")}
             </span>
             {shown && shown.kind === "other" && !blank && (
-              <div className="absolute inset-0 flex items-center justify-center px-4 text-center text-xs sm:text-sm text-neutral-400">Un autre opérateur utilise l'écran</div>
+              <div className="absolute inset-0 flex items-center justify-center px-4 text-center text-xs sm:text-sm text-neutral-400">{tr("pg.otherOperator")}</div>
             )}
             {shown && shown.kind !== "other" && !blank && bandPreview && (
               <div className="absolute inset-0 flex flex-col justify-end" style={{ padding: "4cqh 6cqw" }}>
@@ -1123,14 +1129,14 @@ export default function Control() {
 
           {tab !== "annonces" && peers.length > 0 && (
             <p className={`mt-2 text-xs rounded-lg px-2.5 py-1.5 ${lastBy ? "bg-sky-500/15 text-sky-200" : "bg-neutral-800 text-neutral-400"}`}>
-              {lastBy ? <><b className="font-medium">{lastBy.name}</b> <span className="opacity-70">({lastBy.device})</span> · {lastBy.what}</> : "C'est vous qui pilotez l'écran"}
+              {lastBy ? <><b className="font-medium">{lastBy.name}</b> <span className="opacity-70">({devName(lastBy.device)})</span> · {lastBy.wk ? tr(lastBy.wk) : lastBy.what}</> : tr("pg.youDrive")}
             </p>
           )}
 
           {["assistant", "orateur"].includes(church.role) && (
             canProject
-              ? <p className="mt-2 text-xs rounded-lg px-2.5 py-2 bg-sky-500/15 text-sky-200">Vous pouvez projeter : l'administrateur vous a autorisé. Il peut passer par-dessus à tout moment.</p>
-              : <p className="mt-2 text-xs rounded-lg px-2.5 py-2 bg-amber-400/10 text-amber-200">{helperIds.length ? "L'administrateur a autorisé d'autres personnes." : "L'aide n'est pas activée."} Vous pouvez suivre l'écran, mais pas projeter tant que l'administrateur ne vous a pas autorisé.</p>
+              ? <p className="mt-2 text-xs rounded-lg px-2.5 py-2 bg-sky-500/15 text-sky-200">{tr("pg.canProject")}</p>
+              : <p className="mt-2 text-xs rounded-lg px-2.5 py-2 bg-amber-400/10 text-amber-200">{helperIds.length ? tr("pg.othersAllowed") : tr("pg.helpOff")} {tr("pg.followOnly")}</p>
           )}
 
           {hint && <p className="mt-2 text-xs rounded-lg px-2.5 py-2 bg-amber-400/10 text-amber-200">{hint}</p>}
@@ -1141,20 +1147,20 @@ export default function Control() {
           )}
 
           {tab !== "annonces" && <div className="grid grid-cols-[1.4fr_1.4fr_1fr_0.6fr_0.6fr_1.2fr] lg:grid-cols-6 gap-1.5 lg:gap-2 mt-2 lg:mt-3">
-            <button className={btn + " lg:col-span-3"} disabled={!canStep} onClick={() => step(-1)}>← Préc.</button>
-            <button className={btn + " lg:col-span-3"} disabled={!canStep} onClick={() => step(1)}>Suiv. →</button>
+            <button className={btn + " lg:col-span-3"} disabled={!canStep} onClick={() => step(-1)}>{tr("pg.prev")}</button>
+            <button className={btn + " lg:col-span-3"} disabled={!canStep} onClick={() => step(1)}>{tr("pg.next")}</button>
             <button onClick={toggleBlank} disabled={!canProject}
-              className={`lg:col-span-2 rounded-lg py-2 text-sm transition duration-100 active:scale-95 ${blank ? "bg-amber-400 text-black font-medium" : "bg-neutral-800 hover:bg-neutral-700"}`}>Noir</button>
-            <button onMouseDown={(e) => e.preventDefault()} onClick={applyBold} disabled={!canProject} title="Gras sur les mots sélectionnés dans l'aperçu (Ctrl+B)" aria-label="Gras"
+              className={`lg:col-span-2 rounded-lg py-2 text-sm transition duration-100 active:scale-95 ${blank ? "bg-amber-400 text-black font-medium" : "bg-neutral-800 hover:bg-neutral-700"}`}>{tr("pg.blank")}</button>
+            <button onMouseDown={(e) => e.preventDefault()} onClick={applyBold} disabled={!canProject} title={tr("pg.boldTip")} aria-label={tr("pg.bold")}
               className={btn + " lg:col-span-1 font-bold"}>B</button>
-            <button onMouseDown={(e) => e.preventDefault()} onClick={applyUnder} disabled={!canProject} title="Souligné sur les mots sélectionnés dans l'aperçu (Ctrl+U)" aria-label="Souligné"
+            <button onMouseDown={(e) => e.preventDefault()} onClick={applyUnder} disabled={!canProject} title={tr("pg.underTip")} aria-label={tr("pg.under")}
               className={btn + " lg:col-span-1 underline"}>U</button>
-            <button className={btn + " lg:col-span-2"} disabled={!shown || !canProject} onClick={clearScreen}>Effacer</button>
+            <button className={btn + " lg:col-span-2"} disabled={!shown || !canProject} onClick={clearScreen}>{tr("pg.clear")}</button>
           </div>}
 
           {tab !== "annonces" && !isOrateur && (
-          <div className="mt-2 lg:mt-3 grid grid-cols-2 gap-1 rounded-lg bg-neutral-800 p-1" role="group" aria-label="Mise en page de l'écran">
-            {[["full", "Plein écran"], ["band", "Bandeau"]].map(([k, l]) => (
+          <div className="mt-2 lg:mt-3 grid grid-cols-2 gap-1 rounded-lg bg-neutral-800 p-1" role="group" aria-label={tr("pg.layoutAria")}>
+            {[["full", tr("scr.layoutFull")], ["band", tr("scr.layoutBand")]].map(([k, l]) => (
               <button key={k} onClick={() => setLayoutMode(k)} disabled={!canProject} aria-pressed={layout === k}
                 className={`rounded-md py-1.5 text-sm transition duration-100 active:scale-95 disabled:opacity-40 disabled:pointer-events-none ${layout === k ? "bg-amber-400 text-black font-medium" : "text-neutral-300 hover:bg-neutral-700"}`}>{l}</button>
             ))}
@@ -1163,17 +1169,17 @@ export default function Control() {
 
           {tab !== "annonces" && <div className="hidden lg:flex mt-4 flex-col items-center gap-2.5 text-xs xl:text-sm text-neutral-400">
             <div className="flex flex-wrap justify-center gap-x-4 gap-y-2">
-              <span className="flex items-center gap-1.5"><Kbd>↑↓</Kbd> choisir</span>
-              <span className="flex items-center gap-1.5"><Kbd>Entrée</Kbd> projeter</span>
-              <span className="flex items-center gap-1.5"><Kbd>←→</Kbd> naviguer</span>
-              {planOn && <span className="flex items-center gap-1.5"><Kbd>Page ↓↑</Kbd> plan du culte</span>}
+              <span className="flex items-center gap-1.5"><Kbd>↑↓</Kbd> {tr("pg.kChoose")}</span>
+              <span className="flex items-center gap-1.5"><Kbd>{tr("pg.kEnter")}</Kbd> {tr("pg.kProject")}</span>
+              <span className="flex items-center gap-1.5"><Kbd>←→</Kbd> {tr("pg.kNav")}</span>
+              {planOn && <span className="flex items-center gap-1.5"><Kbd>Page ↓↑</Kbd> {tr("pg.kPlan")}</span>}
             </div>
             <div className="flex flex-wrap justify-center gap-x-4 gap-y-2">
-              <span className="flex items-center gap-1.5"><Kbd>Échap</Kbd> effacer</span>
-              <span className="flex items-center gap-1.5"><Kbd>Ctrl+E</Kbd> écran noir</span>
-              <span className="flex items-center gap-1.5"><Kbd>Ctrl+B</Kbd> gras</span>
-              <span className="flex items-center gap-1.5"><Kbd>Ctrl+U</Kbd> souligné</span>
-              {!isOrateur && <span className="flex items-center gap-1.5"><Kbd>B</Kbd> bandeau</span>}
+              <span className="flex items-center gap-1.5"><Kbd>{tr("pg.kEsc")}</Kbd> {tr("pg.kClear")}</span>
+              <span className="flex items-center gap-1.5"><Kbd>Ctrl+E</Kbd> {tr("pg.kBlank")}</span>
+              <span className="flex items-center gap-1.5"><Kbd>Ctrl+B</Kbd> {tr("pg.kBold")}</span>
+              <span className="flex items-center gap-1.5"><Kbd>Ctrl+U</Kbd> {tr("pg.kUnder")}</span>
+              {!isOrateur && <span className="flex items-center gap-1.5"><Kbd>B</Kbd> {tr("pg.kBand")}</span>}
             </div>
           </div>}
 
@@ -1181,13 +1187,13 @@ export default function Control() {
             <div className="hidden lg:block mt-3 space-y-2">
               <button onClick={toggleCompare} aria-pressed={compare}
                 className={`w-full rounded-lg py-1.5 text-sm transition duration-100 active:scale-95 ${compare ? "bg-amber-400 text-black font-medium" : "bg-neutral-800 hover:bg-neutral-700 text-neutral-200"}`}>
-                ⇄ {compare ? "Fermer la comparaison" : "Comparer 2 versions"}
+                ⇄ {compare ? tr("pg.closeCompare") : tr("pg.compare")}
               </button>
               {compare && (
                 <div className="space-y-2">
                   <div className="grid grid-cols-2 gap-2">
-                    <div className="min-w-0"><p className="mb-1 text-[11px] text-neutral-500">Version 1</p><VersionSelect versions={versions} value={version} onChange={setVersion} loading={loading} /></div>
-                    <div className="min-w-0"><p className="mb-1 text-[11px] text-neutral-500">Version 2</p><VersionSelect versions={versions} value={version2} onChange={setVersion2} /></div>
+                    <div className="min-w-0"><p className="mb-1 text-[11px] text-neutral-500">{tr("pg.version1")}</p><VersionSelect versions={versions} value={version} onChange={setVersion} loading={loading} /></div>
+                    <div className="min-w-0"><p className="mb-1 text-[11px] text-neutral-500">{tr("pg.version2")}</p><VersionSelect versions={versions} value={version2} onChange={setVersion2} /></div>
                   </div>
                   <div className="rounded-lg border border-neutral-700 bg-neutral-800/60 p-2.5 text-sm leading-snug max-h-64 overflow-y-auto">
                     {bothTarget && bible?.[bothTarget.b]?.[bothTarget.c] ? (
@@ -1200,17 +1206,17 @@ export default function Control() {
                           </div>
                           <div className="min-w-0 border-l border-neutral-700 pl-3">
                             <p className="mb-1 text-[11px] font-semibold text-amber-400">{label2 || "…"}</p>
-                            <p className="text-neutral-200">{bible2?.[bothTarget.b]?.[bothTarget.c] && chapterReady2(bothTarget.b, bothTarget.c) ? (textOf(bothTarget, bible2) || "Verset absent de cette version.") : (bibleError2 ? `Version indisponible : ${bibleError2}` : "Chargement…")}</p>
+                            <p className="text-neutral-200">{bible2?.[bothTarget.b]?.[bothTarget.c] && chapterReady2(bothTarget.b, bothTarget.c) ? (textOf(bothTarget, bible2) || tr("pg.verseAbsent")) : (bibleError2 ? tr("pg.versionUnavailable", { err: bibleError2 }) : tr("common.loading"))}</p>
                           </div>
                         </div>
                       </>
-                    ) : <p className="text-xs text-neutral-500">Choisis ou projette un verset : il s'affiche ici dans les 2 versions.</p>}
+                    ) : <p className="text-xs text-neutral-500">{tr("pg.compareHint")}</p>}
                   </div>
                   <button onClick={() => bothTarget && projectBoth(bothTarget)} disabled={!canProject || !bothReady}
                     className="w-full rounded-lg py-1.5 text-sm font-medium bg-amber-400 text-black transition duration-100 active:scale-95 disabled:opacity-40 disabled:pointer-events-none">
-                    Afficher sur l'écran
+                    {tr("pg.showOnScreen")}
                   </button>
-                  {liveBoth && <p className="text-[11px] text-green-400">● Les 2 versions sont à l'écran</p>}
+                  {liveBoth && <p className="text-[11px] text-green-400">{tr("pg.bothLive")}</p>}
                 </div>
               )}
             </div>
@@ -1218,7 +1224,7 @@ export default function Control() {
 
           {history.length > 0 && (
             <section className="mt-3 lg:mt-4">
-              <h2 className="hidden lg:block text-xs text-neutral-500 mb-2">Derniers versets</h2>
+              <h2 className="hidden lg:block text-xs text-neutral-500 mb-2">{tr("pg.lastVerses")}</h2>
               <div className="flex flex-wrap gap-1.5">
                 {history.map((r, i) => (
                   <button key={i} onClick={() => project(r)}

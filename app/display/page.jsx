@@ -7,11 +7,13 @@ import { RichText } from "@/lib/bold";
 import ColsText from "@/lib/ColsText";
 import { DEFAULT_SETTINGS, mergeSettings, loadSettings, saveSettings, loadLogo, saveLogo } from "@/lib/displaySettings";
 import { useWakeLock } from "@/lib/useWakeLock";
+import { useT } from "@/lib/i18n/client";
 
 // messages dont l'écran confirme la réception à la console (sans confirmation, elle renvoie l'état complet)
 const ACKED = new Set(["show", "update", "clear", "blank", "snapshot"]);
 
 export default function Display() {
+  const tr = useT();
   const [v, setV] = useState(null);
   const [blank, setBlank] = useState(false);
   const [bg, setBg] = useState(null);                     // fond choisi dans l'Administration
@@ -90,7 +92,7 @@ export default function Display() {
       }
     }, {
       role: "display",
-      me: { id: uuid(), name: "Écran", role: "display" },          // présence : la console sait qu'un écran est connecté
+      me: { id: uuid(), name: tr("dp.screenName"), role: "display" },          // présence : la console sait qu'un écran est connecté
       onReady: () => chRef.current?.postMessage({ type: "display?" }),   // (re)connexion internet : on redemande l'état complet
     });
     chRef.current = ch;
@@ -190,7 +192,7 @@ export default function Display() {
             </div>
           )}
           {forcedMute && v.mediaType === "video" && (
-            <span className="absolute bottom-3 right-4 rounded-full bg-black/60 text-white/80 text-xs px-3 py-1">🔇 Clique pour activer le son</span>
+            <span className="absolute bottom-3 right-4 rounded-full bg-black/60 text-white/80 text-xs px-3 py-1">{tr("dp.unmute")}</span>
           )}
         </div>
       )}
@@ -249,7 +251,7 @@ export default function Display() {
       )}
       {hint && !isFs && !transparent && (
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-black/70 text-white/70 text-xs px-3 py-1 pointer-events-none select-none">
-          Clique ou appuie sur F pour le plein écran
+          {tr("dp.fsHint")}
         </div>
       )}
     </div>

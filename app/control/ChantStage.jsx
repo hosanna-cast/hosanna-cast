@@ -4,12 +4,14 @@ import { splitSlides, slidesOf } from "@/lib/library";
 import { findRefs } from "@/lib/refs";
 import { parseRef } from "@/lib/parseRef";
 import Cutter, { linesFromSlides, slidesFromLines } from "./Cutter";
+import { useT } from "@/lib/i18n/client";
 
 const field = "w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-amber-400";
 const ghost = "px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-sm transition duration-100 active:scale-95";
 
 // Écran dédié aux chants : le chant ouvert occupe toute la colonne centrale.
 export default function ChantStage({ item, bible, refOf, textOf, isLiveVerse, liveSlide, pausedSlide, onSlide, onVerse, onUpdate, onRemove }) {
+  const tr = useT();
   const [mode, setMode] = useState("view");               // "view" | "all" (tout le texte) | "cut" (choisir les coupures)
   const [f, setF] = useState({ title: "", person: "", text: "" });
   const [error, setError] = useState("");
@@ -44,7 +46,7 @@ export default function ChantStage({ item, bible, refOf, textOf, isLiveVerse, li
     return (
       <div className="rounded-xl border border-dashed border-neutral-700 p-10 text-center text-neutral-500">
         <div className="text-3xl mb-2">♪</div>
-        Choisis un chant dans la liste à gauche, ou ajoute-en un avec <span className="text-amber-400">+</span>.
+        {tr("cs.empty", { plus: "\u0001" }).split("\u0001").flatMap((p, i) => i ? [<span key={i} className="text-amber-400">+</span>, p] : [p])}
       </div>
     );
   }
@@ -59,7 +61,7 @@ export default function ChantStage({ item, bible, refOf, textOf, isLiveVerse, li
   const startAll = () => { setF({ title: item.title, person: item.person || "", text: slides.join("\n\n") }); setError(""); setMode("all"); };
   const saveAll = () => {
     const text = f.text.trim();
-    if (!text) { setError("Les paroles ne peuvent pas être vides."); return; }
+    if (!text) { setError(tr("cs.lyricsEmpty")); return; }
     const next = splitSlides(text, Infinity);              // on respecte exactement les lignes vides
     onUpdate(item.id, { title: f.title.trim() || text.split("\n")[0].slice(0, 60), person: f.person.trim(), slides: next, text: next.join("\n\n") });
     setMode("view");
@@ -80,7 +82,7 @@ export default function ChantStage({ item, bible, refOf, textOf, isLiveVerse, li
     setEdit(null);
   };
   const removeSlide = (i) => {
-    if (!window.confirm(`Supprimer la diapositive ${i + 1} ?`)) return;
+    if (!window.confirm(tr("cs.confirmSlide", { n: i + 1 }))) return;
     commit(slides.filter((_, k) => k !== i));
   };
   const paused = pausedSlide && pausedSlide.id === item.id ? pausedSlide : null;
@@ -88,15 +90,15 @@ export default function ChantStage({ item, bible, refOf, textOf, isLiveVerse, li
   if (mode === "all") {
     return (
       <div className="rounded-xl bg-neutral-800/60 border border-neutral-700 p-4 space-y-2">
-        <div className="text-sm font-medium text-amber-400">Modifier tout le texte</div>
-        <input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} placeholder="Titre" className={field} />
-        <input value={f.person} onChange={(e) => setF({ ...f, person: e.target.value })} placeholder="Auteur (facultatif)" className={field} />
+        <div className="text-sm font-medium text-amber-400">{tr("cs.editAll")}</div>
+        <input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} placeholder={tr("cs.titlePh")} className={field} />
+        <input value={f.person} onChange={(e) => setF({ ...f, person: e.target.value })} placeholder={tr("cs.authorPh")} className={field} />
         <textarea value={f.text} onChange={(e) => setF({ ...f, text: e.target.value })} rows={18} className={`${field} resize-y leading-relaxed text-base`} />
-        <p className="text-xs text-neutral-500">Une ligne vide (ou une ligne <span className="text-neutral-300">---</span>) = nouvelle diapositive. Pour modifier un seul couplet, utilise le crayon sur sa carte.</p>
+        <p className="text-xs text-neutral-500">{tr("cs.allHint", { dashes: "\u0001" }).split("\u0001").flatMap((p, i) => i ? [<span key={i} className="text-neutral-300">---</span>, p] : [p])}</p>
         {error && <p className="text-xs text-red-400">{error}</p>}
         <div className="grid grid-cols-2 gap-2 pt-1 max-w-sm">
-          <button onClick={() => setMode("view")} className={ghost}>Annuler</button>
-          <button onClick={saveAll} className="rounded-lg bg-amber-400 text-black font-medium py-2 text-sm transition duration-100 active:scale-95">Enregistrer</button>
+          <button onClick={() => setMode("view")} className={ghost}>{tr("common.cancel")}</button>
+          <button onClick={saveAll} className="rounded-lg bg-amber-400 text-black font-medium py-2 text-sm transition duration-100 active:scale-95">{tr("common.save")}</button>
         </div>
       </div>
     );
@@ -106,13 +108,13 @@ export default function ChantStage({ item, bible, refOf, textOf, isLiveVerse, li
     return (
       <div className="rounded-xl bg-neutral-800/60 border border-neutral-700 p-4">
         <div className="flex items-center justify-between gap-3 mb-1">
-          <div className="text-sm font-medium text-amber-400">Choisir où couper</div>
+          <div className="text-sm font-medium text-amber-400">{tr("cs.cutTitle")}</div>
           <div className="flex gap-2">
-            <button onClick={() => setMode("view")} className={ghost}>Annuler</button>
-            <button onClick={saveCut} className="rounded-lg bg-amber-400 text-black font-medium px-4 py-1.5 text-sm transition duration-100 active:scale-95">Enregistrer</button>
+            <button onClick={() => setMode("view")} className={ghost}>{tr("common.cancel")}</button>
+            <button onClick={saveCut} className="rounded-lg bg-amber-400 text-black font-medium px-4 py-1.5 text-sm transition duration-100 active:scale-95">{tr("common.save")}</button>
           </div>
         </div>
-        <p className="text-xs text-neutral-500 mb-3">Clique entre deux lignes pour couper ou retirer une coupure. Chaque bloc deviendra une diapositive.</p>
+        <p className="text-xs text-neutral-500 mb-3">{tr("cs.cutHint")}</p>
         <Cutter lines={lines} onToggle={toggleCut} />
       </div>
     );
@@ -132,23 +134,23 @@ export default function ChantStage({ item, bible, refOf, textOf, isLiveVerse, li
                 className="min-w-0 flex-1 bg-neutral-900 border border-amber-400 rounded-lg px-3 py-1 text-lg font-semibold outline-none" />
               <button onClick={() => { if (titleEdit.trim()) onUpdate(item.id, { title: titleEdit.trim() }); setTitleEdit(null); }}
                 className="rounded-lg bg-amber-400 text-black font-medium px-3 py-1.5 text-sm transition duration-100 active:scale-95">OK</button>
-              <button onClick={() => setTitleEdit(null)} className={ghost}>Annuler</button>
+              <button onClick={() => setTitleEdit(null)} className={ghost}>{tr("common.cancel")}</button>
             </div>
           ) : (
             <div className="flex items-center gap-2 min-w-0">
               <h2 className="text-xl font-semibold leading-tight truncate">{item.title}</h2>
-              <button onClick={() => setTitleEdit(item.title)} title="Modifier le titre"
+              <button onClick={() => setTitleEdit(item.title)} title={tr("cs.editTitle")}
                 className="shrink-0 w-7 h-7 rounded-md bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-amber-400 text-sm transition duration-100 active:scale-90">✎</button>
             </div>
           )}
           <div className="text-xs text-neutral-500 mt-0.5">
-            {[item.person, `${slides.length} diapositive${slides.length > 1 ? "s" : ""}`].filter(Boolean).join(" · ")}
+            {[item.person, tr(slides.length > 1 ? "cb.slides.many" : "cb.slides.one", { n: slides.length })].filter(Boolean).join(" · ")}
           </div>
         </div>
         <div className="flex flex-wrap justify-end gap-2 shrink-0">
-          <button onClick={startCut} className={`${ghost} text-amber-400`}>✂ Découper</button>
-          <button onClick={startAll} className={ghost}>Tout le texte</button>
-          <button onClick={() => { if (window.confirm(`Supprimer « ${item.title} » ?`)) onRemove(item.id); }} className={`${ghost} text-neutral-400 hover:text-red-400`}>Supprimer</button>
+          <button onClick={startCut} className={`${ghost} text-amber-400`}>{tr("cs.split")}</button>
+          <button onClick={startAll} className={ghost}>{tr("cs.allText")}</button>
+          <button onClick={() => { if (window.confirm(tr("cs.confirmSong", { title: item.title }))) onRemove(item.id); }} className={`${ghost} text-neutral-400 hover:text-red-400`}>{tr("common.delete")}</button>
         </div>
       </div>
 
@@ -161,7 +163,7 @@ export default function ChantStage({ item, bible, refOf, textOf, isLiveVerse, li
               <div key={i} className="rounded-xl border border-amber-400 bg-neutral-800 p-2 space-y-2">
                 <textarea autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} rows={Math.max(4, draft.split("\n").length + 1)} className={`${field} text-center font-semibold`} />
                 <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => setEdit(null)} className={ghost}>Annuler</button>
+                  <button onClick={() => setEdit(null)} className={ghost}>{tr("common.cancel")}</button>
                   <button onClick={saveEdit} className="rounded-lg bg-amber-400 text-black font-medium py-1.5 text-sm transition duration-100 active:scale-95">OK</button>
                 </div>
               </div>
@@ -173,9 +175,9 @@ export default function ChantStage({ item, bible, refOf, textOf, isLiveVerse, li
               className={`group relative text-center rounded-xl border px-3 py-3 pt-6 whitespace-pre-line leading-snug font-semibold text-sm cursor-pointer select-none transition duration-100 active:scale-[0.98] ${live ? "bg-green-600 border-green-500 text-white" : "bg-neutral-800 border-neutral-700 text-neutral-100 hover:border-amber-400/60 hover:bg-neutral-700/70"}`}>
               <span className={`absolute top-1.5 left-2.5 text-xs font-medium ${live ? "text-green-100" : "text-neutral-500"}`}>{i + 1}</span>
               <span className="absolute top-1 right-1.5 flex gap-1 opacity-60 group-hover:opacity-100">
-                <button title="Modifier cette diapositive" onClick={(e) => { e.stopPropagation(); setEdit({ i, isNew: false }); setDraft(s); }}
+                <button title={tr("cs.editSlide")} onClick={(e) => { e.stopPropagation(); setEdit({ i, isNew: false }); setDraft(s); }}
                   className="w-6 h-6 rounded-md bg-black/30 hover:bg-black/60 text-xs">✎</button>
-                <button title="Supprimer cette diapositive" onClick={(e) => { e.stopPropagation(); removeSlide(i); }}
+                <button title={tr("cs.deleteSlide")} onClick={(e) => { e.stopPropagation(); removeSlide(i); }}
                   className="w-6 h-6 rounded-md bg-black/30 hover:bg-red-600 text-xs">✕</button>
               </span>
               {s}
@@ -185,16 +187,16 @@ export default function ChantStage({ item, bible, refOf, textOf, isLiveVerse, li
 
         {edit?.isNew ? (
           <div className="rounded-xl border border-amber-400 bg-neutral-800 p-2 space-y-2">
-            <textarea autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} rows={4} placeholder="Nouvelle diapositive" className={`${field} text-center font-semibold`} />
+            <textarea autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} rows={4} placeholder={tr("cs.newSlide")} className={`${field} text-center font-semibold`} />
             <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => setEdit(null)} className={ghost}>Annuler</button>
-              <button onClick={saveEdit} className="rounded-lg bg-amber-400 text-black font-medium py-1.5 text-sm transition duration-100 active:scale-95">Ajouter</button>
+              <button onClick={() => setEdit(null)} className={ghost}>{tr("common.cancel")}</button>
+              <button onClick={saveEdit} className="rounded-lg bg-amber-400 text-black font-medium py-1.5 text-sm transition duration-100 active:scale-95">{tr("common.add")}</button>
             </div>
           </div>
         ) : (
           <button onClick={() => { setEdit({ i: slides.length, isNew: true }); setDraft(""); }}
             className="rounded-xl border border-dashed border-neutral-600 py-3 text-sm text-neutral-400 hover:text-amber-400 hover:border-amber-400/60 transition duration-100 active:scale-[0.98]">
-            + Ajouter une diapositive
+            {tr("cs.addSlide")}
           </button>
         )}
       </div>

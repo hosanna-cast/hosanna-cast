@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useT } from "@/lib/i18n/client";
 
 // Point clé : l'orateur dit une phrase importante, l'admin ou l'aide écran la tape ici.
 // Un seul bouton : « Projeter et garder » → la phrase est projetée et gardée dans la note ouverte.
@@ -13,6 +14,7 @@ const Trash = () => (
 );
 
 export default function KeyPoint({ note, autoTitle, liveKey, canProject, onKeepProject, onProjectKey, onEdit, onDelete }) {
+  const tr = useT();
   const [text, setText] = useState("");
   const [editing, setEditing] = useState(null);   // index de la phrase en cours de modification
   const [draft, setDraft] = useState("");
@@ -25,29 +27,29 @@ export default function KeyPoint({ note, autoTitle, liveKey, canProject, onKeepP
 
   return (
     <div className="mt-2 rounded-xl bg-sky-400/5 border border-sky-400/30 p-2.5 sm:p-3">
-      <div className="text-sm font-medium mb-1.5">Point clé</div>
+      <div className="text-sm font-medium mb-1.5">{tr("kp.title")}</div>
       <textarea value={text} onChange={(e) => setText(e.target.value)} rows={2}
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && t) { e.preventDefault(); go(); }
           else if (e.key === "Escape") e.target.blur();
         }}
-        placeholder="Phrase dite par l'orateur : à garder dans la note et à projeter"
+        placeholder={tr("kp.placeholder")}
         className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-sky-400 resize-y" />
       <div className="flex items-center gap-2 mt-1.5">
         <button disabled={!t || !canProject} onClick={go} title="Ctrl+Entrée"
           className="px-3 py-1.5 rounded-lg text-sm bg-sky-400 hover:bg-sky-300 text-black font-medium transition duration-100 active:scale-95 disabled:opacity-40 disabled:pointer-events-none">
-          Projeter et garder
+          {tr("kp.keepProject")}
         </button>
-        {text && <button onClick={() => setText("")} className="ml-auto text-xs text-neutral-500 hover:text-white">Vider</button>}
+        {text && <button onClick={() => setText("")} className="ml-auto text-xs text-neutral-500 hover:text-white">{tr("qt.clear")}</button>}
       </div>
-      {!note && <p className="mt-1.5 text-[11px] text-neutral-500">Aucune note ouverte : les points clés seront gardés dans « {autoTitle} », créée automatiquement.</p>}
-      {!canProject && <p className="mt-1.5 text-[11px] text-neutral-500">L'administrateur doit t'autoriser pour projeter.</p>}
+      {!note && <p className="mt-1.5 text-[11px] text-neutral-500">{tr("kp.noNote", { title: autoTitle })}</p>}
+      {!canProject && <p className="mt-1.5 text-[11px] text-neutral-500">{tr("kp.needAuth")}</p>}
 
       {note && (
         <div className="border-t border-neutral-700 mt-3 pt-2.5">
-          <div className="text-xs text-neutral-400 mb-1.5">Gardés dans la note · {note.title}</div>
+          <div className="text-xs text-neutral-400 mb-1.5">{tr("kp.kept", { title: note.title })}</div>
           {!keys.length ? (
-            <p className="text-xs text-neutral-500">Aucun point clé gardé pour l'instant.</p>
+            <p className="text-xs text-neutral-500">{tr("kp.none")}</p>
           ) : (
             <ul className="space-y-1.5">
               {keys.map((s, k) => {
@@ -60,17 +62,17 @@ export default function KeyPoint({ note, autoTitle, liveKey, canProject, onKeepP
                         else if (e.key === "Escape") setEditing(null);
                       }}
                       className="flex-1 min-w-0 bg-neutral-900 border border-neutral-700 rounded-md px-2 py-1 text-sm outline-none focus:ring-2 ring-sky-400 resize-y" />
-                    <button aria-label="Valider" title="Valider" onClick={saveEdit} className={`${icon} text-green-400 hover:bg-neutral-700`}>✓</button>
-                    <button aria-label="Annuler" title="Annuler" onClick={() => setEditing(null)} className={`${icon} text-neutral-400 hover:bg-neutral-700`}>✕</button>
+                    <button aria-label={tr("kp.validate")} title={tr("kp.validate")} onClick={saveEdit} className={`${icon} text-green-400 hover:bg-neutral-700`}>✓</button>
+                    <button aria-label={tr("common.cancel")} title={tr("common.cancel")} onClick={() => setEditing(null)} className={`${icon} text-neutral-400 hover:bg-neutral-700`}>✕</button>
                   </li>
                 );
                 return (
                   <li key={k} onClick={() => onProjectKey(k)}
                     className={`flex items-start gap-1 pl-2.5 pr-1 py-1.5 rounded-lg border text-sm leading-snug select-none transition duration-100 ${canProject ? "cursor-pointer active:scale-[0.99]" : ""} ${live ? "bg-green-600 border-green-600 text-white" : "border-neutral-700 bg-neutral-900/40 text-neutral-200 hover:bg-neutral-800"}`}>
-                    <span className="flex-1 whitespace-pre-line py-0.5">{s}{live && <span className="block text-[11px] text-green-100">À l'écran</span>}</span>
-                    <button aria-label="Modifier cette phrase" title="Modifier" onClick={(e) => { e.stopPropagation(); startEdit(k); }}
+                    <span className="flex-1 whitespace-pre-line py-0.5">{s}{live && <span className="block text-[11px] text-green-100">{tr("kp.onScreen")}</span>}</span>
+                    <button aria-label={tr("kp.editTip")} title={tr("common.edit")} onClick={(e) => { e.stopPropagation(); startEdit(k); }}
                       className={`${icon} ${live ? "text-green-100 hover:text-white" : "text-neutral-400 hover:text-white"}`}><Pencil /></button>
-                    <button aria-label="Supprimer cette phrase" title="Supprimer" onClick={(e) => { e.stopPropagation(); onDelete(k); }}
+                    <button aria-label={tr("kp.deleteTip")} title={tr("common.delete")} onClick={(e) => { e.stopPropagation(); onDelete(k); }}
                       className={`${icon} ${live ? "text-green-100 hover:text-white" : "text-neutral-400 hover:text-red-400"}`}><Trash /></button>
                   </li>
                 );

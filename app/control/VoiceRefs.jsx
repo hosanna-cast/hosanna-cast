@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { findSpokenRefs } from "@/lib/voiceRefs";
+import { useT, useLocale } from "@/lib/i18n/client";
 
 // Détection vocale (TEST) : le micro écoute, une suggestion apparaît, l'opérateur confirme d'un clic.
 // Deux sources : la référence dite à voix haute (« Jean 3 16 ») ET la ressemblance avec le texte d'un verset cité sans référence.
@@ -15,14 +16,18 @@ const MAX = 5;
 const SIM_DELAY = 500;    // la ressemblance est recalculée au plus toutes les 0,5 s (le micro envoie des résultats en continu)
 
 const LS = "voiceRefsSettings";
-const MODES = { both: "Référence + ressemblance", ref: "Référence seulement", sim: "Ressemblance seulement" };
-const LEVEL_LABELS = { strict: "Stricte", normal: "Normale", souple: "Souple" };
+const MODES = { both: "vr.modeBoth", ref: "vr.modeRef", sim: "vr.modeSim" };
+const LEVEL_LABELS = { strict: "vr.strict", normal: "vr.normal", souple: "vr.souple" };
 const loadSettings = () => { try { return { mode: "both", level: "normal", ...JSON.parse(localStorage.getItem(LS) || "{}") }; } catch { return { mode: "both", level: "normal" }; } };
 
 const same = (a, b) => a.b === b.b && a.c === b.c;
 const key = (r) => `${r.b}-${r.c}-${r.v}-${r.vEnd}`;
 
 export default function VoiceRefs({ resolve, similar, onPick, canProject }) {
+  const tr = useT();
+  const locale = useLocale();
+  const localeRef = useRef(locale);
+  localeRef.current = locale;
   const [supported, setSupported] = useState(true);
   const [on, setOn] = useState(false);
   const [listening, setListening] = useState(false);
@@ -91,7 +96,7 @@ export default function VoiceRefs({ resolve, similar, onPick, canProject }) {
     const launch = () => {
       if (!want.current) return;
       const rec = new SR();
-      rec.lang = "fr-FR";
+      rec.lang = localeRef.current === "en" ? "en-US" : "fr-FR";
       rec.continuous = true;
       rec.interimResults = true;
       rec.onstart = () => setListening(true);
@@ -112,9 +117,9 @@ export default function VoiceRefs({ resolve, similar, onPick, canProject }) {
       };
       rec.onerror = (e) => {
         const code = e.error;
-        if (code === "not-allowed" || code === "service-not-allowed") { setErr("Micro refusé : autorise le micro pour ce site dans le navigateur."); stop(); }
-        else if (code === "audio-capture") { setErr("Aucun micro détecté."); stop(); }
-        else if (code === "network") { setErr("Service vocal du navigateur injoignable (connexion Internet nécessaire)."); stop(); }
+        if (code === "not-allowed" || code === "service-not-allowed") { setErr(tr("vr.denied")); stop(); }
+        else if (code === "audio-capture") { setErr(tr("vr.noMic")); stop(); }
+        else if (code === "network") { setErr(tr("vr.network")); stop(); }
       };
       rec.onend = () => {                       // Chrome coupe l'écoute après un silence : on relance tant que c'est activé
         setListening(false);
@@ -146,29 +151,29 @@ export default function VoiceRefs({ resolve, similar, onPick, canProject }) {
     <div className={`rounded-xl border p-2.5 sm:p-3 ${on ? "border-red-400/50 bg-red-500/5" : "border-neutral-700 bg-neutral-900"}`}>
       <div className="flex items-center gap-2 flex-wrap">
         <button onClick={on ? stop : start} disabled={!supported} aria-pressed={on}
-          title={supported ? "Active ou désactive l'écoute du micro" : "Non disponible sur ce navigateur (utilise Chrome ou Edge)"}
+          title={supported ? tr("vr.toggleTip") : tr("vr.unsupportedTip")}
           className={`rounded-lg px-3 py-1.5 text-sm transition duration-100 active:scale-95 disabled:opacity-40 disabled:pointer-events-none ${on ? "bg-red-500 text-white font-medium" : "bg-neutral-800 hover:bg-neutral-700"}`}>
-          🎤 Détection vocale {on ? "activée" : "désactivée"}
+          {on ? tr("vr.on") : tr("vr.off")}
         </button>
-        <span className="rounded-full bg-sky-400/15 text-sky-300 text-[10px] uppercase tracking-wide px-2 py-0.5">test</span>
-        {on && <span className={`text-xs ${listening ? "text-red-300" : "text-neutral-500"}`} role="status">{listening ? "● Écoute…" : "Reconnexion…"}</span>}
-        <button onClick={() => setShowSet((s) => !s)} aria-expanded={showSet} title="Réglages de la détection"
+        <span className="rounded-full bg-sky-400/15 text-sky-300 text-[10px] uppercase tracking-wide px-2 py-0.5">{tr("vr.test")}</span>
+        {on && <span className={`text-xs ${listening ? "text-red-300" : "text-neutral-500"}`} role="status">{listening ? tr("vr.listening") : tr("vr.reconnecting")}</span>}
+        <button onClick={() => setShowSet((s) => !s)} aria-expanded={showSet} title={tr("vr.settingsTip")}
           className="ml-auto rounded-lg px-2 py-1.5 text-sm bg-neutral-800 hover:bg-neutral-700 transition duration-100 active:scale-95">⚙</button>
-        {!supported && <span className="text-xs text-neutral-500">Non disponible ici : utilise Chrome ou Edge.</span>}
+        {!supported && <span className="text-xs text-neutral-500">{tr("vr.unsupported")}</span>}
       </div>
 
       {showSet && (
         <div className="mt-2 grid gap-2 sm:grid-cols-2 text-xs">
-          <label className="grid min-w-0 gap-1 text-neutral-400">Que détecter ?
+          <label className="grid min-w-0 gap-1 text-neutral-400">{tr("vr.whatDetect")}
             <select value={mode} onChange={(e) => { setMode(e.target.value); save(e.target.value, level); }} className="w-full min-w-0 truncate rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-sm text-neutral-100">
-              {Object.entries(MODES).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+              {Object.entries(MODES).map(([k, l]) => <option key={k} value={k}>{tr(l)}</option>)}
             </select>
           </label>
-          <label className="grid min-w-0 gap-1 text-neutral-400">Sensibilité
+          <label className="grid min-w-0 gap-1 text-neutral-400">{tr("vr.sensitivity")}
             <select value={level} disabled={mode === "ref"} onChange={(e) => { setLevel(e.target.value); save(mode, e.target.value); }} className="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-sm text-neutral-100 disabled:opacity-40 w-full min-w-0">
-              {Object.entries(LEVEL_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+              {Object.entries(LEVEL_LABELS).map(([k, l]) => <option key={k} value={k}>{tr(l)}</option>)}
             </select>
-            <span className="text-[11px] leading-4 text-neutral-500">{level === "strict" ? "Moins de fausses propositions." : level === "souple" ? "Propose plus, même si mal entendu." : "Équilibré."}</span>
+            <span className="text-[11px] leading-4 text-neutral-500">{level === "strict" ? tr("vr.levelStrict") : level === "souple" ? tr("vr.levelSouple") : tr("vr.levelNormal")}</span>
           </label>
         </div>
       )}
@@ -177,23 +182,23 @@ export default function VoiceRefs({ resolve, similar, onPick, canProject }) {
 
       {on && (
         <>
-          <p className="mt-2 text-xs text-neutral-500 truncate" title={heard}>{heard ? `Entendu : « ${heard} »` : "Dis une référence (« Jean 3 16 ») ou cite directement le verset."}</p>
+          <p className="mt-2 text-xs text-neutral-500 truncate" title={heard}>{heard ? tr("vr.heard", { text: heard }) : tr("vr.sayRef")}</p>
           {chips.length > 0 && (
             <ul className="mt-2 flex flex-wrap gap-1.5">
               {chips.map((c) => (
                 <li key={c.k} className={`flex items-stretch rounded-lg overflow-hidden text-black ${c.sim ? "bg-sky-300" : "bg-amber-400"}`}>
                   <button onClick={() => pick(c)} disabled={c.v != null && !canProject}
-                    title={c.sim ? `Ressemble à : ${c.snippet}` : c.v == null ? "Ouvrir ce chapitre" : "Projeter à l'écran"}
+                    title={c.sim ? tr("vr.looksLike", { snippet: c.snippet }) : c.v == null ? tr("vr.openChapter") : tr("vr.projectTip")}
                     className="px-3 py-1.5 text-sm font-medium text-left transition duration-100 active:scale-95 disabled:opacity-50">
                     <span className="block">{c.v == null ? "📖" : "▶"} {c.sim ? "≈ " : ""}{c.label}</span>
                     {c.sim && c.snippet && <span className="block max-w-[260px] truncate text-[11px] font-normal opacity-70">{c.snippet}</span>}
                   </button>
-                  <button onClick={() => drop(c)} aria-label="Ignorer" className="px-2 text-sm bg-black/15 hover:bg-black/30">✕</button>
+                  <button onClick={() => drop(c)} aria-label={tr("vr.ignore")} className="px-2 text-sm bg-black/15 hover:bg-black/30">✕</button>
                 </li>
               ))}
             </ul>
           )}
-          <p className="mt-2 text-[11px] text-neutral-500 leading-4">Rien n'est projeté sans ton clic. Le navigateur envoie le son à son service de reconnaissance vocale en ligne.</p>
+          <p className="mt-2 text-[11px] text-neutral-500 leading-4">{tr("vr.footer")}</p>
         </>
       )}
     </div>

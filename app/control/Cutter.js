@@ -1,4 +1,5 @@
 "use client";
+import { useT } from "@/lib/i18n/client";
 
 // diapositives <-> lignes avec coupures (cut = coupure après cette ligne)
 export const linesFromSlides = (slides) =>
@@ -17,6 +18,7 @@ export const slidesFromLines = (lines) => {
 
 // Toutes les lignes du chant ; un clic entre deux lignes ajoute ou retire une coupure.
 export default function Cutter({ lines, onToggle }) {
+  const tr = useT();
   return (
     <div className="max-w-xl mx-auto">
       {lines.map((l, i) => (
@@ -26,7 +28,7 @@ export default function Cutter({ lines, onToggle }) {
             <button onClick={() => onToggle(i)}
               className={`group w-full flex items-center gap-2 py-1.5 sm:py-0.5 text-xs sm:text-[11px] transition duration-100 ${l.cut ? "text-amber-400" : "text-neutral-600 hover:text-amber-400"}`}>
               <span className={`flex-1 border-t ${l.cut ? "border-dashed border-amber-400" : "border-dashed border-neutral-700 group-hover:border-amber-400/60"}`} />
-              {l.cut ? "✂ coupure (retirer)" : "✂ couper ici"}
+              {l.cut ? tr("cut.removeCut") : tr("cut.cutHere")}
               <span className={`flex-1 border-t ${l.cut ? "border-dashed border-amber-400" : "border-dashed border-neutral-700 group-hover:border-amber-400/60"}`} />
             </button>
           )}

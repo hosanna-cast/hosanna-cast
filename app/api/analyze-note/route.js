@@ -18,17 +18,18 @@ Réponds uniquement par un objet JSON : {"points": ["...", "..."]}`;
 export async function POST(req) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return fail("Connexion requise.", 401);
+  const b = await req.json().catch(() => ({}));
+  const L = (fr, en) => (b.lang === "en" ? en : fr);
+  if (!user) return fail(L("Connexion requise.", "Sign-in required."), 401);
 
   const { data: m } = await supabase.from("memberships").select("role").eq("user_id", user.id).limit(1).maybeSingle();
-  if (!m || !["owner", "admin", "assistant"].includes(m.role)) return fail("Action réservée à l'administrateur et à l'aide écran.", 403);
+  if (!m || !["owner", "admin", "assistant"].includes(m.role)) return fail(L("Action réservée à l'administrateur et à l'aide écran.", "Action reserved for the administrator and the screen helper."), 403);
 
   const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) return fail("Clé ANTHROPIC_API_KEY absente de ce déploiement (Vercel → Settings → Environment Variables).", 500);
+  if (!key) return fail(L("Clé ANTHROPIC_API_KEY absente de ce déploiement (Vercel → Settings → Environment Variables).", "ANTHROPIC_API_KEY is missing from this deployment (Vercel → Settings → Environment Variables)."), 500);
 
-  const b = await req.json().catch(() => ({}));
   const text = String(b.text || "").trim().slice(0, 30000);
-  if (text.length < 40) return fail("La note est trop courte pour être analysée.");
+  if (text.length < 40) return fail(L("La note est trop courte pour être analysée.", "The note is too short to be analyzed."));
 
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 50000);
@@ -45,7 +46,7 @@ export async function POST(req) {
       }),
     });
     const data = await r.json().catch(() => ({}));
-    if (!r.ok) return fail(data?.error?.message || "L'analyse a échoué.", 502);
+    if (!r.ok) return fail(data?.error?.message || L("L'analyse a échoué.", "The analysis failed."), 502);
 
     const raw = (data.content || []).map((c) => (c.type === "text" ? c.text : "")).join("");
     const json = raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1);
@@ -53,10 +54,10 @@ export async function POST(req) {
     try { points = JSON.parse(json).points; } catch {}
     if (!Array.isArray(points)) points = [];
     points = [...new Set(points.filter((p) => typeof p === "string").map((p) => p.trim().slice(0, 300)).filter((p) => p && !hasRef(p)))].slice(0, 15);
-    if (!points.length) return fail("Aucun point clé trouvé. Réessaie.", 502);
+    if (!points.length) return fail(L("Aucun point clé trouvé. Réessaie.", "No key point found. Try again."), 502);
     return NextResponse.json({ points });
   } catch (e) {
-    return fail(e?.name === "AbortError" ? "L'analyse a pris trop de temps. Réessaie." : "L'analyse a échoué.", 502);
+    return fail(e?.name === "AbortError" ? L("L'analyse a pris trop de temps. Réessaie.", "The analysis took too long. Try again.") : L("L'analyse a échoué.", "The analysis failed."), 502);
   } finally {
     clearTimeout(timer);
   }

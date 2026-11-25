@@ -1,5 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
+import { useT } from "@/lib/i18n/client";
+import { useLocale } from "@/lib/i18n/client";
 
 // Image depuis internet (pour la régie technique) :
 //  - on tape des mots (« Jérusalem », « mer de Galilée »…) → vignettes → un clic projette l'image
@@ -36,6 +38,8 @@ const checkImage = (href) => new Promise((resolve) => {
 });
 
 export default function WebImage({ onProject, disabled, liveUrl, status }) {
+  const tr = useT();
+  const locale = useLocale();
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);          // vérification d'un lien / d'une image choisie
   const [searching, setSearching] = useState(false);
@@ -57,9 +61,9 @@ export default function WebImage({ onProject, disabled, liveUrl, status }) {
     if (ok) { onProject(href, name); return; }
     if (tileId) {
       setBad((b) => new Set(b).add(tileId));
-      setErr("Cette image est bloquée par son site d'origine. Essaie-en une autre.");
+      setErr(tr("wi.blocked"));
     } else {
-      setErr("Ce lien n'est pas une image directe, ou le site la bloque. Fais un clic droit sur l'image → « Copier l'adresse de l'image », puis colle-la ici.");
+      setErr(tr("wi.notDirect"));
     }
   };
 
@@ -67,10 +71,10 @@ export default function WebImage({ onProject, disabled, liveUrl, status }) {
     setErr(""); setSearching(true);
     const id = ++run.current;
     try {
-      const r = await fetch(`/api/image-search?q=${encodeURIComponent(q)}&page=${page}`);
+      const r = await fetch(`/api/image-search?q=${encodeURIComponent(q)}&page=${page}&lang=${locale}`);
       const j = await r.json().catch(() => ({}));
       if (id !== run.current) return;
-      if (!r.ok) throw new Error(j.error || `Erreur ${r.status}`);
+      if (!r.ok) throw new Error(j.error || tr("wi.error", { status: r.status }));
       setRes((cur) => {
         const prev = page > 1 && cur?.q === q ? cur.items : [];
         const seen = new Set(prev.map((x) => x.url));
@@ -89,7 +93,7 @@ export default function WebImage({ onProject, disabled, liveUrl, status }) {
     if (!s || disabled) return;
     if (looksLikeUrl(s)) {
       const u = toUrl(s);
-      if (!u) return setErr("Colle l'adresse complète d'une image (https://…).");
+      if (!u) return setErr(tr("wi.pasteFull"));
       setRes(null);
       project(u.href, nameOf(u));
     } else {
@@ -108,23 +112,23 @@ export default function WebImage({ onProject, disabled, liveUrl, status }) {
         <input value={text} onChange={(e) => { setText(e.target.value); setErr(""); }}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); go(); } else if (e.key === "Escape") e.target.blur(); }}
           autoCapitalize="none" autoCorrect="off" spellCheck={false}
-          placeholder="Image depuis internet : tape un mot (Jérusalem, croix…) ou colle un lien"
+          placeholder={tr("wi.placeholder")}
           className="flex-1 min-w-0 bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-sky-400" />
         <button onClick={go} disabled={!text.trim() || disabled || busy || searching}
           className="shrink-0 rounded-lg bg-sky-400 hover:bg-sky-300 text-black font-medium px-3 py-1.5 text-sm transition duration-100 active:scale-95 disabled:opacity-70 disabled:pointer-events-none">
-          {searching ? "Recherche…" : busy && picking === "link" ? "Vérification…" : isLink ? "Projeter" : "Chercher"}
+          {searching ? tr("wi.searching") : busy && picking === "link" ? tr("wi.checking") : isLink ? tr("wi.project") : tr("wi.search")}
         </button>
       </div>
 
       {err && <p className="mt-1.5 text-xs text-red-300 leading-5">{err}</p>}
       {!err && failedStatus && (
-        <p className="mt-1.5 text-xs text-red-300 leading-5">L'écran n'arrive pas à charger cette image (le site la bloque peut-être). Essaie une autre image.</p>
+        <p className="mt-1.5 text-xs text-red-300 leading-5">{tr("wi.screenFail")}</p>
       )}
 
       {res && (
         <div className="mt-2">
           {!items.length && !searching ? (
-            <p className="text-xs text-neutral-300 leading-5">Aucune image trouvée pour « {res.q} ». Essaie un autre mot (en français ou en anglais).</p>
+            <p className="text-xs text-neutral-300 leading-5">{tr("wi.noResult", { q: res.q })}</p>
           ) : (
             <ul className="grid grid-cols-3 sm:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2 max-h-[calc(100vh-17rem)] min-h-72 overflow-y-auto">
               {items.map((r) => {
@@ -137,8 +141,8 @@ export default function WebImage({ onProject, disabled, liveUrl, status }) {
                       <img src={r.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" draggable={false}
                         onError={() => setBad((b) => new Set(b).add(r.id + "!thumb"))}
                         className="w-full h-full object-cover" />
-                      {picking === r.id && <span className="absolute inset-0 flex items-center justify-center bg-black/60 text-[11px]">Chargement…</span>}
-                      {on && <span className="absolute left-1 top-1 rounded bg-green-600 text-[10px] px-1">À l'écran</span>}
+                      {picking === r.id && <span className="absolute inset-0 flex items-center justify-center bg-black/60 text-[11px]">{tr("wi.loadingTile")}</span>}
+                      {on && <span className="absolute left-1 top-1 rounded bg-green-600 text-[10px] px-1">{tr("kp.onScreen")}</span>}
                     </button>
                   </li>
                 );
@@ -148,22 +152,21 @@ export default function WebImage({ onProject, disabled, liveUrl, status }) {
 
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5">
             {res.more && (
-              <button disabled={searching} onClick={() => search(res.q, res.page + 1)} className="text-xs text-sky-300 hover:underline disabled:opacity-50">Plus de résultats</button>
+              <button disabled={searching} onClick={() => search(res.q, res.page + 1)} className="text-xs text-sky-300 hover:underline disabled:opacity-50">{tr("wi.more")}</button>
             )}
             <a href={`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(res.q)}`} target="_blank" rel="noopener noreferrer"
-              className="text-xs text-sky-300 hover:underline">Chercher aussi sur Google Images ↗</a>
-            <button onClick={() => { setRes(null); setErr(""); }} className="ml-auto text-xs text-neutral-500 hover:text-white">Fermer</button>
+              className="text-xs text-sky-300 hover:underline">{tr("wi.google")}</a>
+            <button onClick={() => { setRes(null); setErr(""); }} className="ml-auto text-xs text-neutral-500 hover:text-white">{tr("common.close")}</button>
           </div>
           {res.notes?.length > 0 && <p className="mt-1 text-[11px] text-amber-300 leading-4">⚠ {res.notes.join(" · ")}</p>}
           <p className="mt-1 text-[11px] text-neutral-400 leading-4">
-            Sources : {res.sources.join(", ")}{res.web ? "" : " (images libres de droits uniquement : les images du web demandent une clé, voir README)"}. Certaines licences demandent de citer l'auteur : survole une vignette pour le voir.
-            Sur Google Images : clic droit sur l'image → « Copier l'adresse de l'image », puis colle-la dans le champ.
+            {tr("wi.sources", { list: res.sources.join(", "), free: res.web ? "" : tr("wi.freeOnly") })}
           </p>
         </div>
       )}
 
       {!res && !err && !failedStatus && (
-        <p className="mt-1.5 text-[11px] text-neutral-400 leading-4">Rien n'est enregistré dans l'appli. Pour une image importante, préfère l'onglet Annonces (elle ne dépend pas du site d'origine).</p>
+        <p className="mt-1.5 text-[11px] text-neutral-400 leading-4">{tr("wi.nothingSaved")}</p>
       )}
     </div>
   );

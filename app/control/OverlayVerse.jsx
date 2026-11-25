@@ -1,9 +1,11 @@
 "use client";
 import { useMemo, useState } from "react";
 import { parseRef } from "@/lib/parseRef";
+import { useT } from "@/lib/i18n/client";
 
 // Quand une image est à l'écran : ajouter un verset par-dessus (par référence : jn 3 16), ou le retirer.
 export default function OverlayVerse({ bible, refOf, textOf, overlay, onPick, onClear, disabled }) {
+  const tr = useT();
   const [q, setQ] = useState("");
 
   const results = useMemo(() => {
@@ -22,15 +24,15 @@ export default function OverlayVerse({ bible, refOf, textOf, overlay, onPick, on
   return (
     <div className="mt-2 lg:mt-3 rounded-lg border border-neutral-700 bg-neutral-800/60 p-2 space-y-1.5">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium text-amber-300">Verset sur l'image</span>
+        <span className="text-xs font-medium text-amber-300">{tr("ov.title")}</span>
         {overlay && (
-          <button onClick={onClear} disabled={disabled} className="rounded-md bg-neutral-700 hover:bg-red-600 px-2 py-0.5 text-xs transition duration-100 active:scale-95 disabled:opacity-40">Retirer</button>
+          <button onClick={onClear} disabled={disabled} className="rounded-md bg-neutral-700 hover:bg-red-600 px-2 py-0.5 text-xs transition duration-100 active:scale-95 disabled:opacity-40">{tr("ov.remove")}</button>
         )}
       </div>
-      {overlay && <p className="text-xs text-green-400 truncate">● À l'écran : {overlay.ref}</p>}
+      {overlay && <p className="text-xs text-green-400 truncate">{tr("ov.onScreen", { ref: overlay.ref })}</p>}
       <input value={q} onChange={(e) => setQ(e.target.value)} disabled={disabled || !bible}
         onKeyDown={(e) => { if (e.key === "Enter" && results[0]) { e.preventDefault(); pick(results[0]); } e.stopPropagation(); }}
-        placeholder={bible ? "jn 3 16" : "Chargement de la Bible…"}
+        placeholder={bible ? "jn 3 16" : tr("ov.loadingBible")}
         className="w-full rounded-lg bg-neutral-900 border border-neutral-700 px-2.5 py-1.5 text-sm outline-none focus:ring-2 ring-amber-400 disabled:opacity-40" />
       {results.length > 0 && (
         <ul className="space-y-1">
@@ -45,7 +47,7 @@ export default function OverlayVerse({ bible, refOf, textOf, overlay, onPick, on
           ))}
         </ul>
       )}
-      {!overlay && !q.trim() && <p className="text-[11px] text-neutral-400 leading-4">Tape une référence, puis clique le verset : il s'affiche sur l'image.</p>}
+      {!overlay && !q.trim() && <p className="text-[11px] text-neutral-400 leading-4">{tr("ov.hint")}</p>}
     </div>
   );
 }

@@ -82,11 +82,11 @@ async function serper(q, page) {
 }
 
 // Images du web via Brave Search (https://brave.com/search/api, offre gratuite limitée)
-async function brave(q, page) {
+async function brave(q, page, lang = "fr") {
   const key = process.env.BRAVE_API_KEY;
   if (!key) return null;
   const u = new URL("https://api.search.brave.com/res/v1/images/search");
-  u.search = new URLSearchParams({ q, count: String(Math.min(100, page * 20)), country: "fr", search_lang: "fr", safesearch: "strict", spellcheck: "1" });
+  u.search = new URLSearchParams({ q, count: String(Math.min(100, page * 20)), country: lang === "en" ? "us" : "fr", search_lang: lang, safesearch: "strict", spellcheck: "1" });
   const r = await fetch(u, { headers: { "X-Subscription-Token": key, Accept: "application/json", "User-Agent": UA }, signal: AbortSignal.timeout(7000), cache: "no-store" });
   if (!r.ok) throw new Error(`Brave HTTP ${r.status}`);
   const j = await r.json();
@@ -118,7 +118,7 @@ async function pixabay(q, page) {
   const key = process.env.PIXABAY_API_KEY;
   if (!key) return null;
   const u = new URL("https://pixabay.com/api/");
-  u.search = new URLSearchParams({ key, q, image_type: "photo", per_page: "20", page: String(page), lang: "fr", safesearch: "true" });
+  u.search = new URLSearchParams({ key, q, image_type: "photo", per_page: "20", page: String(page), lang: lang, safesearch: "true" });
   const j = await getJson(u);
   return (j.hits || []).map((x) => ({
     id: "pb:" + x.id, thumb: https(x.webformatURL), url: https(x.largeImageURL) || https(x.webformatURL),
@@ -140,34 +140,36 @@ function merge(web, free) {
 export async function GET(req) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return fail("Connexion requise.", 401);
-
   const sp = new URL(req.url).searchParams;
+  const lang = sp.get("lang") === "en" ? "en" : "fr";
+  const L = (fr, en) => (lang === "en" ? en : fr);
+  if (!user) return fail(L("Connexion requise.", "Sign-in required."), 401);
+
   const q = (sp.get("q") || "").trim().slice(0, 100);
   const page = Math.min(5, Math.max(1, parseInt(sp.get("page") || "1", 10) || 1));
-  if (q.length < 2) return fail("Tape au moins 2 lettres.");
+  if (q.length < 2) return fail(L("Tape au moins 2 lettres.", "Type at least 2 letters."));
 
-  const key = `${q.toLowerCase()}|${page}`;
+  const key = `${q.toLowerCase()}|${page}|${lang}`;
   const hit = cache.get(key);
   if (hit && Date.now() - hit.t < TTL) return NextResponse.json(hit.v);
 
   const jobs = [
     { name: "Google Images", web: true, run: () => serper(q, page) },
-    { name: "Brave", web: true, run: () => brave(q, page) },
+    { name: "Brave", web: true, run: () => brave(q, page, lang) },
     { name: "Pexels", web: false, run: () => pexels(q, page) },
-    { name: "Pixabay", web: false, run: () => pixabay(q, page) },
+    { name: "Pixabay", web: false, run: () => pixabay(q, page, lang) },
     { name: "Wikimedia Commons", web: false, run: () => commons(q, page) },
     { name: "Openverse", web: false, run: () => openverse(q, page) },
   ];
   const settled = await Promise.allSettled(jobs.map((j) => j.run()));
   const used = [], web = [], free = [], notes = [];
-  if (!process.env.SERPER_API_KEY && !process.env.BRAVE_API_KEY) notes.push("Aucune clé SERPER_API_KEY / BRAVE_API_KEY reçue par le serveur : variable absente, mal orthographiée, ou pas de redéploiement après l'avoir ajoutée.");
+  if (!process.env.SERPER_API_KEY && !process.env.BRAVE_API_KEY) notes.push(L("Aucune clé SERPER_API_KEY / BRAVE_API_KEY reçue par le serveur : variable absente, mal orthographiée, ou pas de redéploiement après l'avoir ajoutée.", "No SERPER_API_KEY / BRAVE_API_KEY received by the server: variable missing, misspelled, or not redeployed after adding it."));
   settled.forEach((s, i) => {
-    if (s.status === "rejected") { console.warn("image-search:", jobs[i].name, s.reason?.message); if (jobs[i].web) notes.push(`${jobs[i].name} a échoué : ${s.reason?.message}`); }
-    if (s.status === "fulfilled" && jobs[i].web && s.value && !s.value.length) notes.push(`${jobs[i].name} répond mais ne renvoie aucune image.`);
+    if (s.status === "rejected") { console.warn("image-search:", jobs[i].name, s.reason?.message); if (jobs[i].web) notes.push(L(`${jobs[i].name} a échoué : ${s.reason?.message}`, `${jobs[i].name} failed: ${s.reason?.message}`)); }
+    if (s.status === "fulfilled" && jobs[i].web && s.value && !s.value.length) notes.push(L(`${jobs[i].name} répond mais ne renvoie aucune image.`, `${jobs[i].name} responds but returns no image.`));
     if (s.status === "fulfilled" && s.value) { used.push(jobs[i].name); (jobs[i].web ? web : free).push(s.value); }
   });
-  if (!used.length) return fail("La recherche d'images est indisponible pour le moment. Réessaie, ou colle le lien d'une image.", 502);
+  if (!used.length) return fail(L("La recherche d'images est indisponible pour le moment. Réessaie, ou colle le lien d'une image.", "Image search is unavailable right now. Try again, or paste an image link."), 502);
 
   const results = merge(web, free);
   const hasWeb = web.length > 0;

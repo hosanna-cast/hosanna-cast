@@ -1,9 +1,11 @@
 "use client";
 import { useState } from "react";
+import { useT } from "@/lib/i18n/client";
 
 // Texte rapide : toujours en haut de la colonne centrale (Bible, Notes, Chants).
 // Une ligne tapée = une ligne à l'écran. Le texte reste dans le champ après projection.
 export default function QuickText({ onProject, onAdd, addLabel, onAddProject, addProjectLabel, disabled }) {
+  const tr = useT();
   const [text, setText] = useState("");
   const [open, setOpen] = useState(false);
   const t = text.trim();
@@ -19,12 +21,12 @@ export default function QuickText({ onProject, onAdd, addLabel, onAddProject, ad
           if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && t) { e.preventDefault(); project(); }
           else if (e.key === "Escape") e.target.blur();
         }}
-        placeholder="Texte rapide : tape ici ce qui doit s'afficher (une ligne par ligne à l'écran)"
+        placeholder={tr("qt.placeholder")}
         className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-amber-400 resize-y" />
       {(open || text) && <div className="flex flex-wrap items-center gap-2 mt-1.5">
         <button disabled={!t || disabled} onClick={project}
           className="rounded-lg bg-amber-400 hover:bg-amber-300 text-black font-medium px-3 py-1.5 text-sm transition duration-100 active:scale-95 disabled:opacity-70 disabled:pointer-events-none">
-          Projeter (Ctrl+Entrée)
+          {tr("qt.project")}
         </button>
         {onAddProject && (
           <button disabled={!t || disabled} onClick={() => { onAddProject(t); setText(""); }}
@@ -39,7 +41,7 @@ export default function QuickText({ onProject, onAdd, addLabel, onAddProject, ad
           </button>
         )}
         {text && (
-          <button onClick={() => setText("")} className="ml-auto text-xs text-neutral-500 hover:text-white">Vider</button>
+          <button onClick={() => setText("")} className="ml-auto text-xs text-neutral-500 hover:text-white">{tr("qt.clear")}</button>
         )}
       </div>}
     </div>

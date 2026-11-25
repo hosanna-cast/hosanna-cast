@@ -1,9 +1,11 @@
 "use client";
 import { useEffect, useRef } from "react";
+import { useT } from "@/lib/i18n/client";
 
 // Le chapitre complet du verset projeté : le verset à l'écran est en vert, les versets cités dans la note en bleu.
 // L'orateur peut dire « reviens 3 versets avant » : un clic sur n'importe quel verset le projette.
 export default function ChapterView({ verses, title, label, chapter, chapterCount, live, cite, onPick, onChapter }) {
+  const tr = useT();
   const box = useRef(null);
 
   useEffect(() => {
@@ -35,7 +37,7 @@ export default function ChapterView({ verses, title, label, chapter, chapterCoun
             className="px-3 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-sm disabled:opacity-30 transition duration-100 active:scale-95">{chapter + 2} ›</button>
         </div>
       </div>
-      <p className="text-[11px] text-neutral-500 mb-2">Clic = projeter ce verset · Maj+clic = plusieurs versets</p>
+      <p className="text-[11px] text-neutral-500 mb-2">{tr("cv.hint")}</p>
       <ul ref={box} className="relative space-y-1 max-h-[calc(100vh-14rem)] overflow-y-auto pr-1 scroll-py-4">
         {verses.map((t, v) => {
           const isLive = live === v;

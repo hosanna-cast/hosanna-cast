@@ -8,10 +8,12 @@ import { fold } from "@/lib/textUtil";
 import { parseRef } from "@/lib/parseRef";
 import ChantPlaylists from "./ChantPlaylists";
 import Cutter, { linesFromSlides, slidesFromLines } from "./Cutter";
+import { intlLocale } from "@/lib/i18n";
+import { useT, useLocale } from "@/lib/i18n/client";
 
 const COPY = {
-  notes: { list: "Mes notes", search: "Chercher une note", empty: "Aucune note pour l'instant.", person: "Orateur (facultatif)", add: "Ajouter une note", paste: "Ou colle le texte de la prédication ici…" },
-  chants: { list: "Mes chants", search: "Chercher un chant", empty: "Aucun chant pour l'instant.", person: "Auteur (facultatif)", add: "Ajouter un chant", paste: "Ou colle les paroles ici. Laisse une ligne vide entre les couplets…" },
+  notes: ["list", "search", "empty", "person", "add", "paste"].map((k) => [k, `lib.notes.${k}`]),
+  chants: ["list", "search", "empty", "person", "add", "paste"].map((k) => [k, `lib.chants.${k}`]),
 };
 const Pencil = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3z" /><path d="M13.5 6.5l3 3" /></svg>
@@ -22,7 +24,9 @@ const Trash = () => (
 const field = "w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-amber-400";
 
 export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUpdate, onPick, selectedId, bible, refOf, textOf, isLiveVerse, liveSlide, pausedSlide, onSlide, onVerse, playlists, onKeyPhrase, onOpen, canAnalyze, stage = null, plOpenId, onPlOpenId }) {
-  const t = COPY[kind];
+  const tr = useT();
+  const locale = useLocale();
+  const t = Object.fromEntries(COPY[kind].map(([k, key]) => [k, tr(key)]));
   const [openId, setOpenId] = useState(null);
   const [adding, setAdding] = useState(false);
   const [q, setQ] = useState("");
@@ -61,15 +65,15 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
   }, [items, q]);
 
   const groups = useMemo(() => {
-    if (kind !== "notes") return [["", [...filtered].sort((a, b) => a.title.localeCompare(b.title, "fr"))]];
+    if (kind !== "notes") return [["", [...filtered].sort((a, b) => a.title.localeCompare(b.title, intlLocale(locale)))]];
     const m = new Map();
     for (const x of filtered) {
-      const k = x.session || "Sans session";
+      const k = x.session || tr("lib.noSession");
       if (!m.has(k)) m.set(k, []);
       m.get(k).push(x);
     }
     return [...m.entries()];
-  }, [filtered, kind]);
+  }, [filtered, kind, locale]);
 
   // la diapositive projetée reste visible dans la liste
   useEffect(() => {
@@ -78,7 +82,7 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
   }, [liveSlide]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const startAdd = () => {
-    setF({ title: "", person: "", session: kind === "notes" ? items[0]?.session || `Culte du ${new Date().toLocaleDateString("fr-FR")}` : "", text: "", manual: false, keys: [], fromFile: false });
+    setF({ title: "", person: "", session: kind === "notes" ? items[0]?.session || tr("lib.defaultSession", { date: new Date().toLocaleDateString(intlLocale(locale)) }) : "", text: "", manual: false, keys: [], fromFile: false });
     setCutLines(null);
     setError("");
     setAdding(true);
@@ -94,13 +98,13 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
       setF((cur) => ({ ...cur, text, keys, fromFile: kind === "notes", title: cur.title || file.name.replace(/\.[^.]+$/, "") }));
       setError("");
     } catch (err) {
-      setError(err.message || "Impossible de lire ce fichier.");
+      setError(err.message ? tr(err.message, err.vars) : tr("lib.readFail"));
     } finally { setBusy(false); }
   };
 
   const submit = () => {
     const text = f.text.trim();
-    if (!text) { setError("Ajoute un texte ou choisis un fichier."); return; }
+    if (!text) { setError(tr("lib.needText")); return; }
     const title = f.title.trim() || text.split("\n")[0].slice(0, 60);
     const id = onAdd({ title, person: f.person.trim(), session: kind === "notes" ? f.session.trim() : "", text, ...(kind === "notes" && f.keys?.length ? { keys: f.keys } : {}), ...(kind === "chants" ? { slides: splitSlides(text, f.manual ? Infinity : undefined) } : {}) });
     setAdding(false);
@@ -115,17 +119,17 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
   const analyze = async () => {
     if (!open) return;
     const id = open.id;
-    if ((open.text || "").trim().length < 40) { setAna({ status: "error", msg: "Cette note a trop peu de texte pour être analysée.", points: [], sel: [] }); return; }
+    if ((open.text || "").trim().length < 40) { setAna({ status: "error", msg: tr("lib.tooShort"), points: [], sel: [] }); return; }
     setAna({ status: "loading", points: [], sel: [] });
     try {
-      const r = await fetch("/api/analyze-note", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text: open.text }) });
+      const r = await fetch("/api/analyze-note", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text: open.text, lang: locale }) });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d.error || "L'analyse a échoué.");
+      if (!r.ok) throw new Error(d.error || tr("lib.analyzeFail"));
       const have = new Set((open.keys || []).map((k) => k.trim()));
       const points = d.points.filter((p) => !have.has(p) && !hasRef(p));   // un verset n'est pas une phrase clé
       setAna((cur) => (cur && openIdRef.current === id ? { status: "ready", points, sel: points.map((_, i) => i) } : cur));
     } catch (e) {
-      setAna((cur) => (cur && openIdRef.current === id ? { status: "error", msg: e.message || "L'analyse a échoué.", points: [], sel: [] } : cur));
+      setAna((cur) => (cur && openIdRef.current === id ? { status: "error", msg: e.message || tr("lib.analyzeFail"), points: [], sel: [] } : cur));
     }
   };
   const keepAnalysis = () => {
@@ -138,19 +142,19 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
 
   // crayon / poubelle dans la liste des notes
   const editItem = (x) => { setF({ title: x.title, person: x.person || "", session: x.session || "", text: x.text || "", manual: false, keys: [], fromFile: false }); setError(""); setOpenId(x.id); setEditing(true); };
-  const deleteItem = (x) => { if (window.confirm(`Supprimer « ${x.title} » ?`)) { onRemove(x.id); if (openId === x.id) setOpenId(null); } };
+  const deleteItem = (x) => { if (window.confirm(tr("lib.confirmDelete", { title: x.title }))) { onRemove(x.id); if (openId === x.id) setOpenId(null); } };
 
   /* ───── formulaire d'ajout ───── */
   if (adding && cutLines) {
     return (
       <div>
-        <div className="text-sm font-medium text-amber-400 mb-1">Choisir où couper</div>
-        <p className="text-xs text-neutral-500 mb-3">Clique entre deux lignes pour couper ou retirer une coupure. Chaque bloc sera une diapositive.</p>
+        <div className="text-sm font-medium text-amber-400 mb-1">{tr("cs.cutTitle")}</div>
+        <p className="text-xs text-neutral-500 mb-3">{tr("lib.cutHint")}</p>
         <Cutter lines={cutLines} onToggle={(i) => setCutLines((cur) => cur.map((l, k) => (k === i ? { ...l, cut: !l.cut } : l)))} />
         <div className="grid grid-cols-2 gap-2 pt-3">
-          <button onClick={() => setCutLines(null)} className="rounded-lg bg-neutral-800 hover:bg-neutral-700 py-2 text-sm transition duration-100 active:scale-95">Retour</button>
+          <button onClick={() => setCutLines(null)} className="rounded-lg bg-neutral-800 hover:bg-neutral-700 py-2 text-sm transition duration-100 active:scale-95">{tr("lib.back")}</button>
           <button onClick={() => { setF((cur) => ({ ...cur, text: slidesFromLines(cutLines).join("\n\n"), manual: true })); setCutLines(null); }}
-            className="rounded-lg bg-amber-400 text-black font-medium py-2 text-sm transition duration-100 active:scale-95">Valider</button>
+            className="rounded-lg bg-amber-400 text-black font-medium py-2 text-sm transition duration-100 active:scale-95">{tr("kp.validate")}</button>
         </div>
       </div>
     );
@@ -159,31 +163,31 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
     return (
       <div className="space-y-2">
         <div className="text-sm font-medium mb-1">{t.add}</div>
-        <input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} placeholder="Titre" className={field} />
+        <input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} placeholder={tr("cs.titlePh")} className={field} />
         <input value={f.person} onChange={(e) => setF({ ...f, person: e.target.value })} placeholder={t.person} className={field} />
         {kind === "notes" && (
           <>
-            <input list="sessions" value={f.session} onChange={(e) => setF({ ...f, session: e.target.value })} placeholder="Session (ex. Culte 9h)" className={field} />
+            <input list="sessions" value={f.session} onChange={(e) => setF({ ...f, session: e.target.value })} placeholder={tr("lib.sessionPh")} className={field} />
             <datalist id="sessions">{[...new Set(items.map((x) => x.session).filter(Boolean))].map((s) => <option key={s} value={s} />)}</datalist>
           </>
         )}
         <label className="block border border-dashed border-neutral-600 rounded-lg px-3 py-3 text-center text-sm text-neutral-400 hover:bg-neutral-700/40 cursor-pointer transition duration-100 active:scale-[0.98]">
-          {busy ? "Lecture du fichier…" : "Choisir un fichier .txt, .md ou .docx"}
+          {busy ? tr("lib.readingFile") : tr("lib.chooseFile")}
           <input type="file" accept=".txt,.md,.docx" onChange={onFile} className="hidden" />
         </label>
-        {kind === "notes" && f.fromFile && !f.keys?.length && f.text.trim() && <p className="text-xs text-amber-300">Aucun texte en gras trouvé dans ce fichier.{canAnalyze ? " Après l'ajout, la note sera analysée pour te proposer des points clés." : ""}</p>}
-        {kind === "notes" && f.keys?.length > 0 && <p className="text-xs text-sky-300">{f.keys.length} point{f.keys.length > 1 ? "s" : ""} clé{f.keys.length > 1 ? "s" : ""} repéré{f.keys.length > 1 ? "s" : ""} en gras : {f.keys.length > 1 ? "ils seront gardés" : "il sera gardé"} dans la note.</p>}
+        {kind === "notes" && f.fromFile && !f.keys?.length && f.text.trim() && <p className="text-xs text-amber-300">{tr("lib.noBold")}{canAnalyze ? tr("lib.noBoldAnalyze") : ""}</p>}
+        {kind === "notes" && f.keys?.length > 0 && <p className="text-xs text-sky-300">{tr(f.keys.length > 1 ? "lib.keysFound.many" : "lib.keysFound.one", { n: f.keys.length })}</p>}
         <textarea value={f.text} onChange={(e) => setF({ ...f, text: e.target.value })} rows={7} placeholder={t.paste} className={`${field} resize-y`} />
         {kind === "chants" && (
           <button disabled={!f.text.trim()} onClick={() => setCutLines(linesFromSlides(splitSlides(f.text, Infinity)))}
             className="w-full rounded-lg bg-neutral-800 hover:bg-neutral-700 text-amber-400 py-2 text-sm transition duration-100 active:scale-95 disabled:opacity-40 disabled:pointer-events-none">
-            ✂ Découper les paroles
+            {tr("lib.splitLyrics")}
           </button>
         )}
         {error && <p className="text-xs text-red-400">{error}</p>}
         <div className="grid grid-cols-2 gap-2 pt-1">
-          <button onClick={() => setAdding(false)} className="rounded-lg bg-neutral-800 hover:bg-neutral-700 py-2 text-sm transition duration-100 active:scale-95">Annuler</button>
-          <button onClick={submit} className="rounded-lg bg-amber-400 text-black font-medium py-2 text-sm transition duration-100 active:scale-95">Ajouter</button>
+          <button onClick={() => setAdding(false)} className="rounded-lg bg-neutral-800 hover:bg-neutral-700 py-2 text-sm transition duration-100 active:scale-95">{tr("common.cancel")}</button>
+          <button onClick={submit} className="rounded-lg bg-amber-400 text-black font-medium py-2 text-sm transition duration-100 active:scale-95">{tr("common.add")}</button>
         </div>
       </div>
     );
@@ -193,22 +197,22 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
   if (open && editing) {
     const save = () => {
       const text = f.text.trim();
-      if (!text && !(open.keys || []).length) { setError("Le texte ne peut pas être vide."); return; }
+      if (!text && !(open.keys || []).length) { setError(tr("lib.textEmpty")); return; }
       onUpdate(open.id, { title: f.title.trim() || text.split("\n")[0].slice(0, 60) || open.title, person: f.person.trim(), session: kind === "notes" ? f.session.trim() : "", text });
       setEditing(false);
     };
     return (
       <div className="space-y-2">
-        <div className="text-sm font-medium mb-1">Modifier</div>
-        <input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} placeholder="Titre" className={field} />
+        <div className="text-sm font-medium mb-1">{tr("lib.editTitle")}</div>
+        <input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} placeholder={tr("cs.titlePh")} className={field} />
         <input value={f.person} onChange={(e) => setF({ ...f, person: e.target.value })} placeholder={t.person} className={field} />
-        {kind === "notes" && <input value={f.session} onChange={(e) => setF({ ...f, session: e.target.value })} placeholder="Session" className={field} />}
+        {kind === "notes" && <input value={f.session} onChange={(e) => setF({ ...f, session: e.target.value })} placeholder={tr("lib.sessionShort")} className={field} />}
         <textarea value={f.text} onChange={(e) => setF({ ...f, text: e.target.value })} rows={14} className={`${field} resize-y leading-relaxed`} />
-        <p className="text-[11px] text-neutral-500">Une ligne vide (ou une ligne <span className="text-neutral-300">---</span>) = nouvelle diapositive.</p>
+        <p className="text-[11px] text-neutral-500">{tr("lib.emptyLineHint", { dashes: "\u0001" }).split("\u0001").flatMap((p, i) => i ? [<span key={i} className="text-neutral-300">---</span>, p] : [p])}</p>
         {error && <p className="text-xs text-red-400">{error}</p>}
         <div className="grid grid-cols-2 gap-2 pt-1">
-          <button onClick={() => { setEditing(false); setError(""); }} className="rounded-lg bg-neutral-800 hover:bg-neutral-700 py-2 text-sm transition duration-100 active:scale-95">Annuler</button>
-          <button onClick={save} className="rounded-lg bg-amber-400 text-black font-medium py-2 text-sm transition duration-100 active:scale-95">Enregistrer</button>
+          <button onClick={() => { setEditing(false); setError(""); }} className="rounded-lg bg-neutral-800 hover:bg-neutral-700 py-2 text-sm transition duration-100 active:scale-95">{tr("common.cancel")}</button>
+          <button onClick={save} className="rounded-lg bg-amber-400 text-black font-medium py-2 text-sm transition duration-100 active:scale-95">{tr("common.save")}</button>
         </div>
       </div>
     );
@@ -222,23 +226,23 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
     const view = (
       <div>
         <div className="flex items-center justify-between mb-2 text-sm">
-          <button onClick={() => { setOpenId(null); setVq(""); }} className="text-amber-400 hover:underline">{big ? "✕ Fermer la note" : `‹ ${t.list}`}</button>
+          <button onClick={() => { setOpenId(null); setVq(""); }} className="text-amber-400 hover:underline">{big ? tr("lib.closeNote") : `‹ ${t.list}`}</button>
           <span className="flex gap-3">
-            <button onClick={startEdit} className="text-xs text-neutral-400 hover:text-amber-400">Modifier</button>
-          <button onClick={() => { if (window.confirm(`Supprimer « ${open.title} » ?`)) { onRemove(open.id); setOpenId(null); } }} className="text-xs text-neutral-500 hover:text-red-400">Supprimer</button>
+            <button onClick={startEdit} className="text-xs text-neutral-400 hover:text-amber-400">{tr("common.edit")}</button>
+          <button onClick={() => { if (window.confirm(tr("lib.confirmDelete", { title: open.title }))) { onRemove(open.id); setOpenId(null); } }} className="text-xs text-neutral-500 hover:text-red-400">{tr("common.delete")}</button>
           </span>
         </div>
         <div className="font-medium leading-snug">{open.title}</div>
         <div className="text-xs text-neutral-500 mb-3">
           {[open.person, open.session].filter(Boolean).join(" · ") || "\u00a0"}
-          {" · "}{isChant ? `${slides.length} diapositive${slides.length > 1 ? "s" : ""}` : `${(open.keys || []).length} phrase${(open.keys || []).length > 1 ? "s" : ""} clé${(open.keys || []).length > 1 ? "s" : ""}`}
+          {" · "}{isChant ? tr(slides.length > 1 ? "cb.slides.many" : "cb.slides.one", { n: slides.length }) : tr((open.keys || []).length > 1 ? "lib.keyPhrases.many" : "lib.keyPhrases.one", { n: (open.keys || []).length })}
         </div>
 
         {!isChant && (
         <div className="mb-3">
-          <div className="text-xs text-neutral-500 mb-1.5">Versets de la note</div>
+          <div className="text-xs text-neutral-500 mb-1.5">{tr("lib.noteVerses")}</div>
           {!bible ? (
-            !isChant && <p className="text-xs text-neutral-500">Chargement de la Bible…</p>
+            !isChant && <p className="text-xs text-neutral-500">{tr("ov.loadingBible")}</p>
           ) : verses.length ? (
             <div className="flex flex-wrap gap-1.5">
               {verses.map((r, i) => (
@@ -249,7 +253,7 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
               ))}
             </div>
           ) : !isChant ? (
-            <p className="text-xs text-neutral-500">Aucun verset repéré dans cette note.</p>
+            <p className="text-xs text-neutral-500">{tr("lib.noVerse")}</p>
           ) : null}
         </div>
         )}
@@ -260,14 +264,14 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
           return (
             <div className="mb-3">
               <div className="flex items-center justify-between mb-1.5">
-                <div className="text-xs text-neutral-500">Phrases clés de la note{keys.length ? ` · ${keys.length}` : ""}</div>
+                <div className="text-xs text-neutral-500">{tr("lib.noteKeys")}{keys.length ? ` · ${keys.length}` : ""}</div>
                 {canAnalyze && verseKeys > 0 && (
                   <button onClick={() => onUpdate(open.id, { keys: keys.filter((x) => !hasRef(x)) })}
-                    className="text-[11px] text-sky-300 hover:underline">Retirer les versets ({verseKeys})</button>
+                    className="text-[11px] text-sky-300 hover:underline">{tr("lib.removeVerses", { n: verseKeys })}</button>
                 )}
               </div>
               {!keys.length ? (
-                <p className="text-xs text-neutral-500">Aucune phrase clé. Elles viennent du texte en gras du fichier importé, ou de « Analyser la note ».</p>
+                <p className="text-xs text-neutral-500">{tr("lib.noKeys")}</p>
               ) : (
                 <ul className={big ? "grid gap-1.5 2xl:grid-cols-2" : "space-y-1"}>
                   {keys.map((s, k) => {
@@ -277,7 +281,7 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
                         className={`flex items-start gap-2 px-2.5 ${big ? "py-2.5 text-base" : "py-2 text-sm"} rounded-lg cursor-pointer select-none leading-snug border transition duration-100 active:scale-[0.98] ${live ? "bg-green-600 border-green-600 text-white" : "border-amber-400/30 bg-amber-400/5 text-neutral-200 hover:bg-amber-400/10"}`}>
                         <span className="flex-1 whitespace-pre-line">{s}</span>
                         {canAnalyze && (
-                          <button aria-label="Retirer cette phrase" title="Retirer"
+                          <button aria-label={tr("lib.removePhrase")} title={tr("lib.remove")}
                             onClick={(e) => { e.stopPropagation(); onUpdate(open.id, { keys: keys.filter((_, j) => j !== k) }); }}
                             className={`px-1 text-base leading-none ${live ? "text-green-100 hover:text-white" : "text-neutral-500 hover:text-red-400"}`}>×</button>
                         )}
@@ -293,24 +297,24 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
         {kind === "notes" && canAnalyze && (
           <div className="mb-3">
             {!ana && !(open.text || "").trim() ? (
-              <p className="text-xs text-neutral-500">Cette note ne contient pas de texte à analyser.</p>
+              <p className="text-xs text-neutral-500">{tr("lib.noTextToAnalyze")}</p>
             ) : !ana ? (
               <button onClick={analyze}
                 className="w-full rounded-lg bg-neutral-800 hover:bg-neutral-700 text-sky-300 py-2 text-sm transition duration-100 active:scale-95">
-                Analyser la note (points clés)
+                {tr("lib.analyze")}
               </button>
             ) : ana.status === "loading" ? (
-              <p className="text-xs text-neutral-400">Analyse en cours…</p>
+              <p className="text-xs text-neutral-400">{tr("lib.analyzing")}</p>
             ) : ana.status === "error" ? (
               <div className="text-xs">
                 <p className="text-red-400 mb-1.5">{ana.msg}</p>
-                <button onClick={analyze} className="text-sky-300 hover:underline mr-3">Réessayer</button>
-                <button onClick={() => setAna(null)} className="text-neutral-500 hover:text-white">Fermer</button>
+                <button onClick={analyze} className="text-sky-300 hover:underline mr-3">{tr("lib.retry")}</button>
+                <button onClick={() => setAna(null)} className="text-neutral-500 hover:text-white">{tr("common.close")}</button>
               </div>
             ) : (
               <div className="rounded-lg border border-sky-400/30 bg-sky-400/5 p-2">
-                <div className="text-xs text-neutral-400 mb-1.5">Points clés proposés : coche ceux à garder</div>
-                {!ana.points.length ? <p className="text-xs text-neutral-500">Tout est déjà gardé dans la note.</p> : (
+                <div className="text-xs text-neutral-400 mb-1.5">{tr("lib.proposed")}</div>
+                {!ana.points.length ? <p className="text-xs text-neutral-500">{tr("lib.allKept")}</p> : (
                   <ul className="space-y-1">
                     {ana.points.map((pt, i) => (
                       <li key={i}>
@@ -326,9 +330,9 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
                 <div className="flex items-center gap-2 mt-2">
                   <button disabled={!ana.sel.length} onClick={keepAnalysis}
                     className="px-3 py-1.5 rounded-lg text-sm bg-sky-400 hover:bg-sky-300 text-black font-medium transition duration-100 active:scale-95 disabled:opacity-40 disabled:pointer-events-none">
-                    Garder la sélection ({ana.sel.length})
+                    {tr("lib.keepSelection", { n: ana.sel.length })}
                   </button>
-                  <button onClick={() => setAna(null)} className="text-xs text-neutral-500 hover:text-white">Fermer</button>
+                  <button onClick={() => setAna(null)} className="text-xs text-neutral-500 hover:text-white">{tr("common.close")}</button>
                 </div>
               </div>
             )}
@@ -337,11 +341,11 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
 
         {kind === "notes" && (
           <button onClick={() => setShowText((v) => !v)} className="mb-2 text-xs text-neutral-400 hover:text-amber-400">
-            {showText ? "▾ Masquer le texte complet" : "▸ Voir tout le texte"}
+            {showText ? tr("lib.hideText") : tr("lib.showText")}
           </button>
         )}
         {(isChant || showText) && (<>
-        <div className="text-xs text-neutral-500 mb-1.5">{kind === "notes" ? "Texte de la note" : "Couplets et refrains"}</div>
+        <div className="text-xs text-neutral-500 mb-1.5">{kind === "notes" ? tr("lib.noteText") : tr("lib.versesChoruses")}</div>
         <ul className="space-y-1">
           {slides.map((s, i) => {
             const live = liveSlide && liveSlide.id === open.id && liveSlide.i === i;
@@ -351,10 +355,10 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
                 <b className={`font-medium min-w-4 ${live ? "text-green-100" : "text-neutral-500"}`}>{i + 1}</b>
                 <span className={isChant ? "whitespace-pre-line text-center flex-1 font-medium" : "line-clamp-2 whitespace-pre-line flex-1"}>{s}</span>
                 {kind === "notes" && canAnalyze && (
-                  <button title="Garder ce passage comme point clé"
+                  <button title={tr("lib.keepAsKey")}
                     onClick={(e) => { e.stopPropagation(); if (!(open.keys || []).includes(s)) onUpdate(open.id, { keys: [...(open.keys || []), s] }); }}
                     className={`shrink-0 self-start text-[11px] px-1.5 py-0.5 rounded border ${live ? "border-green-200 text-green-100" : "border-sky-400/50 text-sky-300 hover:bg-sky-400/10"}`}>
-                    {(open.keys || []).includes(s) ? "✓ clé" : "+ clé"}
+                    {(open.keys || []).includes(s) ? tr("lib.keyDone") : tr("lib.keyAdd")}
                   </button>
                 )}
               </li>
@@ -383,9 +387,9 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
       <button onClick={startAdd}
         className="w-full mb-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-amber-400 py-2 text-sm font-medium transition duration-100 active:scale-95">+ {t.add}</button>
       {!ready ? null : !items.length ? (
-        <p className="text-sm text-neutral-500 mt-3">{t.empty} Utilise le bouton ci-dessus pour en ajouter.</p>
+        <p className="text-sm text-neutral-500 mt-3">{t.empty} {tr("lib.useButton")}</p>
       ) : !filtered.length ? (
-        <p className="text-sm text-neutral-500 mt-3">Aucun résultat.</p>
+        <p className="text-sm text-neutral-500 mt-3">{tr("pl.noResult")}</p>
       ) : (
         groups.map(([g, list]) => (
           <div key={g || "all"}>
@@ -397,9 +401,9 @@ export default function LibraryPanel({ kind, items, ready, onAdd, onRemove, onUp
                   <span className="block text-sm font-medium truncate">{x.title}</span>
                   {x.person && <span className="block text-xs truncate text-neutral-500">{x.person}</span>}
                 </button>
-                <button aria-label="Modifier la note" title="Modifier" onClick={() => editItem(x)}
+                <button aria-label={tr("lib.editNote")} title={tr("common.edit")} onClick={() => editItem(x)}
                   className="px-2 rounded-lg bg-neutral-800 text-neutral-400 hover:text-white hover:bg-neutral-700 transition duration-100 active:scale-90"><Pencil /></button>
-                <button aria-label="Supprimer la note" title="Supprimer" onClick={() => deleteItem(x)}
+                <button aria-label={tr("lib.deleteNote")} title={tr("common.delete")} onClick={() => deleteItem(x)}
                   className="px-2 rounded-lg bg-neutral-800 text-neutral-400 hover:text-red-400 hover:bg-neutral-700 transition duration-100 active:scale-90"><Trash /></button>
               </div>
             ) : (
